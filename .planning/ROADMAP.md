@@ -30,7 +30,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. Running `cellar launch cossacks` with a valid game path creates an isolated WINEPREFIX for Cossacks automatically and applies the bundled recipe (registry edits, DLL overrides, env vars, launch args)
   4. The game process launches with Wine and its stdout/stderr is written to a per-launch log file
   5. After launch exits, Cellar asks "Did the game reach the menu? (y/n)" and records the response
-**Plans**: TBD
+**Plans:** 4 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Swift package scaffold, models, dependency checker (SETUP-01, SETUP-02, SETUP-05)
+- [ ] 01-02-PLAN.md — Guided install UX and StatusCommand wiring (SETUP-03, SETUP-04)
+- [ ] 01-03-PLAN.md — Bottle manager, recipe engine, Cossacks recipe (BOTTLE-01, RECIPE-01, RECIPE-02)
+- [ ] 01-04-PLAN.md — Add/Launch/Log commands, validation prompt, end-to-end pipeline (LAUNCH-01, LAUNCH-02, LAUNCH-03)
 
 ### Phase 2: AI Intelligence
 **Goal**: The launch pipeline uses AI to interpret crash logs in plain English and to generate recipes for games that have no bundled recipe
@@ -80,7 +86,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Cossacks Launches | 0/? | Not started | - |
+| 1. Cossacks Launches | 0/4 | Planning complete | - |
 | 2. AI Intelligence | 0/? | Not started | - |
 | 3. Repair Loop | 0/? | Not started | - |
 | 4. Multi-Game Management | 0/? | Not started | - |
