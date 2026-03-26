@@ -98,32 +98,32 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SETUP-01 | — | Pending |
-| SETUP-02 | — | Pending |
-| SETUP-03 | — | Pending |
-| SETUP-04 | — | Pending |
-| SETUP-05 | — | Pending |
-| GAME-01 | — | Pending |
-| GAME-02 | — | Pending |
-| BOTTLE-01 | — | Pending |
-| BOTTLE-02 | — | Pending |
-| BOTTLE-03 | — | Pending |
-| RECIPE-01 | — | Pending |
-| RECIPE-02 | — | Pending |
-| RECIPE-03 | — | Pending |
-| RECIPE-04 | — | Pending |
-| LAUNCH-01 | — | Pending |
-| LAUNCH-02 | — | Pending |
-| LAUNCH-03 | — | Pending |
-| LAUNCH-04 | — | Pending |
-| COMM-01 | — | Pending |
-| CLI-01 | — | Pending |
+| SETUP-01 | Phase 1 | Pending |
+| SETUP-02 | Phase 1 | Pending |
+| SETUP-03 | Phase 1 | Pending |
+| SETUP-04 | Phase 1 | Pending |
+| SETUP-05 | Phase 1 | Pending |
+| BOTTLE-01 | Phase 1 | Pending |
+| RECIPE-01 | Phase 1 | Pending |
+| RECIPE-02 | Phase 1 | Pending |
+| LAUNCH-01 | Phase 1 | Pending |
+| LAUNCH-02 | Phase 1 | Pending |
+| LAUNCH-03 | Phase 1 | Pending |
+| RECIPE-03 | Phase 2 | Pending |
+| LAUNCH-04 | Phase 2 | Pending |
+| RECIPE-04 | Phase 3 | Pending |
+| GAME-01 | Phase 4 | Pending |
+| GAME-02 | Phase 4 | Pending |
+| BOTTLE-02 | Phase 4 | Pending |
+| BOTTLE-03 | Phase 4 | Pending |
+| CLI-01 | Phase 4 | Pending |
+| COMM-01 | Phase 5 | Pending |
 
 **Coverage:**
 - v1 requirements: 20 total
-- Mapped to phases: 0
-- Unmapped: 20 ⚠️
+- Mapped to phases: 20
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 after initial definition*
+*Last updated: 2026-03-25 after roadmap revision to vertical slices*
