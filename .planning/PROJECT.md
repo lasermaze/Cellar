@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An open-source macOS app that turns old Windows game files into working, repeatable, one-click launchers. Cellar sits above Wine as a recipe and repair layer — it manages per-game Wine bottles, applies known or AI-generated configuration recipes, and helps users get old PC games running on Apple silicon Macs without needing to understand Wine internals.
+An open-source macOS CLI+TUI tool that turns old Windows game files into working, repeatable launchers. Cellar sits above Wine as a recipe and repair layer — it manages per-game Wine bottles, applies known or AI-generated configuration recipes, and helps users get old PC games running on Apple silicon Macs without needing to understand Wine internals.
 
 ## Core Value
 
@@ -19,12 +19,12 @@ Any user can go from "I have these old game files" to "the game launches and wor
 - [ ] Import game files and identify the game
 - [ ] Create isolated per-game Wine bottles
 - [ ] Apply configuration recipes (known or AI-generated)
-- [ ] Launch games with one click
-- [ ] Detect and guide installation of dependencies (Homebrew, Wine)
+- [ ] Launch games from terminal (`cellar launch <game>`)
+- [ ] Detect and guide installation of dependencies (Homebrew, Wine via Gcenx tap)
 - [ ] AI-powered log interpretation and recipe generation (API-first)
 - [ ] User-confirmed launch validation ("Did the game reach the menu?")
 - [ ] Save working recipes for reuse and community sharing
-- [ ] Native SwiftUI Mac interface
+- [ ] CLI commands + interactive TUI (lazygit/btop style)
 
 ### Out of Scope
 
@@ -54,8 +54,9 @@ Any user can go from "I have these old game files" to "the game launches and wor
 
 ## Constraints
 
-- **Tech stack**: Native macOS — Swift/SwiftUI for the launcher UI
-- **Wine distribution**: Homebrew — Cellar guides users through installing Homebrew and Wine rather than bundling or managing its own Wine builds
+- **Tech stack**: Swift 6 CLI+TUI — no GUI, terminal-based interface
+- **Wine distribution**: Gcenx Homebrew tap (`gcenx/wine`) — official Homebrew wine-stable is deprecated
+- **Wine engine**: wined3d → OpenGL for DX8/DX9 games. GPTK/D3DMetal optional for DX11+ (detect if installed, cannot redistribute)
 - **AI inference**: API-first (Claude/OpenAI) — simpler to build, requires internet for AI features
 - **Launch validation**: User-confirmed — ask the user if the game reached the menu, no automated screenshot analysis in v1
 - **Recipe storage**: Local + Git repo — bundled recipes, community contributes via PRs
@@ -70,9 +71,13 @@ Any user can go from "I have these old game files" to "the game launches and wor
 | Homebrew for Wine | Avoids bundling complexity, leverages existing package management | — Pending |
 | API-first AI | Simpler to build than local inference, good enough for MVP | — Pending |
 | User-confirmed validation | Avoids vision model complexity in v1, honest about what we can detect | — Pending |
-| Cossacks: European Wars as flagship | 2001 RTS, DirectX-heavy, known Wine compatibility challenges, dedicated audience | — Pending |
+| Cossacks: European Wars as flagship | 2001 RTS, DirectDraw/DX8, dedicated audience | — Pending |
 | Recipes in Git repo | Community PRs, version-controlled, works offline with bundled set | — Pending |
 | GPL-3.0 license | Aligns with Whisky/Heroic ecosystem, encourages contribution | — Pending |
+| CLI+TUI instead of SwiftUI | Dramatically simpler, faster to build, no Xcode project needed | — Pending |
+| Wine via Gcenx tap (not bundled) | Official wine-stable deprecated. Gcenx is the WineHQ macOS maintainer | — Pending |
+| wined3d/OpenGL for DX8/DX9 | D3DMetal doesn't cover old DirectX. Only viable path for target wedge | — Pending |
+| GPTK detect-only (not bundled) | Apple EULA prohibits redistribution of D3DMetal. Detect if installed. | — Pending |
 
 ---
-*Last updated: 2026-03-25 after initialization*
+*Last updated: 2026-03-25 after research*
