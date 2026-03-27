@@ -6,9 +6,9 @@
 <domain>
 ## Phase Boundary
 
-Cossacks: European Wars (GOG original edition) launches end-to-end through the full pipeline on a fresh Mac. From `cellar` on a bare system to game running with logs captured and validation prompt shown. No manual Wine configuration required.
+Cossacks: European Wars (GOG original edition) launches end-to-end through a **self-healing agentic pipeline** on a fresh Mac. The user launches a single command and the system handles everything: dependency installation, bottle creation, winetricks deps, installer execution, executable discovery, recipe application, error diagnosis, and automatic retry with variant configs. No manual Wine configuration required.
 
-Requirements: SETUP-01–05, BOTTLE-01, RECIPE-01–02, LAUNCH-01–03
+Requirements: SETUP-01–05, BOTTLE-01, RECIPE-01–02, LAUNCH-01–03, AGENT-01–12
 
 </domain>
 
@@ -31,19 +31,28 @@ Requirements: SETUP-01–05, BOTTLE-01, RECIPE-01–02, LAUNCH-01–03
 
 ### Recipe Contents
 - Target: GOG original edition of Cossacks: European Wars specifically (one version only)
-- Recipe specifies the exact EXE to launch (no scanning/asking)
+- Recipe specifies the expected EXE name; actual path discovered by BottleScanner after install
 - Full experience recipe: launch config + display settings (resolution, windowed mode) + audio + performance tweaks + known crash workarounds
 - Recipe lives in `recipes/cossacks-european-wars.json` in the project repo root
 - Wine settings in recipe use Wine-native formats: registry edits as .reg file content, DLL overrides as Wine env var format
 - Full transparency when applying: show each registry key being set, like a diff
 - Cellar runs the GOG installer (setup.exe) inside the Wine bottle — user points `cellar add` at the installer, not pre-installed files
+- Recipe includes `setup_deps` (winetricks verbs like dotnet48), `install_dir` (expected install path for verification), and `retry_variants` (alternative configs to try on failure)
+
+### Agentic Behavior
+- `cellar add` is a multi-step pipeline: create bottle → install winetricks deps → run installer → scan for executables → validate installation
+- `cellar launch` is a self-healing loop: apply recipe → launch → parse errors → diagnose → apply fix → retry (up to 3 attempts)
+- On failure, Cellar reports what was tried and the best diagnosis — user gets actionable info, not raw Wine output
+- Each retry attempt is labeled ("Trying variant 2/3...") for transparency
+- WineErrorParser diagnoses common failures from Wine stderr patterns without AI
 
 ### Validation + Logging
 - Wine stdout/stderr streams to terminal in real-time while game runs
 - Also captured to log file simultaneously: `~/.cellar/logs/{game}/{timestamp}.log`
-- Immediate validation prompt when Wine process exits: "Did the game reach the menu? [y/n]"
-- Quick-exit detection: if Wine exits in < 2 seconds, flag as likely crash, skip validation prompt, suggest checking logs
-- Record just success/failure flag in game metadata (no detailed failure description in v1)
+- WineProcess returns structured WineResult (exit code, captured stderr, elapsed time, log path) for error analysis
+- Quick-exit detection triggers automatic error diagnosis and retry, not just "likely a crash"
+- After exhausting retries OR on success: validation prompt "Did the game reach the menu? [y/n]"
+- Record success/failure flag + attempt count + diagnosis in game metadata
 - `cellar log` design: Claude's discretion
 - After game exits: ask user "Shut down Wine services? [y/n]"
 - Ctrl+C during game: kill Wine process but still ask validation question

@@ -63,7 +63,7 @@ None — discussion stayed within phase scope
 | SETUP-01 | Cellar detects whether Homebrew is installed (ARM and Intel paths) | Check `/opt/homebrew/bin/brew` (ARM) and `/usr/local/bin/brew` (Intel); use `FileManager.fileExists` or `Process` to check |
 | SETUP-02 | Cellar detects whether Wine is installed via Gcenx Homebrew tap | Check for `wine` or `wine64` binary in Homebrew bin path; verify Gcenx tap via `brew tap list` or formula name |
 | SETUP-03 | Cellar guides user through installing Homebrew if missing | Run official Homebrew install script via `Process`; stream output in real-time via `Pipe` + `readabilityHandler`; let Homebrew handle CLT |
-| SETUP-04 | Cellar guides user through installing Wine (Gcenx tap) if missing | `brew tap gcenx/wine` then `brew install --no-quarantine gcenx/wine/wine-crossover`; `--no-quarantine` required to prevent Gatekeeper damage error |
+| SETUP-04 | Cellar guides user through installing Wine (Gcenx tap) if missing | `brew tap gcenx/wine` then `brew install gcenx/wine/wine-crossover`; `--no-quarantine` removed from Homebrew — use `xattr` fallback if Gatekeeper flags |
 | SETUP-05 | Cellar detects whether GPTK is installed on the system | Check for GPTK presence at known install paths; detect-only, no installation |
 | BOTTLE-01 | Cellar creates an isolated WINEPREFIX per game automatically on first launch | Path: `~/.cellar/bottles/{game-id}/`; create with `wineboot --init`; set `WINEPREFIX` env var on every Wine invocation |
 | RECIPE-01 | Cellar ships with a bundled recipe for Cossacks: European Wars | JSON file at `recipes/cossacks-european-wars.json` in repo; bundled with binary at install time |
@@ -306,13 +306,17 @@ sigintSource.resume()
 
 ## Common Pitfalls
 
-### Pitfall 1: Gcenx wine-crossover Requires `--no-quarantine`
-**What goes wrong:** `brew install gcenx/wine/wine-crossover` succeeds but macOS Gatekeeper marks the bundle as "damaged" and refuses to run it. Users see: "wine-crossover is damaged and can't be opened."
-**Why it happens:** Homebrew adds the quarantine extended attribute to downloaded casks by default. Wine bundles are not notarized in the standard way, so Gatekeeper rejects them.
-**How to avoid:** Always install with `--no-quarantine` flag:
+### Pitfall 1: ~~Gcenx wine-crossover Requires `--no-quarantine`~~ (OUTDATED)
+**UPDATE (2026-03-27):** Homebrew has REMOVED the `--no-quarantine` flag entirely. It is no longer a valid option for `brew install`. The current install command is simply:
 ```bash
-brew install --no-quarantine gcenx/wine/wine-crossover
+brew tap gcenx/wine
+brew install gcenx/wine/wine-crossover
 ```
+If Gatekeeper still flags the binary as damaged after install, the fallback is:
+```bash
+xattr -rd com.apple.quarantine "$(brew --prefix)/Caskroom/wine-crossover"
+```
+**Original issue:** macOS Gatekeeper could mark the Wine bundle as "damaged" and refuse to run it.
 **Warning signs:** Gatekeeper damage error on first `wine` invocation after install.
 
 ### Pitfall 2: GOG Installer Argument Escaping
@@ -568,6 +572,116 @@ func runLaunchAndValidate(process: Process, gameId: String) throws {
    - What we know: GPTK is Apple's Game Porting Toolkit; it's detect-only for Phase 1; it's not redistributable
    - What's unclear: Where GPTK is installed on end-user machines (Apple provides GPTK via Xcode Auxiliary Tools or direct download — install paths vary)
    - Recommendation: SETUP-05 is detect-only. Research exact path in next phase when it becomes relevant. For Phase 1, a best-effort check at `/usr/local/bin/gameportingtoolkit` or `/opt/homebrew/bin/gameportingtoolkit` is sufficient.
+
+---
+
+## Implementation Discoveries (2026-03-27)
+
+Discovered during human verification testing of the initial linear pipeline. These findings fundamentally change the Phase 1 architecture from a sequential script to an agentic system.
+
+### Discovery 1: GOG Galaxy Installer Requires .NET Framework
+The GOG Galaxy installer for Cossacks requires .NET Framework (dotnet48) to be present in the Wine bottle. Without it, the installer fails silently or with cryptic Wine errors. This means `cellar add` cannot simply run `wine setup.exe` — it must first install dependencies into the bottle.
+
+**Solution:** Use `winetricks` to install dotnet48 before running the GOG installer. Winetricks itself must be installed via Homebrew (`brew install winetricks`). This adds winetricks as a required dependency alongside Wine.
+
+**Impact:** The `add` command becomes a multi-step pipeline: create bottle → install winetricks deps → run installer → verify installation.
+
+### Discovery 2: Executable Path Must Be Discovered, Not Hardcoded
+The original recipe hardcoded `dmln.exe` as the game executable and assumed a fixed GOG install path (`drive_c/GOG Games/Cossacks - European Wars/`). In practice, the install path can vary, and the executable needs to be discovered after installation.
+
+**Solution:** BottleScanner — after installer finishes, scan `drive_c/` for installed .exe files, filtering out Wine system directories (`windows/`, `programdata/`, `users/`) and known non-game executables (`unins000.exe`, `vcredist*.exe`, etc.). Present discovered executables or auto-select if the recipe specifies a known executable name.
+
+### Discovery 3: Wine Errors Are Parseable
+Wine stderr contains structured error patterns that can be matched without AI:
+- `err:module:import_dll` — missing DLL
+- `err:virtual:virtual_setup_exception` — memory/threading crash
+- `X11 driver` / `display` errors — graphics configuration issues
+- `fixme:` prefixed lines — non-critical warnings (can be filtered)
+
+**Solution:** WineErrorParser — regex-based pattern matching on captured stderr. Returns structured error diagnoses (missing DLL name, crash type, etc.) that feed into the retry loop.
+
+### Discovery 4: Linear Pipeline Cannot Handle Real-World Failures
+The original architecture was: apply recipe → launch → validation prompt. If anything failed, the user got raw Wine output and "likely a crash." No diagnosis, no recovery, no retry.
+
+**Solution:** Agentic launch loop architecture:
+```
+launch → monitor → parse errors → diagnose → apply fix → retry
+                                                           ↓
+                                              (max retries) → report diagnosis
+```
+
+### Discovery 5: Recipe Schema Needs Extension
+The original recipe schema only covered launch-time configuration. Real-world usage requires:
+- `setup_deps`: winetricks verbs to install before the GOG installer (e.g., `["dotnet48"]`)
+- `install_dir`: expected install directory inside bottle (for verification)
+- `retry_variants`: alternative environment configurations to try on failure (different DLL overrides, env var combinations)
+
+### Agentic Architecture Patterns
+
+#### Pattern: WineErrorParser
+```swift
+struct WineError {
+    let category: ErrorCategory  // .missingDLL, .crash, .graphics, .configuration
+    let detail: String           // "mscoree.dll not found"
+    let suggestedFix: Fix?       // .installWinetricks("dotnet48"), .setEnvVar("X", "Y")
+}
+
+enum Fix {
+    case installWinetricks(String)
+    case setEnvVar(String, String)
+    case setDLLOverride(String, String)
+    case setRegistryKey(String, String, String)
+}
+```
+
+#### Pattern: BottleScanner
+```swift
+func scanForExecutables(bottlePath: URL) -> [URL] {
+    // Recursively scan drive_c/
+    // Skip: windows/, programdata/, users/
+    // Skip: unins000.exe, vcredist*.exe, setup*.exe, msi*.exe
+    // Return remaining .exe files sorted by path depth (shallowest first)
+}
+```
+
+#### Pattern: Retry Loop
+```swift
+func launchWithRetry(game: GameEntry, recipe: Recipe, maxRetries: Int = 3) {
+    var attempt = 0
+    var currentEnv = recipe.baseEnvironment
+
+    while attempt < maxRetries {
+        let result = launch(game: game, env: currentEnv)
+
+        if result.exitCode == 0 && result.elapsed > 2.0 {
+            // Likely success — ask validation
+            break
+        }
+
+        let errors = WineErrorParser.parse(result.stderr)
+        guard let fix = errors.first?.suggestedFix else {
+            // No known fix — report and stop
+            break
+        }
+
+        print("Attempt \(attempt + 1) failed: \(errors.first!.detail)")
+        print("Trying fix: \(fix)...")
+        currentEnv = apply(fix: fix, to: currentEnv)
+        attempt += 1
+    }
+}
+```
+
+#### Pattern: WineProcess Structured Result
+```swift
+struct WineResult {
+    let exitCode: Int32
+    let stderr: String      // captured for error parsing
+    let elapsed: TimeInterval
+    let logPath: URL
+}
+```
+The existing `WineProcess.run()` needs to return a `WineResult` instead of just streaming — enables error analysis without changing the streaming behavior for the user.
 
 ---
 
