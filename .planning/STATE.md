@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-27T17:09:33.176Z"
+last_updated: "2026-03-27T17:45:31Z"
 progress:
   total_phases: 2
   completed_phases: 2
-  total_plans: 8
-  completed_plans: 8
+  total_plans: 9
+  completed_plans: 9
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 
 ## Current Position
 
-Phase: 01.1-reactive-dependencies (Phase 1.1)
-Plan: 2 of 2 in current phase (01.1-02 complete)
-Status: Complete — Phase 01.1 fully complete
-Last activity: 2026-03-27 — Plan 01.1-02 complete: reactive dep pipeline in AddCommand + LaunchCommand retry loop with dep installation
+Phase: 02-ai-intelligence (Phase 2)
+Plan: 1 of 2 in current phase (02-01 complete)
+Status: In progress — Plan 02-01 complete
+Last activity: 2026-03-27 — Plan 02-01 complete: AIService module with Anthropic/OpenAI provider routing, diagnosis, recipe generation, user-recipe persistence
 
-Progress: [██████████] Phase 01 complete; Phase 01.1 complete
+Progress: [██████████] Phase 01 complete; Phase 01.1 complete; Phase 02 plan 1 complete
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [██████████] Phase 01 complete; Phase 01.1 complet
 | Phase 01-cossacks-launches P06 | 7 | 2 tasks | 5 files |
 | Phase 01.1-reactive-dependencies P01 | 2min | 2 tasks | 4 files |
 | Phase 01.1-reactive-dependencies P02 | 6 | 2 tasks | 2 files |
+| Phase 02-ai-intelligence P01 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -89,6 +90,11 @@ Recent decisions affecting current work:
 - [Phase 01.1-reactive-dependencies]: setup_deps semantic change: from must-pre-install to known-fixes-if-needed — eliminates 30+ min dotnet48 upfront install
 - [Phase 01.1-reactive-dependencies]: LaunchCommand while-loop retry retries same envConfig after dep install (configIndex not advanced on dep install)
 - [Phase 01.1-reactive-dependencies]: maxTotalAttempts=5 replaces old min(count,3) cap — covers both dep installs and variant cycling
+- 2026-03-27 (02-01): detectProvider() checks ANTHROPIC_API_KEY first — prefer Claude if both keys set
+- 2026-03-27 (02-01): URLSession.shared used exclusively (not custom session) to prevent semaphore deadlock on background delegate queue
+- 2026-03-27 (02-01): ResultBox @unchecked Sendable class used for URLSession dataTask result capture — avoids Swift 6 captured-var mutation warning
+- 2026-03-27 (02-01): Winetricks verb validation against known-safe allowlist prevents AI hallucinated verb names
+- 2026-03-27 (02-01): AIResult<T> named to avoid shadowing Swift.Result
 
 ### Pending Todos
 
@@ -104,4 +110,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 01.1-02 — reactive dep pipeline in AddCommand + LaunchCommand retry loop with dep installation
+Stopped at: Completed 02-01 — AIService module with provider routing, diagnose(), generateRecipe(), user-recipe persistence

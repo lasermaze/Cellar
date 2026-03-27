@@ -30,7 +30,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **RECIPE-01**: Cellar ships with a bundled recipe for Cossacks: European Wars
 - [x] **RECIPE-02**: Recipes auto-apply on launch (registry edits, DLL overrides, env vars, launch args)
-- [ ] **RECIPE-03**: AI generates a candidate recipe for games without a bundled recipe
+- [x] **RECIPE-03**: AI generates a candidate recipe for games without a bundled recipe
 - [ ] **RECIPE-04**: Cellar can try multiple recipe variants when a launch fails
 
 ### Launch & Logs
@@ -38,7 +38,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **LAUNCH-01**: User can launch a game via Wine with correct WINEPREFIX and recipe flags
 - [x] **LAUNCH-02**: Cellar captures Wine stdout/stderr to per-launch log files
 - [x] **LAUNCH-03**: After launch, Cellar asks user if the game reached the menu (validation prompt)
-- [ ] **LAUNCH-04**: AI interprets Wine crash logs and provides human-readable diagnosis
+- [x] **LAUNCH-04**: AI interprets Wine crash logs and provides human-readable diagnosis
 
 ### Community
 
@@ -109,8 +109,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LAUNCH-01 | Phase 1 | Complete |
 | LAUNCH-02 | Phase 1 | Complete |
 | LAUNCH-03 | Phase 1 | Complete |
-| RECIPE-03 | Phase 2 | Pending |
-| LAUNCH-04 | Phase 2 | Pending |
+| RECIPE-03 | Phase 2 | Complete |
+| LAUNCH-04 | Phase 2 | Complete |
 | RECIPE-04 | Phase 3 | Pending |
 | GAME-01 | Phase 4 | Pending |
 | GAME-02 | Phase 4 | Pending |
