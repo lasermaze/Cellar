@@ -4,10 +4,10 @@ struct AIService {
 
     // MARK: - Provider Detection
 
-    /// Detect which AI provider is configured via environment variables.
+    /// Detect which AI provider is configured via environment variables or ~/.cellar/.env file.
     /// Prefers Anthropic (Claude) if both keys are present.
     static func detectProvider() -> AIProvider {
-        let env = ProcessInfo.processInfo.environment
+        let env = loadEnvironment()
         if let key = env["ANTHROPIC_API_KEY"], !key.isEmpty {
             return .anthropic(apiKey: key)
         }
@@ -15,6 +15,33 @@ struct AIService {
             return .openai(apiKey: key)
         }
         return .unavailable
+    }
+
+    /// Load environment: process env vars take precedence, then fall back to ~/.cellar/.env file.
+    private static func loadEnvironment() -> [String: String] {
+        var env = ProcessInfo.processInfo.environment
+        let envFile = CellarPaths.base.appendingPathComponent(".env")
+        guard let contents = try? String(contentsOf: envFile, encoding: .utf8) else {
+            return env
+        }
+        for line in contents.components(separatedBy: .newlines) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty || trimmed.hasPrefix("#") { continue }
+            let parts = trimmed.split(separator: "=", maxSplits: 1)
+            guard parts.count == 2 else { continue }
+            let key = String(parts[0]).trimmingCharacters(in: .whitespaces)
+            var value = String(parts[1]).trimmingCharacters(in: .whitespaces)
+            // Strip surrounding quotes
+            if (value.hasPrefix("\"") && value.hasSuffix("\"")) ||
+               (value.hasPrefix("'") && value.hasSuffix("'")) {
+                value = String(value.dropFirst().dropLast())
+            }
+            // Process env takes precedence — only set if not already present
+            if env[key] == nil {
+                env[key] = value
+            }
+        }
+        return env
     }
 
     // MARK: - HTTP
@@ -455,6 +482,90 @@ struct AIService {
         return .success(AIVariantResult(variants: variants, reasoning: reasoning))
     }
 
+    // MARK: - Agent Loop
+
+    /// Run the agentic Wine expert loop for a game launch session.
+    ///
+    /// Requires an Anthropic API key — OpenAI is not supported for the agent loop
+    /// because the tool-use API differs significantly.
+    ///
+    /// Returns:
+    ///   - .unavailable if no Anthropic key is configured (or OpenAI-only)
+    ///   - .success(summary) when the agent loop completes
+    ///   - .failed(message) if an error is thrown during the session
+    static func runAgentLoop(
+        gameId: String,
+        entry: GameEntry,
+        executablePath: String,
+        wineURL: URL,
+        bottleURL: URL,
+        wineProcess: WineProcess
+    ) -> AIResult<String> {
+        let provider = detectProvider()
+        guard case .anthropic(let apiKey) = provider else {
+            // OpenAI or unavailable — agent loop is Anthropic-only
+            return .unavailable
+        }
+
+        let systemPrompt = """
+        You are a Wine compatibility expert for macOS. Your job is to get a Windows game running via Wine.
+
+        ## Workflow
+        1. ALWAYS start by calling inspect_game to understand the game (exe type, existing config, bottle state)
+        2. Based on the game type and any existing recipe, configure environment variables and settings
+        3. Launch the game with launch_game
+        4. After launch, ask the user if the game worked with ask_user
+        5. If the user says yes: save the working configuration with save_recipe, then stop
+        6. If the user says no or the launch failed: read the log with read_log, diagnose the issue, try a different configuration, and launch again
+        7. If you cannot fix the issue after several attempts, explain what you tried and suggest manual steps
+
+        ## Key Domain Knowledge
+        - DirectDraw games (PE32, uses ddraw.dll): try cnc-ddraw via place_dll, set WINEDLLOVERRIDES=ddraw=n,b
+        - Games that crash immediately: try virtual desktop mode via set_registry (HKCU\\Software\\Wine\\Explorer\\Desktops, Default = 1024x768)
+        - DLL override modes: n=native, b=builtin, n,b=prefer native fall back to builtin
+        - WINE_CPU_TOPOLOGY=1:0 helps old single-threaded games
+        - WINEDEBUG=-all suppresses debug noise for performance; use +loaddll via extra_winedebug to diagnose missing DLLs
+        - If a game exits immediately (< 2 seconds), it likely has a missing dependency or configuration issue
+
+        ## Constraints
+        - Maximum 8 launch attempts — be strategic, not brute-force
+        - Only install winetricks verbs from the allowed list
+        - Only place DLLs that are in the known DLL registry
+        - All operations are sandboxed to the game's bottle and ~/.cellar/
+
+        ## Communication
+        - When you discover something interesting, explain it briefly to the user via text
+        - When trying a fix, explain what you're doing and why
+        - If you exhaust your attempts, write a clear summary of what you tried
+        """
+
+        let tools = AgentTools(
+            gameId: gameId,
+            entry: entry,
+            executablePath: executablePath,
+            bottleURL: bottleURL,
+            wineURL: wineURL,
+            wineProcess: wineProcess
+        )
+
+        let agentLoop = AgentLoop(
+            apiKey: apiKey,
+            tools: AgentTools.toolDefinitions,
+            systemPrompt: systemPrompt,
+            model: "claude-sonnet-4-20250514",
+            maxIterations: 20,
+            maxTokens: 4096
+        )
+
+        let initialMessage = "Launch the game '\(entry.name)' (ID: \(gameId)). The executable is at: \(executablePath). Start by inspecting the game to understand its requirements."
+
+        let result = agentLoop.run(
+            initialMessage: initialMessage,
+            toolExecutor: { name, input in tools.execute(toolName: name, input: input) }
+        )
+        return .success(result.finalText)
+    }
+
     // MARK: - One-Time Tip
 
     /// Show the AI setup tip once if no API key is configured.
@@ -490,7 +601,7 @@ struct AIService {
 
     private static func callAnthropic(apiKey: String, systemPrompt: String, userMessage: String) throws -> String {
         let requestBody = AnthropicRequest(
-            model: "claude-haiku-4-5",
+            model: "claude-opus-4-6",
             maxTokens: 1024,
             system: systemPrompt,
             messages: [AnthropicRequest.Message(role: "user", content: userMessage)]
