@@ -24,10 +24,19 @@ struct AIDiagnosis {
     let suggestedFix: WineFix?
 }
 
+// MARK: - AI Variant
+
+/// An AI-generated launch variant with parsed WineFix actions (not Codable — used only at runtime).
+struct AIVariant {
+    let description: String
+    let environment: [String: String]
+    let actions: [WineFix]   // parsed from AI response actions array
+}
+
 // MARK: - AI Variant Result
 
 struct AIVariantResult {
-    let variants: [RetryVariant]
+    let variants: [AIVariant]
     let reasoning: String
 }
 

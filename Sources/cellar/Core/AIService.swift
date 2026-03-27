@@ -253,13 +253,17 @@ struct AIService {
     // MARK: - Generate Variants
 
     /// Generate alternative recipe variants using AI after bundled variants are exhausted.
-    /// Returns up to 3 RetryVariant values with environment-only changes (no registry edits).
+    /// escalationLevel controls which action types are permitted:
+    ///   Level 1: env vars and WINEDLLOVERRIDES only
+    ///   Level 2: adds winetricks verbs and DLL overrides
+    ///   Level 3: adds place_dll and set_registry actions
     /// Returns .unavailable if no API key is configured.
     static func generateVariants(
         gameId: String,
         gameName: String,
         currentEnvironment: [String: String],
-        attemptHistory: [(description: String, envDiff: [String: String], errorSummary: String)]
+        attemptHistory: [(description: String, envDiff: [String: String], errorSummary: String)],
+        escalationLevel: Int = 1
     ) -> AIResult<AIVariantResult> {
         let provider = detectProvider()
         if case .unavailable = provider {
@@ -268,7 +272,9 @@ struct AIService {
         return _generateVariants(
             gameId: gameId, gameName: gameName,
             currentEnvironment: currentEnvironment,
-            attemptHistory: attemptHistory, provider: provider
+            attemptHistory: attemptHistory,
+            escalationLevel: escalationLevel,
+            provider: provider
         )
     }
 
@@ -277,28 +283,10 @@ struct AIService {
         gameName: String,
         currentEnvironment: [String: String],
         attemptHistory: [(description: String, envDiff: [String: String], errorSummary: String)],
+        escalationLevel: Int,
         provider: AIProvider
     ) -> AIResult<AIVariantResult> {
-        let systemPrompt = """
-        You are a Wine compatibility expert generating alternative launch configurations for a Windows game running on macOS via Wine.
-
-        Output MUST use environment variables and WINEDLLOVERRIDES ONLY. Do NOT suggest registry edits. Do NOT suggest winetricks installs.
-
-        Return a JSON object with exactly these keys:
-        - "reasoning": string — 1-2 sentences explaining your analysis of what might be causing the failure
-        - "variants": array of up to 3 objects, each with:
-          - "description": string — brief label for this variant
-          - "environment": object — string key-value pairs of Wine environment variables to set
-
-        Each variant should try a meaningfully different approach, not minor tweaks of the same idea.
-
-        Common Wine environment variables to consider:
-        WINEDLLOVERRIDES, MESA_GL_VERSION_OVERRIDE, MESA_GLSL_VERSION_OVERRIDE, WINED3D_DISABLE_CSMT,
-        STAGING_SHARED_MEMORY, WINE_LARGE_ADDRESS_AWARE, WINEDEBUG, __GL_THREADED_OPTIMIZATIONS,
-        DXVK_HUD, WINEFSYNC, WINEESYNC
-
-        Return ONLY the JSON object, no additional text or markdown.
-        """
+        let systemPrompt = buildVariantSystemPrompt(level: escalationLevel)
 
         // Build user message with game context and attempt history
         var lines: [String] = []
@@ -346,6 +334,83 @@ struct AIService {
         }
     }
 
+    /// Build the system prompt for variant generation based on escalation level.
+    /// Level 1: env vars and WINEDLLOVERRIDES only (conservative).
+    /// Level 2: adds winetricks + DLL overrides.
+    /// Level 3: adds place_dll and set_registry (most powerful).
+    private static func buildVariantSystemPrompt(level: Int) -> String {
+        let base = """
+        You are a Wine compatibility expert generating alternative launch configurations for a Windows game running on macOS via Wine.
+
+        Return a JSON object with exactly these keys:
+        - "reasoning": string — 1-2 sentences explaining your analysis of what might be causing the failure
+        - "variants": array of up to 3 objects, each with:
+          - "description": string — brief label for this variant
+          - "environment": object — string key-value pairs of Wine environment variables to set
+          - "actions": array of typed action objects (may be empty)
+
+        Each variant should try a meaningfully different approach, not minor tweaks of the same idea.
+
+        Common Wine environment variables to consider:
+        WINEDLLOVERRIDES, MESA_GL_VERSION_OVERRIDE, MESA_GLSL_VERSION_OVERRIDE, WINED3D_DISABLE_CSMT,
+        STAGING_SHARED_MEMORY, WINE_LARGE_ADDRESS_AWARE, WINEDEBUG, __GL_THREADED_OPTIMIZATIONS,
+        DXVK_HUD, WINEFSYNC, WINEESYNC, WINE_CPU_TOPOLOGY
+
+        Return ONLY the JSON object, no additional text or markdown.
+        """
+
+        switch level {
+        case 1:
+            return base + """
+
+
+        IMPORTANT: At this level you MUST use environment variables and WINEDLLOVERRIDES ONLY.
+        Do NOT suggest registry edits. Do NOT suggest winetricks installs. Do NOT suggest DLL downloads.
+        All action arrays must be empty [].
+
+        Action format (all empty at this level):
+        {"type": "set_env", "key": "...", "value": "..."}
+        """
+        case 2:
+            return base + """
+
+
+        You may also suggest these additional action types:
+        - "install_winetricks" actions with a verb name (e.g., "d3dx9", "vcrun2019", "dsound")
+        - "set_dll_override" actions with DLL name and mode
+
+        Return actions as an array of typed objects:
+        {"type": "set_env", "key": "...", "value": "..."}
+        {"type": "set_dll_override", "dll": "...", "mode": "..."}
+        {"type": "install_winetricks", "verb": "..."}
+
+        Valid winetricks verbs (only use these): dotnet48, dotnet40, dotnet35, vcrun2019, vcrun2015, vcrun2013, vcrun2010, vcrun2008, d3dx9, d3dx10, d3dx11_43, d3dcompiler_47, dinput8, dinput, quartz, wmp9, wmp10, dsound, xinput, physx, xact, xactengine3_7
+        """
+        default: // level 3+
+            return base + """
+
+
+        You may suggest all action types including powerful low-level fixes:
+        - "place_dll" actions to download and install DLL replacements (e.g., cnc-ddraw for DirectDraw games)
+        - "set_registry" actions for Wine registry modifications
+        - "set_dll_override" actions for WINEDLLOVERRIDES tweaks
+        - "install_winetricks" actions for runtime dependencies
+
+        Known DLL replacements available for auto-download:
+        - cnc-ddraw: DirectDraw replacement for classic 2D games (fixes "DirectDraw Init Failed" errors)
+
+        Return actions as typed objects:
+        {"type": "set_env", "key": "...", "value": "..."}
+        {"type": "set_dll_override", "dll": "...", "mode": "..."}
+        {"type": "install_winetricks", "verb": "..."}
+        {"type": "place_dll", "dll": "cnc-ddraw", "target": "game_dir"}
+        {"type": "set_registry", "key": "HKCU\\\\Software\\\\...", "value_name": "...", "data": "dword:00000001"}
+
+        Valid winetricks verbs (only use these): dotnet48, dotnet40, dotnet35, vcrun2019, vcrun2015, vcrun2013, vcrun2010, vcrun2008, d3dx9, d3dx10, d3dx11_43, d3dcompiler_47, dinput8, dinput, quartz, wmp9, wmp10, dsound, xinput, physx, xact, xactengine3_7
+        """
+        }
+    }
+
     private static func parseVariantsResponse(_ text: String) -> AIResult<AIVariantResult> {
         let cleanedText = extractJSON(from: text)
 
@@ -361,7 +426,7 @@ struct AIService {
             return .failed("AI variants response missing or empty 'variants' array")
         }
 
-        let variants: [RetryVariant] = variantsArray.prefix(3).compactMap { dict in
+        let variants: [AIVariant] = variantsArray.prefix(3).compactMap { dict in
             guard let description = dict["description"] as? String,
                   let envRaw = dict["environment"] as? [String: Any]
             else { return nil }
@@ -370,7 +435,17 @@ struct AIService {
             for (key, value) in envRaw {
                 environment[key] = "\(value)"
             }
-            return RetryVariant(description: description, environment: environment, actions: nil)
+            // Parse actions array if present
+            var parsedActions: [WineFix] = []
+            if let actionsArray = dict["actions"] as? [[String: Any]] {
+                parsedActions = actionsArray.compactMap { actionDict in
+                    // Cast all values to String for parseWineFix(from:)
+                    var stringDict: [String: String] = [:]
+                    for (k, v) in actionDict { stringDict[k] = "\(v)" }
+                    return parseWineFix(from: stringDict)
+                }
+            }
+            return AIVariant(description: description, environment: environment, actions: parsedActions)
         }
 
         guard !variants.isEmpty else {
@@ -488,14 +563,27 @@ struct AIService {
         return trimmed
     }
 
-    /// Map AI fix_type + args to WineFix enum. Validates winetricks verbs against known-safe list.
-    private static func parseWineFix(fixType: String, arg1: String, arg2: String) -> WineFix? {
-        // Valid winetricks verbs — prevents hallucinated verb names
-        let validWinetricksVerbs: Set<String> = [
-            "dotnet48", "d3dx9", "d3dx10", "d3dx11_43",
-            "d3dcompiler_47", "vcrun2019", "xinput"
-        ]
+    /// Expanded winetricks verb allowlist — prevents AI hallucinating invalid verbs.
+    private static let validWinetricksVerbs: Set<String> = [
+        // Runtime dependencies
+        "dotnet48", "dotnet40", "dotnet35",
+        "vcrun2019", "vcrun2015", "vcrun2013", "vcrun2010", "vcrun2008",
+        // DirectX components
+        "d3dx9", "d3dx10", "d3dx11_43", "d3dcompiler_47",
+        "dinput8", "dinput",
+        // Media
+        "quartz", "wmp9", "wmp10",
+        // Audio
+        "dsound",
+        // Input
+        "xinput",
+        // Common game deps
+        "physx", "xact", "xactengine3_7"
+    ]
 
+    /// Map AI fix_type + args to WineFix enum. Validates winetricks verbs against known-safe list.
+    /// Used by diagnose() response parser (flat key format).
+    private static func parseWineFix(fixType: String, arg1: String, arg2: String) -> WineFix? {
         switch fixType {
         case "installWinetricks":
             guard validWinetricksVerbs.contains(arg1) else { return nil }
@@ -506,6 +594,43 @@ struct AIService {
         case "setDLLOverride":
             guard !arg1.isEmpty else { return nil }
             return .setDLLOverride(arg1, arg2.isEmpty ? "n,b" : arg2)
+        default:
+            return nil
+        }
+    }
+
+    /// Parse a typed action dict (from AI variants actions array) into a WineFix.
+    /// Dict keys depend on type: type, key/value (set_env), dll/mode (set_dll_override),
+    /// verb (install_winetricks), dll/target (place_dll), key/value_name/data (set_registry).
+    static func parseWineFix(from dict: [String: String]) -> WineFix? {
+        guard let type = dict["type"] else { return nil }
+        switch type {
+        case "set_env":
+            guard let key = dict["key"], !key.isEmpty,
+                  let value = dict["value"]
+            else { return nil }
+            return .setEnvVar(key, value)
+        case "set_dll_override":
+            guard let dll = dict["dll"], !dll.isEmpty else { return nil }
+            let mode = dict["mode"] ?? "n,b"
+            return .setDLLOverride(dll, mode.isEmpty ? "n,b" : mode)
+        case "install_winetricks":
+            guard let verb = dict["verb"], !verb.isEmpty else { return nil }
+            guard validWinetricksVerbs.contains(verb) else {
+                print("Warning: AI suggested winetricks verb '\(verb)' which is not in our known list — skipping.")
+                return nil
+            }
+            return .installWinetricks(verb)
+        case "place_dll":
+            guard let dllName = dict["dll"], !dllName.isEmpty else { return nil }
+            let target: DLLPlacementTarget = (dict["target"] == "system32") ? .system32 : .gameDir
+            return .placeDLL(dllName, target)
+        case "set_registry":
+            guard let key = dict["key"], !key.isEmpty,
+                  let valueName = dict["value_name"] ?? dict["valueName"],
+                  let data = dict["data"]
+            else { return nil }
+            return .setRegistry(key, valueName, data)
         default:
             return nil
         }
