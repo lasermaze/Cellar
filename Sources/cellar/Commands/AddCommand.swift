@@ -197,13 +197,85 @@ struct AddCommand: ParsableCommand {
             executablePath = discovered[0].path
         }
 
-        // 11. Save game entry with discovered executable path
+        // 11. AI Recipe Generation: if no bundled recipe, try AI
+        var activeRecipe: Recipe? = recipe
+        if recipe == nil {
+            // Build file context for AI: exe + dll + config files, capped at 50
+            var fileContext: [URL] = discovered  // already have exe list from scan
+            // Add DLLs and config files from game install directory only
+            let driveCURL = bottleURL.appendingPathComponent("drive_c")
+            if let enumerator = FileManager.default.enumerator(
+                at: driveCURL,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            ) {
+                for case let fileURL as URL in enumerator {
+                    let ext = fileURL.pathExtension.lowercased()
+                    // Skip Wine system directories
+                    let relativePath = fileURL.path.replacingOccurrences(of: driveCURL.path, with: "")
+                    if relativePath.hasPrefix("/windows/") { continue }
+                    if ["dll", "ini", "cfg"].contains(ext) {
+                        fileContext.append(fileURL)
+                    }
+                    if fileContext.count >= 50 { break }
+                }
+            }
+
+            switch AIService.generateRecipe(gameName: gameName, gameId: gameId, installedFiles: fileContext) {
+            case .success(let aiRecipe):
+                print("\nAI generated recipe for \(gameName):")
+                // Display with same transparency as bundled recipes
+                if !aiRecipe.environment.isEmpty {
+                    for (key, value) in aiRecipe.environment.sorted(by: { $0.key < $1.key }) {
+                        print("  Environment: \(key)=\(value)")
+                    }
+                }
+                if !aiRecipe.registry.isEmpty {
+                    for entry in aiRecipe.registry {
+                        print("  Registry: \(entry.description)")
+                    }
+                }
+                if let deps = aiRecipe.setupDeps, !deps.isEmpty {
+                    print("  Dependencies: \(deps.joined(separator: ", "))")
+                }
+                // Save for reuse on next launch
+                try RecipeEngine.saveUserRecipe(aiRecipe)
+                activeRecipe = aiRecipe
+                // Update executablePath from AI recipe if we don't have one yet
+                if executablePath == nil, !aiRecipe.executable.isEmpty {
+                    if let found = BottleScanner.findExecutable(named: aiRecipe.executable, in: discovered) {
+                        executablePath = found.path
+                        print("Game executable (from AI recipe): \(aiRecipe.executable) -> \(found.path)")
+                    }
+                }
+            case .unavailable:
+                AIService.showAITipIfNeeded()
+                print("No recipe available for \(gameName). Continue with defaults? [y/n] ", terminator: "")
+                fflush(stdout)
+                let answer = readLine()?.trimmingCharacters(in: .whitespaces).lowercased()
+                if answer != "y" {
+                    print("Aborted. You can try again with an API key configured.")
+                    throw ExitCode.failure
+                }
+            case .failed(let msg):
+                print("AI recipe generation failed: \(msg)")
+                print("No recipe available for \(gameName). Continue with defaults? [y/n] ", terminator: "")
+                fflush(stdout)
+                let answer = readLine()?.trimmingCharacters(in: .whitespaces).lowercased()
+                if answer != "y" {
+                    print("Aborted.")
+                    throw ExitCode.failure
+                }
+            }
+        }
+
+        // 12. Save game entry with discovered executable path
         let entry = GameEntry(
             id: gameId,
             name: gameName,
             installPath: "",
             executablePath: executablePath,
-            recipeId: gameId,
+            recipeId: activeRecipe?.id ?? gameId,
             addedAt: Date()
         )
         try CellarStore.addGame(entry)
