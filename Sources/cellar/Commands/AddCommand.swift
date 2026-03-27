@@ -10,6 +10,9 @@ struct AddCommand: ParsableCommand {
     @Argument(help: "Path to the game installer (e.g. setup.exe)")
     var installerPath: String
 
+    @Flag(help: "Pre-install recipe dependencies before running installer (old behavior)")
+    var forceProactiveDeps: Bool = false
+
     mutating func run() throws {
         let installerURL = URL(fileURLWithPath: installerPath)
 
@@ -44,71 +47,106 @@ struct AddCommand: ParsableCommand {
         let bottleManager = BottleManager(wineBinary: wineURL)
         _ = try bottleManager.createBottle(gameId: gameId)
 
-        // 6. Load recipe and install winetricks setup_deps (AGENT-02)
+        // 6. Load recipe
         let recipe = try RecipeEngine.findBundledRecipe(for: gameId)
-        if let deps = recipe?.setupDeps, !deps.isEmpty {
+
+        // 7. Proactive mode (--force-proactive-deps): install recipe deps upfront
+        if forceProactiveDeps, let deps = recipe?.setupDeps, !deps.isEmpty {
             guard let winetricksURL = status.winetricks else {
-                print("Error: winetricks is required to install dependencies but was not found.")
-                print("Run `cellar` first to install dependencies.")
+                print("Error: winetricks is required for --force-proactive-deps but was not found.")
                 throw ExitCode.failure
             }
-            let bottlePath = CellarPaths.bottleDir(for: gameId).path
+            let runner = WinetricksRunner(winetricksURL: winetricksURL, wineBinary: wineURL, bottlePath: CellarPaths.bottleDir(for: gameId).path)
             for dep in deps {
-                print("Installing dependency: \(dep) (this may take several minutes)...")
-                let wtProcess = Process()
-                wtProcess.executableURL = winetricksURL
-                wtProcess.arguments = [dep]
-                var env = ProcessInfo.processInfo.environment
-                env["WINEPREFIX"] = bottlePath
-                wtProcess.environment = env
-
-                // Stream winetricks output in real-time
-                let stdoutPipe = Pipe()
-                let stderrPipe = Pipe()
-                wtProcess.standardOutput = stdoutPipe
-                wtProcess.standardError = stderrPipe
-
-                stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
-                    let data = handle.availableData
-                    guard !data.isEmpty else { return }
-                    FileHandle.standardOutput.write(data)
-                }
-                stderrPipe.fileHandleForReading.readabilityHandler = { handle in
-                    let data = handle.availableData
-                    guard !data.isEmpty else { return }
-                    FileHandle.standardError.write(data)
-                }
-
-                try wtProcess.run()
-                wtProcess.waitUntilExit()
-
-                // Drain remaining data
-                let r1 = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
-                if !r1.isEmpty { FileHandle.standardOutput.write(r1) }
-                let r2 = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-                if !r2.isEmpty { FileHandle.standardError.write(r2) }
-
-                if wtProcess.terminationStatus != 0 {
-                    print("Warning: winetricks \(dep) exited with status \(wtProcess.terminationStatus)")
+                print("Pre-installing dependency: \(dep)...")
+                let result = try runner.install(verb: dep)
+                if result.timedOut {
+                    print("Warning: winetricks \(dep) timed out (stale output). Skipping.")
+                } else if !result.success {
+                    print("Warning: winetricks \(dep) failed (exit \(result.exitCode)). Continuing.")
                 } else {
                     print("Installed \(dep) successfully.")
                 }
             }
         }
 
-        // 7. Run GOG installer inside the bottle
-        let wineProcess = WineProcess(
-            wineBinary: wineURL,
-            winePrefix: CellarPaths.bottleDir(for: gameId)
-        )
+        // 8. Run installer (first attempt)
+        let wineProcess = WineProcess(wineBinary: wineURL, winePrefix: CellarPaths.bottleDir(for: gameId))
         print("Running installer inside Wine bottle...")
-        try wineProcess.run(
+        let installerResult = try wineProcess.run(
             binary: installerURL.path,
             arguments: ["/VERYSILENT", "/SP-", "/SUPPRESSMSGBOXES"],
             environment: [:]
         )
 
-        // 8. Post-install scan and validation (AGENT-04, AGENT-05, AGENT-06)
+        // 9. Reactive dep install: if installer failed, diagnose and retry
+        if installerResult.exitCode != 0 && !forceProactiveDeps {
+            let errors = WineErrorParser.parse(installerResult.stderr)
+            var installed = false
+
+            // Try diagnosed fix first
+            for error in errors {
+                if case .installWinetricks(let verb) = error.suggestedFix {
+                    guard let winetricksURL = status.winetricks else {
+                        print("Error: winetricks needed to install \(verb) but not found.")
+                        throw ExitCode.failure
+                    }
+                    print("Installer failed — diagnosed: \(error.detail)")
+                    print("Installing \(verb) via winetricks...")
+                    let runner = WinetricksRunner(winetricksURL: winetricksURL, wineBinary: wineURL, bottlePath: CellarPaths.bottleDir(for: gameId).path)
+                    let wtResult = try runner.install(verb: verb)
+                    if wtResult.success {
+                        installed = true
+                        print("Installed \(verb). Retrying installer...")
+                        let retryResult = try wineProcess.run(
+                            binary: installerURL.path,
+                            arguments: ["/VERYSILENT", "/SP-", "/SUPPRESSMSGBOXES"],
+                            environment: [:]
+                        )
+                        if retryResult.exitCode == 0 {
+                            print("Installer succeeded on retry.")
+                        }
+                    } else if wtResult.timedOut {
+                        print("Warning: \(verb) install timed out.")
+                    }
+                    break  // Only try first diagnosed fix
+                }
+            }
+
+            // Fallback: if no diagnosis but recipe has setup_deps, offer them
+            if !installed, let deps = recipe?.setupDeps, !deps.isEmpty {
+                print("Installer failed with no specific diagnosis.")
+                print("Recipe suggests these dependencies: \(deps.joined(separator: ", "))")
+                print("Install them now? [y/n] ", terminator: "")
+                fflush(stdout)
+                let answer = readLine()?.trimmingCharacters(in: .whitespaces).lowercased()
+                if answer == "y" {
+                    guard let winetricksURL = status.winetricks else {
+                        print("Error: winetricks not found.")
+                        throw ExitCode.failure
+                    }
+                    let runner = WinetricksRunner(winetricksURL: winetricksURL, wineBinary: wineURL, bottlePath: CellarPaths.bottleDir(for: gameId).path)
+                    for dep in deps {
+                        print("Installing \(dep)...")
+                        let wtResult = try runner.install(verb: dep)
+                        if wtResult.timedOut {
+                            print("Warning: \(dep) timed out. Skipping remaining deps.")
+                            break
+                        } else if !wtResult.success {
+                            print("Warning: \(dep) failed (exit \(wtResult.exitCode)).")
+                        }
+                    }
+                    print("Retrying installer...")
+                    _ = try wineProcess.run(
+                        binary: installerURL.path,
+                        arguments: ["/VERYSILENT", "/SP-", "/SUPPRESSMSGBOXES"],
+                        environment: [:]
+                    )
+                }
+            }
+        }
+
+        // 10. Post-install scan and validation (AGENT-04, AGENT-05, AGENT-06)
         let bottleURL = CellarPaths.bottleDir(for: gameId)
         let discovered = BottleScanner.scanForExecutables(bottlePath: bottleURL)
 
@@ -159,7 +197,7 @@ struct AddCommand: ParsableCommand {
             executablePath = discovered[0].path
         }
 
-        // 9. Save game entry with discovered executable path
+        // 11. Save game entry with discovered executable path
         let entry = GameEntry(
             id: gameId,
             name: gameName,
