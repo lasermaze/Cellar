@@ -11,8 +11,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [x] **SETUP-01**: Cellar detects whether Homebrew is installed (ARM and Intel paths)
 - [x] **SETUP-02**: Cellar detects whether Wine is installed via Gcenx Homebrew tap
-- [ ] **SETUP-03**: Cellar guides user through installing Homebrew if missing
-- [ ] **SETUP-04**: Cellar guides user through installing Wine (Gcenx tap) if missing
+- [x] **SETUP-03**: Cellar guides user through installing Homebrew if missing
+- [x] **SETUP-04**: Cellar guides user through installing Wine (Gcenx tap) if missing
 - [x] **SETUP-05**: Cellar detects whether GPTK is installed on the system
 
 ### Game Library
@@ -100,8 +100,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | SETUP-01 | Phase 1 | Complete |
 | SETUP-02 | Phase 1 | Complete |
-| SETUP-03 | Phase 1 | Pending |
-| SETUP-04 | Phase 1 | Pending |
+| SETUP-03 | Phase 1 | Complete |
+| SETUP-04 | Phase 1 | Complete |
 | SETUP-05 | Phase 1 | Complete |
 | BOTTLE-01 | Phase 1 | Pending |
 | RECIPE-01 | Phase 1 | Pending |

@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 1 of 5 (Cossacks Launches)
-Plan: 1 of ? in current phase
+Plan: 2 of ? in current phase
 Status: In progress
-Last activity: 2026-03-27 — Plan 01 complete: Swift package scaffold + DependencyChecker
+Last activity: 2026-03-27 — Plan 02 complete: GuidedInstaller + StatusCommand
 
-Progress: [█░░░░░░░░░] 5%
+Progress: [██░░░░░░░░] 10%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 7 min
-- Total execution time: 0.1 hours
+- Total plans completed: 2
+- Average duration: 4.5 min
+- Total execution time: 0.15 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 01-cossacks-launches | 1 | 7 min | 7 min |
+| 01-cossacks-launches | 2 | 9 min | 4.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 7 min
-- Trend: —
+- Last 5 plans: 7 min, 2 min
+- Trend: faster
 
 *Updated after each plan completion*
 
@@ -50,6 +50,9 @@ Recent decisions affecting current work:
 - 2026-03-27 (01-01): macOS 14 minimum required for Swift Testing framework on Command Line Tools
 - 2026-03-27 (01-01): DependencyChecker uses testable init(existingPaths:) pattern instead of protocol injection — simpler, avoids Sendable complexity in Swift 6
 - 2026-03-27 (01-01): swift test requires -Xswiftc -F flag to find Testing.framework on Command Line Tools
+- 2026-03-27 (01-02): installHomebrew() uses /bin/bash -c directly; brew binary doesn't exist yet at that stage
+- 2026-03-27 (01-02): installWine() resolves brew path via DependencyChecker().detectHomebrew() for ARM/Intel correctness
+- 2026-03-27 (01-02): StatusCommand re-checks DependencyChecker after each install attempt for accurate updated status
 
 ### Pending Todos
 
@@ -65,5 +68,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 01-01-PLAN.md — package scaffold, models, CellarPaths, DependencyChecker
+Stopped at: Completed 01-02-PLAN.md — GuidedInstaller + StatusCommand with guided install flow
 Resume file: None
