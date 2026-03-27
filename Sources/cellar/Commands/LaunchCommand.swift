@@ -165,13 +165,64 @@ struct LaunchCommand: ParsableCommand {
             }
 
             if !depInstalled {
-                // No dep installed (or dep already tried) — advance to next variant
-                if errors.isEmpty {
-                    print("Wine exited in \(String(format: "%.1f", result.elapsed))s with no diagnosed errors.")
-                } else {
-                    print("Diagnosed: \(errors.first!.detail)")
+                // AI diagnosis: try when WineErrorParser has no actionable fix
+                let hasActionableFix = errors.contains { $0.suggestedFix != nil }
+                if !hasActionableFix {
+                    let truncatedStderr = String(result.stderr.suffix(8000))
+                    switch AIService.diagnose(stderr: truncatedStderr, gameId: game) {
+                    case .success(let diagnosis):
+                        print("\nAI diagnosis: \(diagnosis.explanation)")
+                        if let fix = diagnosis.suggestedFix {
+                            // AI suggested a fix -- try to apply it
+                            switch fix {
+                            case .installWinetricks(let verb):
+                                if !installedDeps.contains(verb),
+                                   let winetricksURL = DependencyChecker().checkAll().winetricks {
+                                    print("AI suggests installing '\(verb)' via winetricks...")
+                                    let runner = WinetricksRunner(
+                                        winetricksURL: winetricksURL,
+                                        wineBinary: wineURL,
+                                        bottlePath: bottleURL.path
+                                    )
+                                    let wtResult = try runner.install(verb: verb)
+                                    installedDeps.insert(verb)
+                                    if wtResult.success {
+                                        print("Installed \(verb). Retrying...")
+                                        depInstalled = true
+                                    }
+                                }
+                            case .setEnvVar(let key, let value):
+                                // Inject env var into current config for next retry
+                                print("AI suggests setting \(key)=\(value)")
+                                envConfigs[configIndex].environment[key] = value
+                                // Don't advance -- retry same config with new env
+                                depInstalled = true  // reuse flag to prevent configIndex advance
+                            case .setDLLOverride(let dll, let mode):
+                                let key = "WINEDLLOVERRIDES"
+                                let override = "\(dll)=\(mode)"
+                                let current = envConfigs[configIndex].environment[key] ?? ""
+                                let newValue = current.isEmpty ? override : "\(current);\(override)"
+                                print("AI suggests DLL override: \(override)")
+                                envConfigs[configIndex].environment[key] = newValue
+                                depInstalled = true
+                            }
+                        }
+                    case .unavailable:
+                        break  // Silent -- no API key is not an error during launch
+                    case .failed(let msg):
+                        print("AI diagnosis unavailable: \(msg)")
+                    }
                 }
-                configIndex += 1
+
+                if !depInstalled {
+                    // No dep installed (or dep already tried) — advance to next variant
+                    if errors.isEmpty {
+                        print("Wine exited in \(String(format: "%.1f", result.elapsed))s with no diagnosed errors.")
+                    } else {
+                        print("Diagnosed: \(errors.first!.detail)")
+                    }
+                    configIndex += 1
+                }
             }
 
             if totalAttempts >= maxTotalAttempts {
