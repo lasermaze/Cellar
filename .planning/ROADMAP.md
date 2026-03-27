@@ -12,7 +12,7 @@ Cellar is built in five vertical slices. Each phase delivers a working capabilit
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Cossacks Launches** - Prove the core pipeline end-to-end with self-healing agentic behavior: dependency check, bottle creation, winetricks deps, installer, executable discovery, recipe application, error diagnosis, retry loop, validation prompt
+- [x] **Phase 1: Cossacks Launches** - Prove the core pipeline end-to-end with self-healing agentic behavior: dependency check, bottle creation, winetricks deps, installer, executable discovery, recipe application, error diagnosis, retry loop, validation prompt (completed 2026-03-27)
 - [ ] **Phase 2: AI Intelligence** - Add AI log interpretation and AI recipe generation to the working launch loop
 - [ ] **Phase 3: Repair Loop** - When launch fails, AI diagnoses and retries with variant configs; self-healing pipeline
 - [ ] **Phase 4: Multi-Game Management** - Generalize beyond Cossacks; add/remove games, bottle reset, winecfg, full CLI surface
@@ -32,7 +32,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   5. The game process launches with Wine and its stdout/stderr is written to a per-launch log file
   6. After launch exits, Cellar asks "Did the game reach the menu? (y/n)" and records the response with attempt count and diagnosis
   7. After exhausting retries, Cellar reports what was tried and the best diagnosis
-**Plans:** 6 plans (4 complete, 2 new)
+**Plans:** 6/6 plans complete
 
 Plans:
 - [ ] 01-01-PLAN.md — Swift package scaffold, models, dependency checker (SETUP-01, SETUP-02, SETUP-05)
@@ -90,7 +90,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Cossacks Launches | 4/6 | In progress | - |
+| 1. Cossacks Launches | 6/6 | Complete   | 2026-03-27 |
 | 2. AI Intelligence | 0/? | Not started | - |
 | 3. Repair Loop | 0/? | Not started | - |
 | 4. Multi-Game Management | 0/? | Not started | - |

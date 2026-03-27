@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-27T05:11:39.458Z"
+last_updated: "2026-03-27T05:31:55.181Z"
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 6
-  completed_plans: 5
+  completed_plans: 6
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 1 of 5 (Cossacks Launches)
-Plan: 5 of 6 in current phase
-Status: In progress — Plan 05 complete, ready for Plan 06
-Last activity: 2026-03-26 — Plan 05 complete: WineResult, WineErrorParser, BottleScanner, winetricks dependency, quarantine fix
+Plan: 6 of 6 in current phase
+Status: In progress — Plan 06 tasks complete, paused at checkpoint:human-verify (Task 3)
+Last activity: 2026-03-26 — Plan 06 tasks complete: agentic pipeline wired (winetricks deps, BottleScanner, retry loop, exhaustion report)
 
 Progress: [██████████] 100% (Phase 1 code complete, pending human verify)
 
@@ -50,6 +50,7 @@ Progress: [██████████] 100% (Phase 1 code complete, pending 
 | Phase 01-cossacks-launches P03 | 2 | 2 tasks | 4 files |
 | Phase 01-cossacks-launches P04 | 3min | 2 tasks | 6 files |
 | Phase 01-cossacks-launches P05 | 7 | 2 tasks | 9 files |
+| Phase 01-cossacks-launches P06 | 7 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,9 @@ Recent decisions affecting current work:
 - [Phase 01-05]: StderrCapture uses NSLock wrapper class for Swift 6 Sendable compliance in WineProcess readabilityHandler
 - [Phase 01-05]: allRequired now requires winetricks — DependencyStatus and guided install flow updated
 - [Phase 01-05]: GuidedInstaller.installWine() uses plain brew install with xattr fallback — no --no-quarantine flag
+- [Phase 01-06]: ValidationPrompt.run() returns Bool? (reachedMenu) instead of LaunchResult — LaunchCommand constructs full result with attemptCount and diagnosis
+- [Phase 01-06]: Retry loop capped at min(envConfigs.count, 3) — if no retryVariants, only 1 attempt made (no pointless identical retries)
+- [Phase 01-06]: Legacy backward compat: entries without executablePath fall back to hardcoded GOG path + recipe.executable
 
 ### Pending Todos
 
@@ -92,5 +96,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Completed 01-05-PLAN.md — agentic infrastructure layer complete. Ready for 01-06.
+Stopped at: Completed 01-06 Tasks 1-2 — paused at checkpoint:human-verify (Task 3: verify agentic pipeline end-to-end)
 Resume file: .planning/phases/01-cossacks-launches/.continue-here.md
