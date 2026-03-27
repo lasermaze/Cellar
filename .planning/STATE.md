@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-27T18:34:51.356Z"
+last_updated: "2026-03-27T18:38:50.836Z"
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 03-repair-loop (Phase 3)
-Plan: 1 of 2 in current phase (03-01 complete)
-Status: In Progress — Phase 03 Plan 01 complete, Plan 02 pending
-Last activity: 2026-03-27 — Plan 03-01 complete: WineProcess stale-output hang detection, AIVariantResult model, CellarPaths.repairReportFile, AIService.generateVariants()
+Plan: 2 of 2 in current phase (03-02 complete — phase complete)
+Status: Phase 03 Complete
+Last activity: 2026-03-27 — Plan 03-02 complete: LaunchCommand AI variant injection mid-loop, recipe save on success, repair report on exhaustion. RECIPE-04 delivered. Phase 03 complete.
 
 Progress: [██████████] Phase 01 complete; Phase 01.1 complete; Phase 02 complete
 
@@ -56,6 +56,7 @@ Progress: [██████████] Phase 01 complete; Phase 01.1 complet
 | Phase 02-ai-intelligence P01 | 3min | 2 tasks | 4 files |
 | Phase 02-ai-intelligence P02 | 3min | 2 tasks | 2 files |
 | Phase 03-repair-loop P01 | 8min | 2 tasks | 4 files |
+| Phase 03-repair-loop P02 | 1 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,9 @@ Recent decisions affecting current work:
 - 2026-03-27 (02-02): AI recipe generation only triggers when recipe == nil — bundled recipes always take precedence
 - [Phase 03-repair-loop]: generateVariants prompt explicitly prohibits registry edits and winetricks — env vars and WINEDLLOVERRIDES only
 - [Phase 03-repair-loop]: Attempt history error summaries capped at 500 chars per entry to prevent prompt token explosion
+- [Phase 03-repair-loop]: maxTotalAttempts raised from 5 to 10 to accommodate AI variant budget
+- [Phase 03-repair-loop]: AI variant injection uses same loop body as bundled variants — no code duplication
+- [Phase 03-repair-loop]: Exhaustion condition broadened to include timedOut — hung launches that exhaust attempt budget trigger repair report
 
 ### Pending Todos
 
@@ -118,4 +122,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 03-01 — repair loop infrastructure: stale-output hang detection, AIVariantResult, CellarPaths.repairReportFile, AIService.generateVariants. Phase 03 Plan 01 complete.
+Stopped at: Completed 03-02 — repair loop integration: AI variant injection, recipe save on success, repair report on exhaustion. Phase 03 complete.
