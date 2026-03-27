@@ -70,7 +70,6 @@ struct LaunchCommand: ParsableCommand {
                 envConfigs.append((description: variant.description, environment: variant.environment))
             }
         }
-        let maxAttempts = min(envConfigs.count, 3)  // cap at 3 per AGENT-09
 
         // 8. Self-healing retry loop (AGENT-09, AGENT-10, AGENT-11)
         var lastResult: WineResult? = nil
@@ -78,12 +77,19 @@ struct LaunchCommand: ParsableCommand {
         var attemptCount = 0
         var allAttempts: [(description: String, errors: [WineError])] = []
 
-        for attempt in 0..<maxAttempts {
-            attemptCount = attempt + 1
-            let config = envConfigs[attempt]
+        var installedDeps: Set<String> = []  // Track installed deps to avoid re-installing
+        let maxTotalAttempts = 5  // Cap total attempts across dep installs + variant cycling
+        var totalAttempts = 0
 
-            if attempt > 0 {
-                print("\nTrying variant \(attempt + 1)/\(maxAttempts): \(config.description)...")
+        var configIndex = 0
+
+        while configIndex < envConfigs.count && totalAttempts < maxTotalAttempts {
+            totalAttempts += 1
+            attemptCount = totalAttempts
+            let config = envConfigs[configIndex]
+
+            if totalAttempts > 1 {
+                print("\nAttempt \(totalAttempts): \(config.description)...")
             }
 
             // Prepare log file for this attempt
@@ -104,7 +110,7 @@ struct LaunchCommand: ParsableCommand {
             }
             sigintSource.resume()
 
-            if attempt == 0 {
+            if totalAttempts == 1 {
                 print("Launching \(game)...")
             }
 
@@ -125,22 +131,50 @@ struct LaunchCommand: ParsableCommand {
                 break
             }
 
-            // Quick exit — parse errors and decide whether to retry
+            // Quick exit — parse errors
             let errors = WineErrorParser.parse(result.stderr)
             lastErrors = errors
             allAttempts.append((description: config.description, errors: errors))
 
-            if errors.isEmpty {
-                print("Wine exited in \(String(format: "%.1f", result.elapsed))s with no diagnosed errors.")
-                if attempt < maxAttempts - 1 {
-                    print("Retrying with alternative configuration...")
+            // Check for winetricks fix BEFORE advancing to next variant
+            var depInstalled = false
+            if let firstFix = errors.compactMap({ error -> String? in
+                if case .installWinetricks(let verb) = error.suggestedFix { return verb }
+                return nil
+            }).first, !installedDeps.contains(firstFix) {
+                // Try installing the dep and retry same config
+                if let winetricksURL = DependencyChecker().checkAll().winetricks {
+                    print("Diagnosed: missing dependency '\(firstFix)'. Installing via winetricks...")
+                    let runner = WinetricksRunner(
+                        winetricksURL: winetricksURL,
+                        wineBinary: wineURL,
+                        bottlePath: bottleURL.path
+                    )
+                    let wtResult = try runner.install(verb: firstFix)
+                    installedDeps.insert(firstFix)
+                    if wtResult.success {
+                        print("Installed \(firstFix). Retrying same configuration...")
+                        depInstalled = true
+                        // Don't advance configIndex — retry same config with dep installed
+                    } else if wtResult.timedOut {
+                        print("Warning: \(firstFix) install timed out. Advancing to next variant...")
+                    } else {
+                        print("Warning: \(firstFix) install failed. Advancing to next variant...")
+                    }
                 }
-            } else {
-                print("Diagnosed: \(errors.first!.detail)")
             }
 
-            // If this is the last attempt, stop
-            if attempt == maxAttempts - 1 {
+            if !depInstalled {
+                // No dep installed (or dep already tried) — advance to next variant
+                if errors.isEmpty {
+                    print("Wine exited in \(String(format: "%.1f", result.elapsed))s with no diagnosed errors.")
+                } else {
+                    print("Diagnosed: \(errors.first!.detail)")
+                }
+                configIndex += 1
+            }
+
+            if totalAttempts >= maxTotalAttempts {
                 break
             }
         }
@@ -153,9 +187,9 @@ struct LaunchCommand: ParsableCommand {
         }
 
         // Exhausted retries and still failed (AGENT-11)
-        if finalResult.elapsed < 2.0 && finalResult.exitCode != 0 && attemptCount >= maxAttempts {
+        if finalResult.elapsed < 2.0 && finalResult.exitCode != 0 && totalAttempts >= maxTotalAttempts {
             print("\n--- Launch Failed ---")
-            print("Exhausted \(attemptCount) attempt(s). Summary:")
+            print("Exhausted \(totalAttempts) attempt(s). Summary:")
             for (i, attempt) in allAttempts.enumerated() {
                 print("  Attempt \(i + 1): \(attempt.description)")
                 if attempt.errors.isEmpty {
