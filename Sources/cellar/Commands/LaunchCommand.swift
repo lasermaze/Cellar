@@ -287,7 +287,7 @@ struct LaunchCommand: ParsableCommand {
         }
 
         // Exhausted retries and still failed (AGENT-11)
-        if finalResult.elapsed < 2.0 && finalResult.exitCode != 0 && totalAttempts >= maxTotalAttempts {
+        if (finalResult.elapsed < 2.0 || finalResult.timedOut) && finalResult.exitCode != 0 && totalAttempts >= maxTotalAttempts {
             print("\n--- Launch Failed ---")
             print("Exhausted \(totalAttempts) attempt(s). Summary:")
             for (i, attempt) in allAttempts.enumerated() {
@@ -313,6 +313,57 @@ struct LaunchCommand: ParsableCommand {
                     }
                 }
             }
+
+            // Write repair report
+            let reportTimestamp = Date()
+            let reportURL = CellarPaths.repairReportFile(for: game, timestamp: reportTimestamp)
+            var reportLines: [String] = []
+            reportLines.append("Cellar Repair Report")
+            reportLines.append("Game: \(game)")
+            reportLines.append("Date: \(reportTimestamp)")
+            reportLines.append("Total attempts: \(totalAttempts)")
+            reportLines.append("")
+            reportLines.append("--- Attempt History ---")
+            for (i, attempt) in allAttempts.enumerated() {
+                reportLines.append("")
+                reportLines.append("Attempt \(i + 1): \(attempt.description)")
+                reportLines.append("Environment:")
+                for (key, value) in attempt.environment.sorted(by: { $0.key < $1.key }) {
+                    reportLines.append("  \(key)=\(value)")
+                }
+                if attempt.errors.isEmpty {
+                    reportLines.append("Errors: None diagnosed")
+                } else {
+                    reportLines.append("Errors:")
+                    for error in attempt.errors {
+                        reportLines.append("  - \(error.detail)")
+                    }
+                }
+            }
+            reportLines.append("")
+            reportLines.append("--- Best Diagnosis ---")
+            if let bestDiagnosis = lastErrors.first {
+                reportLines.append(bestDiagnosis.detail)
+                if let fix = bestDiagnosis.suggestedFix {
+                    switch fix {
+                    case .installWinetricks(let verb):
+                        reportLines.append("Suggested: Install '\(verb)' via winetricks")
+                    case .setEnvVar(let key, let value):
+                        reportLines.append("Suggested: Set \(key)=\(value)")
+                    case .setDLLOverride(let dll, let mode):
+                        reportLines.append("Suggested: DLL override \(dll)=\(mode)")
+                    }
+                }
+            } else {
+                reportLines.append("No specific errors diagnosed.")
+            }
+            reportLines.append("")
+            reportLines.append("--- Logs ---")
+            reportLines.append("Log directory: \(CellarPaths.logDir(for: game).path)")
+            let reportContent = reportLines.joined(separator: "\n")
+            try? reportContent.write(to: reportURL, atomically: true, encoding: .utf8)
+            print("Repair report saved: \(reportURL.path)")
+
             print("\nCheck the latest log for details: \(CellarPaths.logDir(for: game).path)")
 
             // Record the failed result
@@ -333,6 +384,51 @@ struct LaunchCommand: ParsableCommand {
             elapsed: finalResult.elapsed,
             wineProcess: wineProcess
         )
+
+        // Save winning AI variant as user recipe if it came from AI stage
+        if let reachedMenu = reachedMenu, reachedMenu,
+           winningConfigIndex >= originalEnvConfigsCount,
+           let baseRecipe = recipe {
+            let winningEnv = envConfigs[winningConfigIndex].environment
+            // Show winning config diff
+            let diffKeys = winningEnv.filter { baseRecipe.environment[$0.key] != $0.value }
+            if !diffKeys.isEmpty {
+                print("\nSaving winning configuration:")
+                for (key, value) in diffKeys.sorted(by: { $0.key < $1.key }) {
+                    print("  \(key)=\(value)")
+                }
+            }
+            // Build updated recipe with AI variant environment merged over base
+            var mergedEnv = baseRecipe.environment
+            for (key, value) in winningEnv {
+                mergedEnv[key] = value
+            }
+            let updatedRecipe = Recipe(
+                id: baseRecipe.id, name: baseRecipe.name, version: baseRecipe.version,
+                source: baseRecipe.source, executable: baseRecipe.executable,
+                wineTested: baseRecipe.wineTested, environment: mergedEnv,
+                registry: baseRecipe.registry, launchArgs: baseRecipe.launchArgs,
+                notes: baseRecipe.notes, setupDeps: baseRecipe.setupDeps,
+                installDir: baseRecipe.installDir, retryVariants: baseRecipe.retryVariants
+            )
+            try RecipeEngine.saveUserRecipe(updatedRecipe)
+        } else if let reachedMenu = reachedMenu, reachedMenu,
+                  winningConfigIndex >= originalEnvConfigsCount,
+                  recipe == nil {
+            // No base recipe — build minimal recipe from winning env
+            let winningEnv = envConfigs[winningConfigIndex].environment
+            print("\nSaving winning configuration:")
+            for (key, value) in winningEnv.sorted(by: { $0.key < $1.key }) {
+                print("  \(key)=\(value)")
+            }
+            let minimalRecipe = Recipe(
+                id: game, name: game, version: "1.0.0", source: "ai-generated",
+                executable: executablePath, wineTested: nil, environment: winningEnv,
+                registry: [], launchArgs: [], notes: "Auto-generated from successful AI variant",
+                setupDeps: nil, installDir: nil, retryVariants: nil
+            )
+            try RecipeEngine.saveUserRecipe(minimalRecipe)
+        }
 
         if let reachedMenu = reachedMenu {
             entry.lastLaunched = Date()
