@@ -12,10 +12,23 @@ enum WineErrorCategory {
 
 // MARK: - Suggested Fix
 
+enum DLLPlacementTarget {
+    case gameDir    // next to EXE — how cnc-ddraw works
+    case system32   // Wine's virtual System32 inside WINEPREFIX
+}
+
 enum WineFix {
+    // Existing (Level 1)
     case installWinetricks(String)         // verb name
     case setEnvVar(String, String)         // key, value
     case setDLLOverride(String, String)    // dll, mode (n,b / native / builtin)
+
+    // New (Level 2+3)
+    case placeDLL(String, DLLPlacementTarget)   // dllName (matches KnownDLLRegistry.name), target
+    case setRegistry(String, String, String)    // key path, value name, data (e.g. "dword:00000001")
+
+    // Compound (any level)
+    case compound([WineFix])                    // ordered list of sub-actions
 }
 
 // MARK: - Wine Error
@@ -69,6 +82,18 @@ struct WineErrorParser {
                 category: .configuration,
                 detail: "Wine configuration/registry error",
                 suggestedFix: nil
+            ))
+        }
+
+        // Pattern 5: DirectDraw initialization failure — suggest cnc-ddraw
+        if stderr.contains("DirectDraw Init Failed") || stderr.contains("ddraw") && stderr.contains("80004001") {
+            errors.append(WineError(
+                category: .graphics,
+                detail: "DirectDraw initialization failed (likely Wine+Rosetta+MoltenVK translation chain)",
+                suggestedFix: .compound([
+                    .placeDLL("cnc-ddraw", .gameDir),
+                    .setDLLOverride("ddraw", "n,b")
+                ])
             ))
         }
 

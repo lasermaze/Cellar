@@ -273,6 +273,9 @@ struct LaunchCommand: ParsableCommand {
                                 print("AI suggests DLL override: \(override)")
                                 envConfigs[configIndex].environment[key] = newValue
                                 depInstalled = true
+                            case .placeDLL, .setRegistry, .compound:
+                                // Advanced fixes handled by WineActionExecutor in future plan
+                                break
                             }
                         }
                     case .unavailable:
@@ -329,6 +332,12 @@ struct LaunchCommand: ParsableCommand {
                         print("Suggested fix: Set \(key)=\(value)")
                     case .setDLLOverride(let dll, let mode):
                         print("Suggested fix: Set DLL override \(dll)=\(mode)")
+                    case .placeDLL(let name, _):
+                        print("Suggested fix: Place DLL '\(name)' in game directory")
+                    case .setRegistry(let key, let name, let data):
+                        print("Suggested fix: Set registry \(key) \(name)=\(data)")
+                    case .compound(let fixes):
+                        print("Suggested fix: Compound fix (\(fixes.count) actions)")
                     }
                 }
             }
@@ -371,6 +380,12 @@ struct LaunchCommand: ParsableCommand {
                         reportLines.append("Suggested: Set \(key)=\(value)")
                     case .setDLLOverride(let dll, let mode):
                         reportLines.append("Suggested: DLL override \(dll)=\(mode)")
+                    case .placeDLL(let name, _):
+                        reportLines.append("Suggested: Place DLL '\(name)' in game directory")
+                    case .setRegistry(let key, let name, let data):
+                        reportLines.append("Suggested: Set registry \(key) \(name)=\(data)")
+                    case .compound(let fixes):
+                        reportLines.append("Suggested: Compound fix (\(fixes.count) actions)")
                     }
                 }
             } else {

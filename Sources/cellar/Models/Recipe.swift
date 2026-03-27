@@ -37,6 +37,11 @@ struct Recipe: Codable {
 struct RetryVariant: Codable {
     let description: String
     let environment: [String: String]
+    let actions: [[String: String]]?    // Optional typed action array for DLL/registry fixes
+
+    enum CodingKeys: String, CodingKey {
+        case description, environment, actions
+    }
 }
 
 struct RegistryEntry: Codable {

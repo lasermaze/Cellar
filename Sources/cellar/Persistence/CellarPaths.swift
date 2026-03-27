@@ -18,6 +18,16 @@ struct CellarPaths {
 
     static let aiTipSentinel: URL = base.appendingPathComponent(".ai-tip-shown")
 
+    static let dllsDir: URL = base.appendingPathComponent("dlls")
+
+    static func dllCacheDir(for dllName: String) -> URL {
+        dllsDir.appendingPathComponent(dllName)
+    }
+
+    static func cachedDLLFile(dllName: String, fileName: String) -> URL {
+        dllCacheDir(for: dllName).appendingPathComponent(fileName)
+    }
+
     static func bottleDir(for gameId: String) -> URL {
         bottlesDir.appendingPathComponent(gameId)
     }

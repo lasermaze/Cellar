@@ -370,7 +370,7 @@ struct AIService {
             for (key, value) in envRaw {
                 environment[key] = "\(value)"
             }
-            return RetryVariant(description: description, environment: environment)
+            return RetryVariant(description: description, environment: environment, actions: nil)
         }
 
         guard !variants.isEmpty else {
