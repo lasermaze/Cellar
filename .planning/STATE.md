@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-27T20:34:44.316Z"
+last_updated: "2026-03-27T22:35:18.334Z"
 progress:
-  total_phases: 5
+  total_phases: 6
   completed_phases: 5
-  total_plans: 14
-  completed_plans: 14
+  total_plans: 17
+  completed_plans: 15
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 
 ## Current Position
 
-Phase: 03.1-expand-ai-repair-system (Phase 3.1)
-Plan: 2 of 2 complete (03.1-02 complete — PHASE COMPLETE)
-Status: Phase 03.1 Complete
-Last activity: 2026-03-27 — Plan 03.1-02 complete: Progressive AI prompts (3 escalation levels), graduated LaunchCommand repair loop, WineActionExecutor as single fix dispatcher, Cossacks cnc-ddraw recipe variant, expanded winetricks allowlist.
+Phase: 06-implement-agentic-launch-architecture-with-ai-tool-use-loop (Phase 6)
+Plan: 1 of N complete (06-01 complete)
+Status: Phase 06 In Progress
+Last activity: 2026-03-27 — Plan 06-01 complete: JSONValue, ToolContentBlock, MessageContent, ToolDefinition, AnthropicToolRequest/Response added to AIModels.swift; AgentLoop state machine created in AgentLoop.swift.
 
 Progress: [██████████] Phase 01 complete; Phase 01.1 complete; Phase 02 complete; Phase 03 complete; Phase 03.1 in progress (1/2)
 
@@ -60,6 +60,7 @@ Progress: [██████████] Phase 01 complete; Phase 01.1 complet
 | Phase 03-repair-loop P02 | 1 | 2 tasks | 1 files |
 | Phase 03.1-expand-ai-repair-system P01 | 8min | 2 tasks | 8 files |
 | Phase 03.1-expand-ai-repair-system P02 | 6min | 2 tasks | 5 files |
+| Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop P01 | 2min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -118,6 +119,9 @@ Recent decisions affecting current work:
 - [Phase 03.1-02]: Escalation loop uses continue (not break+call) when level produces no variants — immediately tries next
 - [Phase 03.1-02]: parseWineFix(from:) made internal for LaunchCommand recipe-action parsing at load time
 - [Phase 03.1-02]: Winning config serializes WineFix actions back to [[String:String]] for RetryVariant.actions persistence
+- [Phase 06-01]: JSONValue decodes Bool before Double — critical ordering to prevent true/false becoming 1.0/0.0
+- [Phase 06-01]: ToolContentBlock named to avoid collision with AnthropicResponse.ContentBlock
+- [Phase 06-01]: AgentLoop struct with private callAPI — mirrors AIService DispatchSemaphore+ResultBox pattern without exposing internals
 
 ### Pending Todos
 
@@ -126,6 +130,7 @@ None.
 ### Roadmap Evolution
 
 - Phase 03.1 inserted after Phase 03: Expand AI repair system to support DLL replacements and advanced fixes beyond env vars (URGENT)
+- Phase 6 added: Implement agentic launch architecture with AI tool-use loop
 
 ### Blockers/Concerns
 
@@ -137,4 +142,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 03.1-02 — progressive AI prompts (3 escalation levels), graduated LaunchCommand repair loop, WineActionExecutor as single fix dispatcher, Cossacks cnc-ddraw recipe variant. Phase 03.1 complete.
+Stopped at: Completed 06-01 — JSONValue recursive Codable enum, ToolContentBlock tagged union, MessageContent, ToolDefinition, AnthropicToolRequest/Response types, and AgentLoop state machine. Phase 06 plan 1 of N complete.
