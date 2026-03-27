@@ -13,6 +13,7 @@ Cellar is built in five vertical slices. Each phase delivers a working capabilit
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Cossacks Launches** - Prove the core pipeline end-to-end with self-healing agentic behavior: dependency check, bottle creation, winetricks deps, installer, executable discovery, recipe application, error diagnosis, retry loop, validation prompt (completed 2026-03-27)
+- [ ] **Phase 1.1: Reactive Dependencies** — INSERTED — Fix dependency pipeline: try-first/install-on-failure instead of blind pre-install, add timeout/deadlock protection for winetricks
 - [ ] **Phase 2: AI Intelligence** - Add AI log interpretation and AI recipe generation to the working launch loop
 - [ ] **Phase 3: Repair Loop** - When launch fails, AI diagnoses and retries with variant configs; self-healing pipeline
 - [ ] **Phase 4: Multi-Game Management** - Generalize beyond Cossacks; add/remove games, bottle reset, winecfg, full CLI surface
@@ -41,6 +42,18 @@ Plans:
 - [ ] 01-04-PLAN.md — Add/Launch/Log commands, validation prompt, end-to-end pipeline (LAUNCH-01, LAUNCH-02, LAUNCH-03)
 - [ ] 01-05-PLAN.md — Agentic infrastructure: Recipe schema extension, WineResult, WineErrorParser, BottleScanner, winetricks detection, quarantine fix (AGENT-01, AGENT-03, AGENT-04, AGENT-07, AGENT-08, AGENT-12)
 - [ ] 01-06-PLAN.md — Agentic commands: winetricks deps in add, post-install validation, executable discovery, retry loop, variant cycling, exhaustion report (AGENT-02, AGENT-05, AGENT-06, AGENT-09, AGENT-10, AGENT-11)
+
+### Phase 1.1: Reactive Dependencies
+**Goal**: Dependency installation uses try-first/install-on-failure instead of blind pre-install; winetricks runs have timeout and deadlock protection
+**Depends on**: Phase 1
+**Requirements**: AGENT-02 (revised), AGENT-09 (extended)
+**Success Criteria** (what must be TRUE):
+  1. `cellar add` runs the game installer WITHOUT pre-installing winetricks deps — deps are only installed if the installer fails with a diagnosable error
+  2. Winetricks runs have stale-output detection — if no output for 5 minutes, the process is killed and the user is informed
+  3. When `cellar launch` detects a missing DLL at runtime, it auto-installs the needed dep via winetricks and retries before advancing to the next variant
+  4. Users can override with `--force-proactive-deps` to restore old pre-install behavior
+  5. WinetricksRunner is a reusable service (not inline in AddCommand)
+**Plans**: TBD
 
 ### Phase 2: AI Intelligence
 **Goal**: The launch pipeline uses AI to interpret crash logs in plain English and to generate recipes for games that have no bundled recipe
