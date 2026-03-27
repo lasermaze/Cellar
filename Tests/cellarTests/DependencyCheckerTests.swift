@@ -52,8 +52,11 @@ struct DependencyCheckerTests {
 
     @Test("detectWine returns wine64 when wine64 binary exists in brew bin dir")
     func detectWineWine64() {
-        let sut = DependencyChecker(existingPaths: ["/opt/homebrew/bin/wine64"])
-        let brewPrefix = URL(fileURLWithPath: "/opt/homebrew/bin/brew")
+        let sut = DependencyChecker(existingPaths: [
+            "/opt/homebrew/bin/brew",
+            "/opt/homebrew/bin/wine64",
+        ])
+        let brewPrefix = sut.detectHomebrew()!
 
         let result = sut.detectWine(brewPrefix: brewPrefix)
 
@@ -62,8 +65,11 @@ struct DependencyCheckerTests {
 
     @Test("detectWine falls back to wine when only wine binary exists")
     func detectWineFallback() {
-        let sut = DependencyChecker(existingPaths: ["/opt/homebrew/bin/wine"])
-        let brewPrefix = URL(fileURLWithPath: "/opt/homebrew/bin/brew")
+        let sut = DependencyChecker(existingPaths: [
+            "/opt/homebrew/bin/brew",
+            "/opt/homebrew/bin/wine",
+        ])
+        let brewPrefix = sut.detectHomebrew()!
 
         let result = sut.detectWine(brewPrefix: brewPrefix)
 
@@ -73,10 +79,11 @@ struct DependencyCheckerTests {
     @Test("detectWine prefers wine64 over wine when both exist")
     func detectWinePreferWine64() {
         let sut = DependencyChecker(existingPaths: [
+            "/opt/homebrew/bin/brew",
             "/opt/homebrew/bin/wine64",
             "/opt/homebrew/bin/wine",
         ])
-        let brewPrefix = URL(fileURLWithPath: "/opt/homebrew/bin/brew")
+        let brewPrefix = sut.detectHomebrew()!
 
         let result = sut.detectWine(brewPrefix: brewPrefix)
 
@@ -85,8 +92,8 @@ struct DependencyCheckerTests {
 
     @Test("detectWine returns nil when no wine binary found")
     func detectWineNil() {
-        let sut = DependencyChecker(existingPaths: [])
-        let brewPrefix = URL(fileURLWithPath: "/opt/homebrew/bin/brew")
+        let sut = DependencyChecker(existingPaths: ["/opt/homebrew/bin/brew"])
+        let brewPrefix = sut.detectHomebrew()!
 
         let result = sut.detectWine(brewPrefix: brewPrefix)
 
@@ -95,8 +102,11 @@ struct DependencyCheckerTests {
 
     @Test("detectWine derives bin dir from Intel brew prefix correctly")
     func detectWineIntelPrefix() {
-        let sut = DependencyChecker(existingPaths: ["/usr/local/bin/wine64"])
-        let brewPrefix = URL(fileURLWithPath: "/usr/local/bin/brew")
+        let sut = DependencyChecker(existingPaths: [
+            "/usr/local/bin/brew",
+            "/usr/local/bin/wine64",
+        ])
+        let brewPrefix = sut.detectHomebrew()!
 
         let result = sut.detectWine(brewPrefix: brewPrefix)
 
@@ -107,37 +117,34 @@ struct DependencyCheckerTests {
 
     @Test("allRequired is true when both homebrew and wine are non-nil")
     func allRequiredTrue() {
-        let status = DependencyStatus(
-            homebrew: URL(fileURLWithPath: "/opt/homebrew/bin/brew"),
-            wine: URL(fileURLWithPath: "/opt/homebrew/bin/wine64"),
-            gptk: false
-        )
+        let sut = DependencyChecker(existingPaths: [
+            "/opt/homebrew/bin/brew",
+            "/opt/homebrew/bin/wine64",
+        ])
+        let status = sut.checkAll()
         #expect(status.allRequired == true)
     }
 
-    @Test("allRequired is false when homebrew is nil")
+    @Test("allRequired is false when homebrew is absent")
     func allRequiredFalseNoHomebrew() {
-        let status = DependencyStatus(
-            homebrew: nil,
-            wine: URL(fileURLWithPath: "/opt/homebrew/bin/wine64"),
-            gptk: false
-        )
+        let sut = DependencyChecker(existingPaths: [])
+        let status = sut.checkAll()
         #expect(status.allRequired == false)
     }
 
-    @Test("allRequired is false when wine is nil")
+    @Test("allRequired is false when wine is absent but homebrew present")
     func allRequiredFalseNoWine() {
-        let status = DependencyStatus(
-            homebrew: URL(fileURLWithPath: "/opt/homebrew/bin/brew"),
-            wine: nil,
-            gptk: false
-        )
+        let sut = DependencyChecker(existingPaths: ["/opt/homebrew/bin/brew"])
+        let status = sut.checkAll()
         #expect(status.allRequired == false)
     }
 
-    @Test("allRequired is false when both homebrew and wine are nil")
+    @Test("allRequired is false when both homebrew and wine are absent")
     func allRequiredFalseBothNil() {
-        let status = DependencyStatus(homebrew: nil, wine: nil, gptk: false)
+        let sut = DependencyChecker(existingPaths: [])
+        let status = sut.checkAll()
+        #expect(status.homebrew == nil)
+        #expect(status.wine == nil)
         #expect(status.allRequired == false)
     }
 
