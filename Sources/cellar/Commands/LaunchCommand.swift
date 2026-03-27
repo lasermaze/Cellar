@@ -75,15 +75,52 @@ struct LaunchCommand: ParsableCommand {
         var lastResult: WineResult? = nil
         var lastErrors: [WineError] = []
         var attemptCount = 0
-        var allAttempts: [(description: String, errors: [WineError])] = []
+        var allAttempts: [(description: String, environment: [String: String], errors: [WineError])] = []
 
         var installedDeps: Set<String> = []  // Track installed deps to avoid re-installing
-        let maxTotalAttempts = 5  // Cap total attempts across dep installs + variant cycling
+        let maxTotalAttempts = 10  // Cap total attempts across dep installs + variant cycling (raised for AI budget)
         var totalAttempts = 0
 
         var configIndex = 0
+        var aiVariantsGenerated = false
+        let originalEnvConfigsCount = envConfigs.count
+        var winningConfigIndex = 0  // track which config succeeded
 
-        while configIndex < envConfigs.count && totalAttempts < maxTotalAttempts {
+        while (configIndex < envConfigs.count || !aiVariantsGenerated) && totalAttempts < maxTotalAttempts {
+            // Phase 3: AI variant injection — when bundled variants exhausted, ask AI for more
+            if configIndex >= envConfigs.count && !aiVariantsGenerated {
+                aiVariantsGenerated = true
+
+                let history: [(description: String, envDiff: [String: String], errorSummary: String)] = allAttempts.map { attempt in
+                    let errorSummary = attempt.errors.map { $0.detail }.joined(separator: "; ")
+                    let capped = String(errorSummary.prefix(500))
+                    return (description: attempt.description, envDiff: attempt.environment, errorSummary: capped)
+                }
+
+                switch AIService.generateVariants(
+                    gameId: game,
+                    gameName: entry.name,
+                    currentEnvironment: recipeEnv,
+                    attemptHistory: history
+                ) {
+                case .success(let aiResult):
+                    print("\nAI analysis: \(aiResult.reasoning)")
+                    print("Generating \(aiResult.variants.count) alternative configuration(s)...\n")
+                    for variant in aiResult.variants {
+                        envConfigs.append((description: variant.description, environment: variant.environment))
+                    }
+                case .unavailable:
+                    break  // Silent — no API key is not an error
+                case .failed(let msg):
+                    print("AI variant generation failed: \(msg)")
+                }
+
+                // If no variants were added, exit
+                if configIndex >= envConfigs.count {
+                    break
+                }
+            }
+
             totalAttempts += 1
             attemptCount = totalAttempts
             let config = envConfigs[configIndex]
@@ -126,15 +163,27 @@ struct LaunchCommand: ParsableCommand {
 
             lastResult = result
 
+            // Hung launch — treat as failed attempt, advance to next variant
+            if result.timedOut {
+                let errors = WineErrorParser.parse(result.stderr)
+                lastErrors = errors
+                allAttempts.append((description: config.description, environment: config.environment, errors: errors))
+                print("Launch timed out (no output for 5 minutes). Moving to next variant...")
+                configIndex += 1
+                if totalAttempts >= maxTotalAttempts { break }
+                continue
+            }
+
             // Check if launch succeeded: exit code 0 OR ran for > 2 seconds (game ran)
             if result.exitCode == 0 || result.elapsed > 2.0 {
+                winningConfigIndex = configIndex
                 break
             }
 
             // Quick exit — parse errors
             let errors = WineErrorParser.parse(result.stderr)
             lastErrors = errors
-            allAttempts.append((description: config.description, errors: errors))
+            allAttempts.append((description: config.description, environment: config.environment, errors: errors))
 
             // Check for winetricks fix BEFORE advancing to next variant
             var depInstalled = false
