@@ -95,7 +95,7 @@ Plans:
   5. Repair reports include all action types attempted (DLL placements, registry edits, not just env vars)
   6. Unknown DLLs are not auto-downloaded — user is told where to get them manually
   7. All file operations are sandboxed to the game's WINEPREFIX and ~/.cellar/dlls/ cache
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 03.1-01-PLAN.md — Expand WineFix enum, KnownDLLRegistry, DLLDownloader, WineActionExecutor, CellarPaths, RetryVariant actions

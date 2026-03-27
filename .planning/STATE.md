@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-27T18:42:00.701Z"
+last_updated: "2026-03-27T20:21:28.835Z"
 progress:
-  total_phases: 4
+  total_phases: 5
   completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 14
+  completed_plans: 13
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 
 ## Current Position
 
-Phase: 03-repair-loop (Phase 3)
-Plan: 2 of 2 in current phase (03-02 complete — phase complete)
-Status: Phase 03 Complete
-Last activity: 2026-03-27 — Plan 03-02 complete: LaunchCommand AI variant injection mid-loop, recipe save on success, repair report on exhaustion. RECIPE-04 delivered. Phase 03 complete.
+Phase: 03.1-expand-ai-repair-system (Phase 3.1)
+Plan: 1 of 2 complete (03.1-01 complete)
+Status: Phase 03.1 In Progress
+Last activity: 2026-03-27 — Plan 03.1-01 complete: WineFix expanded (placeDLL/setRegistry/compound), KnownDLLRegistry (cnc-ddraw), DLLDownloader, WineActionExecutor. Infrastructure foundation for Plan 02 wiring.
 
-Progress: [██████████] Phase 01 complete; Phase 01.1 complete; Phase 02 complete
+Progress: [██████████] Phase 01 complete; Phase 01.1 complete; Phase 02 complete; Phase 03 complete; Phase 03.1 in progress (1/2)
 
 ## Performance Metrics
 
@@ -47,6 +47,7 @@ Progress: [██████████] Phase 01 complete; Phase 01.1 complet
 - Trend: faster
 
 *Updated after each plan completion*
+| Phase 03.1-expand-ai-repair-system P01 | 8min | 2 tasks | 8 files |
 | Phase 01-cossacks-launches P03 | 2 | 2 tasks | 4 files |
 | Phase 01-cossacks-launches P04 | 3min | 2 tasks | 6 files |
 | Phase 01-cossacks-launches P05 | 7 | 2 tasks | 9 files |
@@ -57,6 +58,7 @@ Progress: [██████████] Phase 01 complete; Phase 01.1 complet
 | Phase 02-ai-intelligence P02 | 3min | 2 tasks | 2 files |
 | Phase 03-repair-loop P01 | 8min | 2 tasks | 4 files |
 | Phase 03-repair-loop P02 | 1 | 2 tasks | 1 files |
+| Phase 03.1-expand-ai-repair-system P01 | 8min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -107,6 +109,9 @@ Recent decisions affecting current work:
 - [Phase 03-repair-loop]: maxTotalAttempts raised from 5 to 10 to accommodate AI variant budget
 - [Phase 03-repair-loop]: AI variant injection uses same loop body as bundled variants — no code duplication
 - [Phase 03-repair-loop]: Exhaustion condition broadened to include timedOut — hung launches that exhaust attempt budget trigger repair report
+- [Phase 03.1-01]: cnc-ddraw only in KnownDLLRegistry v1 — dgVoodoo2 excluded (does not work on Wine)
+- [Phase 03.1-01]: DLLDownloader download failures non-fatal: WineActionExecutor continues on failure, prints warning
+- [Phase 03.1-01]: placeDLL auto-applies requiredOverrides from KnownDLLRegistry (cnc-ddraw needs WINEDLLOVERRIDES=ddraw=n,b)
 
 ### Pending Todos
 
@@ -126,4 +131,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 03-02 — repair loop integration: AI variant injection, recipe save on success, repair report on exhaustion. Phase 03 complete.
+Stopped at: Completed 03.1-01 — expanded WineFix infrastructure: DLLDownloader, WineActionExecutor, KnownDLLRegistry (cnc-ddraw), CellarPaths DLL helpers. Plan 02 wiring next.
