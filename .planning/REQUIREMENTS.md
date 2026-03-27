@@ -22,14 +22,14 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Bottle Management
 
-- [ ] **BOTTLE-01**: Cellar creates an isolated WINEPREFIX per game automatically on first launch
+- [x] **BOTTLE-01**: Cellar creates an isolated WINEPREFIX per game automatically on first launch
 - [ ] **BOTTLE-02**: User can reset a game's bottle to a clean state (`cellar reset`)
 - [ ] **BOTTLE-03**: User can open winecfg for a game's bottle (`cellar config`)
 
 ### Recipe System
 
-- [ ] **RECIPE-01**: Cellar ships with a bundled recipe for Cossacks: European Wars
-- [ ] **RECIPE-02**: Recipes auto-apply on launch (registry edits, DLL overrides, env vars, launch args)
+- [x] **RECIPE-01**: Cellar ships with a bundled recipe for Cossacks: European Wars
+- [x] **RECIPE-02**: Recipes auto-apply on launch (registry edits, DLL overrides, env vars, launch args)
 - [ ] **RECIPE-03**: AI generates a candidate recipe for games without a bundled recipe
 - [ ] **RECIPE-04**: Cellar can try multiple recipe variants when a launch fails
 
@@ -103,9 +103,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SETUP-03 | Phase 1 | Complete |
 | SETUP-04 | Phase 1 | Complete |
 | SETUP-05 | Phase 1 | Complete |
-| BOTTLE-01 | Phase 1 | Pending |
-| RECIPE-01 | Phase 1 | Pending |
-| RECIPE-02 | Phase 1 | Pending |
+| BOTTLE-01 | Phase 1 | Complete |
+| RECIPE-01 | Phase 1 | Complete |
+| RECIPE-02 | Phase 1 | Complete |
 | LAUNCH-01 | Phase 1 | Pending |
 | LAUNCH-02 | Phase 1 | Pending |
 | LAUNCH-03 | Phase 1 | Pending |

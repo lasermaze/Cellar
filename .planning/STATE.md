@@ -1,3 +1,16 @@
+---
+gsd_state_version: 1.0
+milestone: v1.0
+milestone_name: milestone
+status: unknown
+last_updated: "2026-03-27T01:08:22.927Z"
+progress:
+  total_phases: 1
+  completed_phases: 0
+  total_plans: 4
+  completed_plans: 3
+---
+
 # Project State
 
 ## Project Reference
@@ -10,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 1 of 5 (Cossacks Launches)
-Plan: 2 of ? in current phase
+Plan: 3 of ? in current phase
 Status: In progress
-Last activity: 2026-03-27 — Plan 02 complete: GuidedInstaller + StatusCommand
+Last activity: 2026-03-27 — Plan 03 complete: WineProcess, BottleManager, RecipeEngine, Cossacks recipe JSON
 
 Progress: [██░░░░░░░░] 10%
 
@@ -34,6 +47,7 @@ Progress: [██░░░░░░░░] 10%
 - Trend: faster
 
 *Updated after each plan completion*
+| Phase 01-cossacks-launches P03 | 2 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -53,6 +67,8 @@ Recent decisions affecting current work:
 - 2026-03-27 (01-02): installHomebrew() uses /bin/bash -c directly; brew binary doesn't exist yet at that stage
 - 2026-03-27 (01-02): installWine() resolves brew path via DependencyChecker().detectHomebrew() for ARM/Intel correctness
 - 2026-03-27 (01-02): StatusCommand re-checks DependencyChecker after each install attempt for accurate updated status
+- [Phase 01-03]: logHandle captured as let constant — Swift 6 Sendable requires let binding for values captured in concurrently-executing closures like readabilityHandler
+- [Phase 01-03]: RecipeEngine.findBundledRecipe uses Bundle.main first then CWD fallback — covers both release bundle and swift run development workflow
 
 ### Pending Todos
 
@@ -68,5 +84,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 01-02-PLAN.md — GuidedInstaller + StatusCommand with guided install flow
+Stopped at: Completed 01-03-PLAN.md — WineProcess, BottleManager, RecipeEngine, Cossacks recipe JSON
 Resume file: None
