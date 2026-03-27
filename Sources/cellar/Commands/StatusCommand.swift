@@ -45,6 +45,19 @@ struct StatusCommand: ParsableCommand {
                 status = DependencyChecker().checkAll()
             }
 
+            // Install winetricks if Homebrew and Wine are present but winetricks is missing
+            if status.homebrew != nil && status.wine != nil && status.winetricks == nil {
+                print("\nwinetricks is required for dependency management.")
+                print("Install winetricks now? [y/n] ", terminator: "")
+                fflush(stdout)
+                let answer = readLine()?.trimmingCharacters(in: .whitespaces).lowercased()
+                if answer == "y" {
+                    installer.installWinetricks()
+                }
+                // Re-check after attempted install
+                status = DependencyChecker().checkAll()
+            }
+
             // Print updated status after any installs
             if !status.allRequired {
                 print("\nUpdated status:")
@@ -63,19 +76,24 @@ struct StatusCommand: ParsableCommand {
     private func printDependencyStatus(_ status: DependencyStatus) {
         print("Dependencies:")
         if let brew = status.homebrew {
-            print("  Homebrew: \(brew.path)")
+            print("  Homebrew:   \(brew.path)")
         } else {
-            print("  Homebrew: not found")
+            print("  Homebrew:   not found")
         }
         if let wine = status.wine {
-            print("  Wine:     \(wine.path)")
+            print("  Wine:       \(wine.path)")
         } else {
-            print("  Wine:     not found")
+            print("  Wine:       not found")
+        }
+        if let wt = status.winetricks {
+            print("  winetricks: \(wt.path)")
+        } else {
+            print("  winetricks: not found")
         }
         if status.gptk {
-            print("  GPTK:    detected")
+            print("  GPTK:       detected")
         } else {
-            print("  GPTK:    not detected (optional)")
+            print("  GPTK:       not detected (optional)")
         }
     }
 }

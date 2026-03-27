@@ -5,9 +5,10 @@ import Foundation
 struct DependencyStatus {
     let homebrew: URL?
     let wine: URL?
+    let winetricks: URL?   // AGENT-01
     let gptk: Bool
 
-    var allRequired: Bool { homebrew != nil && wine != nil }
+    var allRequired: Bool { homebrew != nil && wine != nil && winetricks != nil }
 }
 
 // MARK: - DependencyChecker
@@ -58,6 +59,13 @@ struct DependencyChecker {
         return candidates.first { fileExists(atPath: $0.path) }
     }
 
+    /// Detects winetricks binary in the same Homebrew bin directory as `brew`.
+    func detectWinetricks(brewPrefix: URL) -> URL? {
+        let binDir = brewPrefix.deletingLastPathComponent()
+        let path = binDir.appendingPathComponent("winetricks")
+        return fileExists(atPath: path.path) ? path : nil
+    }
+
     /// Best-effort detection of Game Porting Toolkit at known install paths.
     func detectGPTK() -> Bool {
         let candidates = [
@@ -71,7 +79,8 @@ struct DependencyChecker {
     func checkAll() -> DependencyStatus {
         let homebrew = detectHomebrew()
         let wine = homebrew.flatMap { detectWine(brewPrefix: $0) }
+        let winetricks = homebrew.flatMap { detectWinetricks(brewPrefix: $0) }
         let gptk = detectGPTK()
-        return DependencyStatus(homebrew: homebrew, wine: wine, gptk: gptk)
+        return DependencyStatus(homebrew: homebrew, wine: wine, winetricks: winetricks, gptk: gptk)
     }
 }
