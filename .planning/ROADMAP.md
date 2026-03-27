@@ -82,6 +82,25 @@ Plans:
   3. After exhausting variants, Cellar reports what was tried and surfaces the best diagnosis before stopping
 **Plans**: TBD
 
+### Phase 03.1: Expand AI repair system to support DLL replacements and advanced fixes beyond env vars (INSERTED)
+
+**Goal:** Expand the AI repair system from env-vars-only to a three-tier graduated escalation system supporting DLL replacements (cnc-ddraw), registry edits, wiretricks verbs, and compound multi-step fixes — with AI reasoning driving what fixes are attempted
+**Requirements**: None (INSERTED phase — extends RECIPE-04 capabilities)
+**Depends on:** Phase 3
+**Success Criteria** (what must be TRUE):
+  1. When bundled variants are exhausted, AI generates fixes at escalating power levels: Level 1 (env vars) -> Level 2 (+ winetricks/DLL overrides) -> Level 3 (+ DLL replacements/registry edits)
+  2. cnc-ddraw is automatically downloaded from GitHub, cached in ~/.cellar/dlls/, and placed in the game directory when AI or bundled recipe suggests it
+  3. The Cossacks: European Wars bundled recipe includes cnc-ddraw as a first-class retry variant
+  4. User sees escalation progression messages during the repair loop
+  5. Repair reports include all action types attempted (DLL placements, registry edits, not just env vars)
+  6. Unknown DLLs are not auto-downloaded — user is told where to get them manually
+  7. All file operations are sandboxed to the game's WINEPREFIX and ~/.cellar/dlls/ cache
+**Plans:** 2 plans
+
+Plans:
+- [ ] 03.1-01-PLAN.md — Expand WineFix enum, KnownDLLRegistry, DLLDownloader, WineActionExecutor, CellarPaths, RetryVariant actions
+- [ ] 03.1-02-PLAN.md — Progressive AI prompts, escalation wiring in LaunchCommand, Cossacks recipe update, repair report expansion
+
 ### Phase 4: Multi-Game Management
 **Goal**: Users can manage any number of games — add, remove, reset bottles, open winecfg — and the full CLI command surface is in place
 **Depends on**: Phase 3
