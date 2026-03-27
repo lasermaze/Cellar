@@ -1,0 +1,20 @@
+{
+  "id": "cossacks-european-wars",
+  "name": "Cossacks: European Wars",
+  "version": "2.1.0.13",
+  "source": "gog",
+  "executable": "dmln.exe",
+  "wine_tested_with": "wine-crossover-23.7.1",
+  "environment": {
+    "WINE_CPU_TOPOLOGY": "1:0",
+    "WINEDLLOVERRIDES": "ddraw=n,b"
+  },
+  "registry": [
+    {
+      "description": "Set screen resolution to 1024x768 windowed",
+      "reg_content": "Windows Registry Editor Version 5.00\n\n[HKEY_CURRENT_USER\\Software\\GSC Game World\\Cossacks - European Wars]\n\"ScreenWidth\"=dword:00000400\n\"ScreenHeight\"=dword:00000300\n\"Windowed\"=dword:00000001"
+    }
+  ],
+  "launch_args": [],
+  "notes": "Requires single CPU affinity (WINE_CPU_TOPOLOGY=1:0) on Wine 8+. GOG version 2.1.0.13. Registry keys for display settings are best-effort — may need adjustment after testing with actual installer."
+}
