@@ -53,7 +53,10 @@ Plans:
   3. When `cellar launch` detects a missing DLL at runtime, it auto-installs the needed dep via winetricks and retries before advancing to the next variant
   4. Users can override with `--force-proactive-deps` to restore old pre-install behavior
   5. WinetricksRunner is a reusable service (not inline in AddCommand)
-**Plans**: TBD
+**Plans**: 1/? complete
+
+Plans:
+- [x] 01.1-01-PLAN.md — WinetricksRunner service, WineResult.timedOut, WineProcess drain fixes (AGENT-02)
 
 ### Phase 2: AI Intelligence
 **Goal**: The launch pipeline uses AI to interpret crash logs in plain English and to generate recipes for games that have no bundled recipe
@@ -103,7 +106,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Cossacks Launches | 6/6 | Complete   | 2026-03-27 |
+| 1. Cossacks Launches | 6/6 | Complete | 2026-03-27 |
+| 1.1 Reactive Dependencies | 1/? | In progress | - |
 | 2. AI Intelligence | 0/? | Not started | - |
 | 3. Repair Loop | 0/? | Not started | - |
 | 4. Multi-Game Management | 0/? | Not started | - |

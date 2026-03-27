@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-27T05:31:55.181Z"
+last_updated: "2026-03-27T16:59:05Z"
 progress:
-  total_phases: 1
+  total_phases: 2
   completed_phases: 1
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 7
+  completed_plans: 7
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 
 ## Current Position
 
-Phase: 1 of 5 (Cossacks Launches)
-Plan: 6 of 6 in current phase
-Status: In progress — Plan 06 tasks complete, paused at checkpoint:human-verify (Task 3)
-Last activity: 2026-03-26 — Plan 06 tasks complete: agentic pipeline wired (winetricks deps, BottleScanner, retry loop, exhaustion report)
+Phase: 01.1-reactive-dependencies (Phase 1.1)
+Plan: 1 of N in current phase (01.1-01 complete)
+Status: In progress — Plan 01.1-01 complete
+Last activity: 2026-03-27 — Plan 01.1-01 complete: WinetricksRunner service created, WineResult.timedOut added, WineProcess drain fixes applied
 
-Progress: [██████████] 100% (Phase 1 code complete, pending human verify)
+Progress: [██████████] Phase 01 complete; Phase 01.1 Plan 01 complete
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Progress: [██████████] 100% (Phase 1 code complete, pending 
 | Phase 01-cossacks-launches P04 | 3min | 2 tasks | 6 files |
 | Phase 01-cossacks-launches P05 | 7 | 2 tasks | 9 files |
 | Phase 01-cossacks-launches P06 | 7 | 2 tasks | 5 files |
+| Phase 01.1-reactive-dependencies P01 | 2min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,9 @@ Recent decisions affecting current work:
 - [Phase 01-06]: ValidationPrompt.run() returns Bool? (reachedMenu) instead of LaunchResult — LaunchCommand constructs full result with attemptCount and diagnosis
 - [Phase 01-06]: Retry loop capped at min(envConfigs.count, 3) — if no retryVariants, only 1 attempt made (no pointless identical retries)
 - [Phase 01-06]: Legacy backward compat: entries without executablePath fall back to hardcoded GOG path + recipe.executable
+- [Phase 01.1-01]: WinetricksRunner always passes -q for unattended (no-dialog) winetricks mode
+- [Phase 01.1-01]: Stale-output timeout is 5 minutes — no output for 5 min = process assumed hung, kill + wineserver cleanup
+- [Phase 01.1-01]: OutputMonitor reuses NSLock + @unchecked Sendable pattern from WineProcess.StderrCapture for Swift 6 compliance
 
 ### Pending Todos
 
@@ -95,6 +99,5 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-26
-Stopped at: Completed 01-06 Tasks 1-2 — paused at checkpoint:human-verify (Task 3: verify agentic pipeline end-to-end)
-Resume file: .planning/phases/01-cossacks-launches/.continue-here.md
+Last session: 2026-03-27
+Stopped at: Completed 01.1-01 — WinetricksRunner service + WineResult.timedOut + WineProcess drain fixes
