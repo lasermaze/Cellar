@@ -1,10 +1,12 @@
 import Foundation
 
 struct ValidationPrompt {
-    /// Run the full post-launch flow: quick-exit check, wineserver shutdown prompt, validation prompt.
+    /// Run the post-launch validation prompt: wineserver shutdown + "did game reach menu?" question.
     ///
-    /// Returns the LaunchResult to be saved, or nil if the game exited too quickly (crash detection).
-    static func run(gameId: String, elapsed: TimeInterval, wineProcess: WineProcess) -> LaunchResult? {
+    /// Returns true/false for reachedMenu, or nil if the game exited too quickly (crash detection).
+    /// The caller (LaunchCommand) is responsible for constructing the full LaunchResult with
+    /// attemptCount and diagnosis fields.
+    static func run(gameId: String, elapsed: TimeInterval, wineProcess: WineProcess) -> Bool? {
         // 1. Quick-exit detection: < 2 seconds means likely a crash
         if elapsed < 2.0 {
             let elapsedStr = String(format: "%.1f", elapsed)
@@ -25,6 +27,6 @@ struct ValidationPrompt {
         print("Did the game reach the menu? [y/n] ", terminator: "")
         fflush(stdout)
         let validationResponse = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
-        return LaunchResult(timestamp: Date(), reachedMenu: validationResponse == "y")
+        return validationResponse == "y"
     }
 }
