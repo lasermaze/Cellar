@@ -33,11 +33,9 @@ struct AddCommand: ParsableCommand {
         let gameId = slugify(installerName)
 
         // 4. Check if game already exists
-        if let existing = try? CellarStore.findGame(id: gameId) {
-            if existing != nil {
-                print("Game already added. Use `cellar launch \(gameId)` to play.")
-                throw ExitCode.success
-            }
+        if let existing = try? CellarStore.findGame(id: gameId), existing != nil {
+            print("Game already added. Use `cellar launch \(gameId)` to play.")
+            throw ExitCode.success
         }
 
         print("Adding game: \(gameName)")

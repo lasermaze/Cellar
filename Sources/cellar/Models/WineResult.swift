@@ -7,4 +7,5 @@ struct WineResult {
     let stderr: String       // captured stderr for error parsing
     let elapsed: TimeInterval
     let logPath: URL?
+    let timedOut: Bool       // true if the run was terminated due to stale-output timeout
 }

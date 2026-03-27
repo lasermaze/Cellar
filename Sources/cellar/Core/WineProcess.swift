@@ -96,6 +96,10 @@ struct WineProcess {
             }
         }
 
+        // Prevent spurious callbacks after process exit (matches GuidedInstaller pattern)
+        stdoutPipe.fileHandleForReading.readabilityHandler = nil
+        stderrPipe.fileHandleForReading.readabilityHandler = nil
+
         // Close log file handle
         logHandle?.closeFile()
 
@@ -103,7 +107,8 @@ struct WineProcess {
             exitCode: process.terminationStatus,
             stderr: stderrCapture.value,
             elapsed: elapsed,
-            logPath: logFile
+            logPath: logFile,
+            timedOut: false
         )
     }
 
@@ -153,6 +158,10 @@ struct WineProcess {
         if !remainingStderr.isEmpty {
             FileHandle.standardError.write(remainingStderr)
         }
+
+        // Prevent spurious callbacks after process exit (matches GuidedInstaller pattern)
+        stdoutPipe.fileHandleForReading.readabilityHandler = nil
+        stderrPipe.fileHandleForReading.readabilityHandler = nil
     }
 
     /// Run wine regedit with a .reg file.
