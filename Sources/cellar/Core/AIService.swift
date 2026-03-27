@@ -250,6 +250,136 @@ struct AIService {
         }
     }
 
+    // MARK: - Generate Variants
+
+    /// Generate alternative recipe variants using AI after bundled variants are exhausted.
+    /// Returns up to 3 RetryVariant values with environment-only changes (no registry edits).
+    /// Returns .unavailable if no API key is configured.
+    static func generateVariants(
+        gameId: String,
+        gameName: String,
+        currentEnvironment: [String: String],
+        attemptHistory: [(description: String, envDiff: [String: String], errorSummary: String)]
+    ) -> AIResult<AIVariantResult> {
+        let provider = detectProvider()
+        if case .unavailable = provider {
+            return .unavailable
+        }
+        return _generateVariants(
+            gameId: gameId, gameName: gameName,
+            currentEnvironment: currentEnvironment,
+            attemptHistory: attemptHistory, provider: provider
+        )
+    }
+
+    private static func _generateVariants(
+        gameId: String,
+        gameName: String,
+        currentEnvironment: [String: String],
+        attemptHistory: [(description: String, envDiff: [String: String], errorSummary: String)],
+        provider: AIProvider
+    ) -> AIResult<AIVariantResult> {
+        let systemPrompt = """
+        You are a Wine compatibility expert generating alternative launch configurations for a Windows game running on macOS via Wine.
+
+        Output MUST use environment variables and WINEDLLOVERRIDES ONLY. Do NOT suggest registry edits. Do NOT suggest winetricks installs.
+
+        Return a JSON object with exactly these keys:
+        - "reasoning": string — 1-2 sentences explaining your analysis of what might be causing the failure
+        - "variants": array of up to 3 objects, each with:
+          - "description": string — brief label for this variant
+          - "environment": object — string key-value pairs of Wine environment variables to set
+
+        Each variant should try a meaningfully different approach, not minor tweaks of the same idea.
+
+        Common Wine environment variables to consider:
+        WINEDLLOVERRIDES, MESA_GL_VERSION_OVERRIDE, MESA_GLSL_VERSION_OVERRIDE, WINED3D_DISABLE_CSMT,
+        STAGING_SHARED_MEMORY, WINE_LARGE_ADDRESS_AWARE, WINEDEBUG, __GL_THREADED_OPTIMIZATIONS,
+        DXVK_HUD, WINEFSYNC, WINEESYNC
+
+        Return ONLY the JSON object, no additional text or markdown.
+        """
+
+        // Build user message with game context and attempt history
+        var lines: [String] = []
+        lines.append("Game ID: \(gameId)")
+        lines.append("Game name: \(gameName)")
+        lines.append("")
+        lines.append("Current base environment:")
+        if currentEnvironment.isEmpty {
+            lines.append("(none)")
+        } else {
+            for (key, value) in currentEnvironment.sorted(by: { $0.key < $1.key }) {
+                lines.append("  \(key)=\(value)")
+            }
+        }
+        lines.append("")
+        lines.append("Prior attempts:")
+        if attemptHistory.isEmpty {
+            lines.append("(none)")
+        } else {
+            for (index, attempt) in attemptHistory.enumerated() {
+                lines.append("Attempt \(index + 1): \(attempt.description)")
+                if !attempt.envDiff.isEmpty {
+                    let envStr = attempt.envDiff.sorted(by: { $0.key < $1.key })
+                        .map { "\($0.key)=\($0.value)" }
+                        .joined(separator: ", ")
+                    lines.append("  Env diff: \(envStr)")
+                }
+                // Cap error summary at 500 chars to prevent prompt token explosion
+                let cappedError = String(attempt.errorSummary.prefix(500))
+                lines.append("  Error: \(cappedError)")
+            }
+        }
+        lines.append("")
+        lines.append("Generate up to 3 alternative configurations to try.")
+        let userMessage = lines.joined(separator: "\n")
+
+        do {
+            let responseText = try withRetry {
+                try makeAPICall(provider: provider, systemPrompt: systemPrompt, userMessage: userMessage)
+            }
+
+            return parseVariantsResponse(responseText)
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+    }
+
+    private static func parseVariantsResponse(_ text: String) -> AIResult<AIVariantResult> {
+        let cleanedText = extractJSON(from: text)
+
+        guard let data = cleanedText.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
+            return .failed("Could not parse AI variants response as JSON")
+        }
+
+        let reasoning = json["reasoning"] as? String ?? ""
+
+        guard let variantsArray = json["variants"] as? [[String: Any]], !variantsArray.isEmpty else {
+            return .failed("AI variants response missing or empty 'variants' array")
+        }
+
+        let variants: [RetryVariant] = variantsArray.prefix(3).compactMap { dict in
+            guard let description = dict["description"] as? String,
+                  let envRaw = dict["environment"] as? [String: Any]
+            else { return nil }
+            // Cast environment values to String
+            var environment: [String: String] = [:]
+            for (key, value) in envRaw {
+                environment[key] = "\(value)"
+            }
+            return RetryVariant(description: description, environment: environment)
+        }
+
+        guard !variants.isEmpty else {
+            return .failed("AI variants response contained no valid variant objects")
+        }
+
+        return .success(AIVariantResult(variants: variants, reasoning: reasoning))
+    }
+
     // MARK: - One-Time Tip
 
     /// Show the AI setup tip once if no API key is configured.
