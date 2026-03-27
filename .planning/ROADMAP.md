@@ -41,7 +41,7 @@ Plans:
 - [ ] 01-03-PLAN.md — Bottle manager, recipe engine, Cossacks recipe (BOTTLE-01, RECIPE-01, RECIPE-02)
 - [ ] 01-04-PLAN.md — Add/Launch/Log commands, validation prompt, end-to-end pipeline (LAUNCH-01, LAUNCH-02, LAUNCH-03)
 - [ ] 01-05-PLAN.md — Agentic infrastructure: Recipe schema extension, WineResult, WineErrorParser, BottleScanner, winetricks detection, quarantine fix (AGENT-01, AGENT-03, AGENT-04, AGENT-07, AGENT-08, AGENT-12)
-- [ ] 01-06-PLAN.md — Agentic commands: winetricks deps in add, post-install validation, executable discovery, retry loop, variant cycling, exhaustion report (AGENT-02, AGENT-05, AGENT-06, AGENT-09, AGENT-10, AGENT-11)
+- [ ] 01-06-PLAN.md — Agentic commands: wiretricks deps in add, post-install validation, executable discovery, retry loop, variant cycling, exhaustion report (AGENT-02, AGENT-05, AGENT-06, AGENT-09, AGENT-10, AGENT-11)
 
 ### Phase 1.1: Reactive Dependencies
 **Goal**: Dependency installation uses try-first/install-on-failure instead of blind pre-install; winetricks runs have timeout and deadlock protection
@@ -66,7 +66,11 @@ Plans:
   1. When a launch fails, Cellar calls an AI API with the captured Wine log and returns a plain-English diagnosis to the user (not raw Wine errors)
   2. When a game has no bundled recipe, Cellar calls an AI API to generate a candidate recipe and applies it automatically before launching
   3. The AI integration is configurable (API key from environment) and fails gracefully with a clear message when unavailable
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 02-01-PLAN.md — AIService module: provider detection, HTTP calls, prompts, retry logic + RecipeEngine user-recipe support (RECIPE-03, LAUNCH-04)
+- [ ] 02-02-PLAN.md — Wire AI into LaunchCommand (diagnosis) and AddCommand (recipe generation) (LAUNCH-04, RECIPE-03)
 
 ### Phase 3: Repair Loop
 **Goal**: When a launch fails, Cellar automatically retries with AI-suggested variant configurations before declaring failure
@@ -74,7 +78,7 @@ Plans:
 **Requirements**: RECIPE-04
 **Success Criteria** (what must be TRUE):
   1. When a launch fails, Cellar generates at least one alternative recipe variant (via AI or permutation) and retries automatically
-  2. The user sees each retry attempt labeled (e.g., "Trying variant 2/3…") so the loop is transparent
+  2. The user sees each retry attempt labeled (e.g., "Trying variant 2/3...") so the loop is transparent
   3. After exhausting variants, Cellar reports what was tried and surfaces the best diagnosis before stopping
 **Plans**: TBD
 
@@ -102,13 +106,13 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
+Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Cossacks Launches | 6/6 | Complete | 2026-03-27 |
 | 1.1 Reactive Dependencies | 1/? | In progress | - |
-| 2. AI Intelligence | 0/? | Not started | - |
+| 2. AI Intelligence | 0/2 | Not started | - |
 | 3. Repair Loop | 0/? | Not started | - |
 | 4. Multi-Game Management | 0/? | Not started | - |
 | 5. Community | 0/? | Not started | - |
