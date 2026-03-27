@@ -33,4 +33,11 @@ struct CellarPaths {
         let timestampString = formatter.string(from: timestamp)
         return logDir(for: gameId).appendingPathComponent("\(timestampString).log")
     }
+
+    static func repairReportFile(for gameId: String, timestamp: Date) -> URL {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH-mm-ss"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return logDir(for: gameId).appendingPathComponent("repair-report-\(formatter.string(from: timestamp)).txt")
+    }
 }

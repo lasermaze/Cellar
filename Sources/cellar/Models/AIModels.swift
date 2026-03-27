@@ -24,6 +24,13 @@ struct AIDiagnosis {
     let suggestedFix: WineFix?
 }
 
+// MARK: - AI Variant Result
+
+struct AIVariantResult {
+    let variants: [RetryVariant]
+    let reasoning: String
+}
+
 // MARK: - AI Result
 
 enum AIResult<T> {

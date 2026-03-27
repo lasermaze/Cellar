@@ -4,6 +4,14 @@ struct WineProcess {
     let wineBinary: URL
     let winePrefix: URL
 
+    /// Thread-safe output monitor for stale-output hang detection.
+    private final class OutputMonitor: @unchecked Sendable {
+        private var _lastOutputTime = Date()
+        private let lock = NSLock()
+        func touch() { lock.lock(); _lastOutputTime = Date(); lock.unlock() }
+        var lastOutputTime: Date { lock.lock(); defer { lock.unlock() }; return _lastOutputTime }
+    }
+
     /// Thread-safe stderr capture buffer for Swift 6 Sendable compliance.
     private final class StderrCapture: @unchecked Sendable {
         private var buffer = ""
@@ -56,12 +64,14 @@ struct WineProcess {
 
         // Stderr capture buffer (thread-safe)
         let stderrCapture = StderrCapture()
+        let outputMonitor = OutputMonitor()
         let startTime = Date()
 
         // Real-time stdout streaming to terminal + log
         stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
             guard !data.isEmpty else { return }
+            outputMonitor.touch()
             FileHandle.standardOutput.write(data)
             logHandle?.write(data)
         }
@@ -70,6 +80,7 @@ struct WineProcess {
         stderrPipe.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
             guard !data.isEmpty else { return }
+            outputMonitor.touch()
             FileHandle.standardError.write(data)
             logHandle?.write(data)
             if let str = String(data: data, encoding: .utf8) {
@@ -78,7 +89,21 @@ struct WineProcess {
         }
 
         try process.run()
-        process.waitUntilExit()
+
+        let staleTimeout: TimeInterval = 300  // 5 minutes — per CONTEXT.md decision
+        var didTimeout = false
+        while process.isRunning {
+            Thread.sleep(forTimeInterval: 2.0)
+            if Date().timeIntervalSince(outputMonitor.lastOutputTime) > staleTimeout {
+                print("\nGame launch has produced no output for \(Int(staleTimeout / 60)) minutes — assuming hung.")
+                process.terminate()
+                try? killWineserver()
+                Thread.sleep(forTimeInterval: 1.0)
+                didTimeout = true
+                break
+            }
+        }
+
         let elapsed = Date().timeIntervalSince(startTime)
 
         // Drain remaining data after exit (Pitfall 4: readabilityHandler EOF bug)
@@ -108,7 +133,7 @@ struct WineProcess {
             stderr: stderrCapture.value,
             elapsed: elapsed,
             logPath: logFile,
-            timedOut: false
+            timedOut: didTimeout
         )
     }
 
