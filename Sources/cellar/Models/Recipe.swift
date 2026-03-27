@@ -12,6 +12,11 @@ struct Recipe: Codable {
     let launchArgs: [String]
     let notes: String?
 
+    // New optional fields (AGENT-12) — backward-compatible, existing JSON loads without modification
+    let setupDeps: [String]?          // winetricks verbs to install before game installer
+    let installDir: String?           // expected install directory inside bottle for verification
+    let retryVariants: [RetryVariant]? // alternative env configs to try on failure
+
     enum CodingKeys: String, CodingKey {
         case id
         case name
@@ -23,7 +28,15 @@ struct Recipe: Codable {
         case registry
         case launchArgs = "launch_args"
         case notes
+        case setupDeps = "setup_deps"
+        case installDir = "install_dir"
+        case retryVariants = "retry_variants"
     }
+}
+
+struct RetryVariant: Codable {
+    let description: String
+    let environment: [String: String]
 }
 
 struct RegistryEntry: Codable {

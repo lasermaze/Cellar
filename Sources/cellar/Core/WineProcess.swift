@@ -4,14 +4,23 @@ struct WineProcess {
     let wineBinary: URL
     let winePrefix: URL
 
+    /// Thread-safe stderr capture buffer for Swift 6 Sendable compliance.
+    private final class StderrCapture: @unchecked Sendable {
+        private var buffer = ""
+        private let lock = NSLock()
+        func append(_ str: String) { lock.lock(); buffer += str; lock.unlock() }
+        var value: String { lock.lock(); defer { lock.unlock() }; return buffer }
+    }
+
     /// Run a Wine command with WINEPREFIX set, streaming output to terminal and optionally to a log file.
+    /// Returns a WineResult with exit code, captured stderr, elapsed time, and log path.
     @discardableResult
     func run(
         binary: String,
         arguments: [String] = [],
         environment: [String: String] = [:],
         logFile: URL? = nil
-    ) throws -> Int32 {
+    ) throws -> WineResult {
         let process = Process()
         process.executableURL = wineBinary
 
@@ -45,6 +54,10 @@ struct WineProcess {
             logHandle = nil
         }
 
+        // Stderr capture buffer (thread-safe)
+        let stderrCapture = StderrCapture()
+        let startTime = Date()
+
         // Real-time stdout streaming to terminal + log
         stdoutPipe.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
@@ -53,16 +66,20 @@ struct WineProcess {
             logHandle?.write(data)
         }
 
-        // Real-time stderr streaming to terminal + log
+        // Real-time stderr streaming to terminal + log + capture buffer
         stderrPipe.fileHandleForReading.readabilityHandler = { handle in
             let data = handle.availableData
             guard !data.isEmpty else { return }
             FileHandle.standardError.write(data)
             logHandle?.write(data)
+            if let str = String(data: data, encoding: .utf8) {
+                stderrCapture.append(str)
+            }
         }
 
         try process.run()
         process.waitUntilExit()
+        let elapsed = Date().timeIntervalSince(startTime)
 
         // Drain remaining data after exit (Pitfall 4: readabilityHandler EOF bug)
         let remainingStdout = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
@@ -74,12 +91,20 @@ struct WineProcess {
         if !remainingStderr.isEmpty {
             FileHandle.standardError.write(remainingStderr)
             logHandle?.write(remainingStderr)
+            if let str = String(data: remainingStderr, encoding: .utf8) {
+                stderrCapture.append(str)
+            }
         }
 
         // Close log file handle
         logHandle?.closeFile()
 
-        return process.terminationStatus
+        return WineResult(
+            exitCode: process.terminationStatus,
+            stderr: stderrCapture.value,
+            elapsed: elapsed,
+            logPath: logFile
+        )
     }
 
     /// Run wineboot with --init to initialize a new prefix.

@@ -16,5 +16,24 @@
     }
   ],
   "launch_args": [],
-  "notes": "Requires single CPU affinity (WINE_CPU_TOPOLOGY=1:0) on Wine 8+. GOG version 2.1.0.13. Registry keys for display settings are best-effort — may need adjustment after testing with actual installer."
+  "notes": "Requires single CPU affinity (WINE_CPU_TOPOLOGY=1:0) on Wine 8+. GOG version 2.1.0.13. Registry keys for display settings are best-effort — may need adjustment after testing with actual installer.",
+  "setup_deps": ["dotnet48"],
+  "install_dir": "GOG Games/Cossacks - European Wars",
+  "retry_variants": [
+    {
+      "description": "Disable ddraw override (use Wine builtin)",
+      "environment": {
+        "WINE_CPU_TOPOLOGY": "1:0",
+        "WINEDLLOVERRIDES": ""
+      }
+    },
+    {
+      "description": "Force single CPU with virtual desktop",
+      "environment": {
+        "WINE_CPU_TOPOLOGY": "1:0",
+        "WINEDLLOVERRIDES": "ddraw=n,b",
+        "WINE_VD": "1024x768"
+      }
+    }
+  ]
 }
