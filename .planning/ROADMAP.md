@@ -141,7 +141,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 **Goal:** Replace the ~500-line hardcoded LaunchCommand pipeline with an AI agent loop that has tools to inspect, configure, launch, and diagnose Wine games — no fixed escalation levels, no hardcoded retry logic. Graceful degradation to recipe-only launch when no API key is set.
 **Requirements**: None (INSERTED phase — extends existing launch architecture)
 **Depends on:** Phase 3.1
-**Plans:** 3 plans
+**Plans:** 3/3 plans complete
 
 Plans:
 - [ ] 06-01-PLAN.md — Tool-use API types (JSONValue, ContentBlock, ToolDefinition) and AgentLoop state machine
