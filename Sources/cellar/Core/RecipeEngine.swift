@@ -31,6 +31,12 @@ struct RecipeEngine {
             return try loadRecipe(from: cwdRecipePath)
         }
 
+        // Strategy 2b: User-generated recipes in ~/.cellar/recipes/
+        let userRecipePath = CellarPaths.userRecipeFile(for: gameId)
+        if FileManager.default.fileExists(atPath: userRecipePath.path) {
+            return try loadRecipe(from: userRecipePath)
+        }
+
         // Strategy 3: Scan all recipes for one whose ID is a substring of the game ID
         // e.g., recipe "cossacks-european-wars" matches game ID "gog-galaxy-cossacks-european-wars"
         let recipesDir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
@@ -49,6 +55,20 @@ struct RecipeEngine {
 
         // No recipe found for this game ID
         return nil
+    }
+
+    /// Save an AI-generated recipe to ~/.cellar/recipes/{gameId}.json for reuse.
+    static func saveUserRecipe(_ recipe: Recipe) throws {
+        let dir = CellarPaths.userRecipesDir
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(recipe)
+
+        let file = CellarPaths.userRecipeFile(for: recipe.id)
+        try data.write(to: file, options: .atomic)
+        print("Recipe saved to ~/.cellar/recipes/\(recipe.id).json")
     }
 
     /// Apply a recipe to a bottle: registry edits + env vars.
