@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 03.1-expand-ai-repair-system (Phase 3.1)
-Plan: 1 of 2 complete (03.1-01 complete)
-Status: Phase 03.1 In Progress
-Last activity: 2026-03-27 — Plan 03.1-01 complete: WineFix expanded (placeDLL/setRegistry/compound), KnownDLLRegistry (cnc-ddraw), DLLDownloader, WineActionExecutor. Infrastructure foundation for Plan 02 wiring.
+Plan: 2 of 2 complete (03.1-02 complete — PHASE COMPLETE)
+Status: Phase 03.1 Complete
+Last activity: 2026-03-27 — Plan 03.1-02 complete: Progressive AI prompts (3 escalation levels), graduated LaunchCommand repair loop, WineActionExecutor as single fix dispatcher, Cossacks cnc-ddraw recipe variant, expanded winetricks allowlist.
 
 Progress: [██████████] Phase 01 complete; Phase 01.1 complete; Phase 02 complete; Phase 03 complete; Phase 03.1 in progress (1/2)
 
@@ -59,6 +59,7 @@ Progress: [██████████] Phase 01 complete; Phase 01.1 complet
 | Phase 03-repair-loop P01 | 8min | 2 tasks | 4 files |
 | Phase 03-repair-loop P02 | 1 | 2 tasks | 1 files |
 | Phase 03.1-expand-ai-repair-system P01 | 8min | 2 tasks | 8 files |
+| Phase 03.1-expand-ai-repair-system P02 | 6min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -112,6 +113,11 @@ Recent decisions affecting current work:
 - [Phase 03.1-01]: cnc-ddraw only in KnownDLLRegistry v1 — dgVoodoo2 excluded (does not work on Wine)
 - [Phase 03.1-01]: DLLDownloader download failures non-fatal: WineActionExecutor continues on failure, prints warning
 - [Phase 03.1-01]: placeDLL auto-applies requiredOverrides from KnownDLLRegistry (cnc-ddraw needs WINEDLLOVERRIDES=ddraw=n,b)
+- [Phase 03.1-02]: AIVariant (runtime, parsed [WineFix]) distinct from RetryVariant (Codable) — two structs for two contexts
+- [Phase 03.1-02]: WineActionExecutor.execute() tuple updated to include actions field — consistent across all callers
+- [Phase 03.1-02]: Escalation loop uses continue (not break+call) when level produces no variants — immediately tries next
+- [Phase 03.1-02]: parseWineFix(from:) made internal for LaunchCommand recipe-action parsing at load time
+- [Phase 03.1-02]: Winning config serializes WineFix actions back to [[String:String]] for RetryVariant.actions persistence
 
 ### Pending Todos
 
@@ -131,4 +137,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 03.1-01 — expanded WineFix infrastructure: DLLDownloader, WineActionExecutor, KnownDLLRegistry (cnc-ddraw), CellarPaths DLL helpers. Plan 02 wiring next.
+Stopped at: Completed 03.1-02 — progressive AI prompts (3 escalation levels), graduated LaunchCommand repair loop, WineActionExecutor as single fix dispatcher, Cossacks cnc-ddraw recipe variant. Phase 03.1 complete.
