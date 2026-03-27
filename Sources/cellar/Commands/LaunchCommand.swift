@@ -174,10 +174,29 @@ struct LaunchCommand: ParsableCommand {
                 continue
             }
 
-            // Check if launch succeeded: exit code 0 OR ran for > 2 seconds (game ran)
+            // Check if launch ran long enough to possibly be a real session
             if result.exitCode == 0 || result.elapsed > 2.0 {
-                winningConfigIndex = configIndex
-                break
+                // Ask the user — did it actually work?
+                let validation = ValidationPrompt.run(
+                    gameId: game,
+                    elapsed: result.elapsed,
+                    wineProcess: wineProcess
+                )
+                if validation?.reachedMenu == true {
+                    winningConfigIndex = configIndex
+                    break
+                }
+                // User said no — treat as failed attempt, continue retry loop
+                var errors = WineErrorParser.parse(result.stderr)
+                // Include user's observation as an error context for AI
+                if let observation = validation?.userObservation {
+                    errors.append(WineError(category: .unknown, detail: "User reported: \(observation)", suggestedFix: nil))
+                }
+                lastErrors = errors
+                allAttempts.append((description: config.description, environment: config.environment, errors: errors))
+                configIndex += 1
+                if totalAttempts >= maxTotalAttempts { break }
+                continue
             }
 
             // Quick exit — parse errors
@@ -378,16 +397,11 @@ struct LaunchCommand: ParsableCommand {
             return
         }
 
-        // Normal post-exit: validation prompt
-        let reachedMenu = ValidationPrompt.run(
-            gameId: game,
-            elapsed: finalResult.elapsed,
-            wineProcess: wineProcess
-        )
+        // Normal post-exit: user already confirmed via in-loop validation prompt
+        let reachedMenu = true
 
         // Save winning AI variant as user recipe if it came from AI stage
-        if let reachedMenu = reachedMenu, reachedMenu,
-           winningConfigIndex >= originalEnvConfigsCount,
+        if winningConfigIndex >= originalEnvConfigsCount,
            let baseRecipe = recipe {
             let winningEnv = envConfigs[winningConfigIndex].environment
             // Show winning config diff
@@ -412,8 +426,7 @@ struct LaunchCommand: ParsableCommand {
                 installDir: baseRecipe.installDir, retryVariants: baseRecipe.retryVariants
             )
             try RecipeEngine.saveUserRecipe(updatedRecipe)
-        } else if let reachedMenu = reachedMenu, reachedMenu,
-                  winningConfigIndex >= originalEnvConfigsCount,
+        } else if winningConfigIndex >= originalEnvConfigsCount,
                   recipe == nil {
             // No base recipe — build minimal recipe from winning env
             let winningEnv = envConfigs[winningConfigIndex].environment
@@ -430,16 +443,14 @@ struct LaunchCommand: ParsableCommand {
             try RecipeEngine.saveUserRecipe(minimalRecipe)
         }
 
-        if let reachedMenu = reachedMenu {
-            entry.lastLaunched = Date()
-            entry.lastResult = LaunchResult(
-                timestamp: Date(),
-                reachedMenu: reachedMenu,
-                attemptCount: attemptCount,
-                diagnosis: lastErrors.isEmpty ? nil : lastErrors.first?.detail
-            )
-            try CellarStore.updateGame(entry)
-            print("Launch result recorded.")
-        }
+        entry.lastLaunched = Date()
+        entry.lastResult = LaunchResult(
+            timestamp: Date(),
+            reachedMenu: reachedMenu,
+            attemptCount: attemptCount,
+            diagnosis: lastErrors.isEmpty ? nil : lastErrors.first?.detail
+        )
+        try CellarStore.updateGame(entry)
+        print("Launch result recorded.")
     }
 }

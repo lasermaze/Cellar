@@ -38,6 +38,9 @@ struct WineProcess {
         // Build environment: start with current process env, set WINEPREFIX, merge additional env
         var env = ProcessInfo.processInfo.environment
         env["WINEPREFIX"] = winePrefix.path
+        // Capture message box text in stderr so error dialogs are visible to the retry loop
+        let existingDebug = environment["WINEDEBUG"] ?? env["WINEDEBUG"] ?? ""
+        env["WINEDEBUG"] = existingDebug.isEmpty ? "+msgbox" : "\(existingDebug),+msgbox"
         for (key, value) in environment {
             env[key] = value
         }
