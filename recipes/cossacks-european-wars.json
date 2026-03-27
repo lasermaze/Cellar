@@ -21,6 +21,16 @@
   "install_dir": "GOG Games/Cossacks - European Wars",
   "retry_variants": [
     {
+      "description": "cnc-ddraw DirectDraw replacement (recommended for DirectDraw init failures)",
+      "environment": {
+        "WINE_CPU_TOPOLOGY": "1:0",
+        "WINEDLLOVERRIDES": "ddraw=n,b"
+      },
+      "actions": [
+        {"type": "place_dll", "dll": "cnc-ddraw", "target": "game_dir"}
+      ]
+    },
+    {
       "description": "Disable ddraw override (use Wine builtin)",
       "environment": {
         "WINE_CPU_TOPOLOGY": "1:0",

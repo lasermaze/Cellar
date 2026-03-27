@@ -8,9 +8,10 @@ struct WineActionExecutor {
 
     /// Execute a single WineFix action. Returns true if action succeeded.
     /// Failures: prints warning and returns false (repair loop continues).
+    /// The envConfigs tuple includes actions field from LaunchCommand.
     func execute(
         _ fix: WineFix,
-        envConfigs: inout [(description: String, environment: [String: String])],
+        envConfigs: inout [(description: String, environment: [String: String], actions: [WineFix])],
         configIndex: Int,
         installedDeps: inout Set<String>
     ) -> Bool {

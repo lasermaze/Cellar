@@ -62,34 +62,58 @@ struct LaunchCommand: ParsableCommand {
             throw ExitCode.failure
         }
 
-        // 7. Build the list of env configurations to try (base + retry variants)
-        var envConfigs: [(description: String, environment: [String: String])] = []
-        envConfigs.append((description: "Base recipe configuration", environment: recipeEnv))
+        // 7. Compute gameDir for WineActionExecutor
+        let gameDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
+
+        // 8. Create WineActionExecutor for applying all fix types uniformly
+        let executor = WineActionExecutor(
+            wineProcess: wineProcess,
+            wineURL: wineURL,
+            bottleURL: bottleURL,
+            gameDir: gameDir
+        )
+
+        // 9. Build the list of env configurations to try (base + retry variants with parsed actions)
+        var envConfigs: [(description: String, environment: [String: String], actions: [WineFix])] = []
+        envConfigs.append((description: "Base recipe configuration", environment: recipeEnv, actions: []))
         if let variants = recipe?.retryVariants {
             for variant in variants {
-                envConfigs.append((description: variant.description, environment: variant.environment))
+                // Parse recipe-level actions through AIService.parseWineFix(from:)
+                let parsedActions: [WineFix] = (variant.actions ?? []).compactMap { actionDict in
+                    AIService.parseWineFix(from: actionDict)
+                }
+                envConfigs.append((description: variant.description, environment: variant.environment, actions: parsedActions))
             }
         }
 
-        // 8. Self-healing retry loop (AGENT-09, AGENT-10, AGENT-11)
+        // 10. Self-healing retry loop with graduated escalation (AGENT-09, AGENT-10, AGENT-11)
         var lastResult: WineResult? = nil
         var lastErrors: [WineError] = []
         var attemptCount = 0
         var allAttempts: [(description: String, environment: [String: String], errors: [WineError])] = []
+        var appliedActions: [(description: String, actions: [String])] = []  // for repair report
 
         var installedDeps: Set<String> = []  // Track installed deps to avoid re-installing
         let maxTotalAttempts = 10  // Cap total attempts across dep installs + variant cycling (raised for AI budget)
         var totalAttempts = 0
 
         var configIndex = 0
-        var aiVariantsGenerated = false
+        var currentEscalationLevel = 1   // tracks which AI escalation level to call next (1, 2, 3)
         let originalEnvConfigsCount = envConfigs.count
         var winningConfigIndex = 0  // track which config succeeded
 
-        while (configIndex < envConfigs.count || !aiVariantsGenerated) && totalAttempts < maxTotalAttempts {
-            // Phase 3: AI variant injection — when bundled variants exhausted, ask AI for more
-            if configIndex >= envConfigs.count && !aiVariantsGenerated {
-                aiVariantsGenerated = true
+        while (configIndex < envConfigs.count || currentEscalationLevel <= 3) && totalAttempts < maxTotalAttempts {
+            // AI variant injection — when bundled variants exhausted, escalate and ask AI for more
+            if configIndex >= envConfigs.count && currentEscalationLevel <= 3 {
+                let level = currentEscalationLevel
+                currentEscalationLevel += 1
+
+                let escalationMessages = [
+                    1: "Trying environment variable adjustments...",
+                    2: "Escalating to DLL overrides and winetricks...",
+                    3: "Escalating to DLL replacements and registry edits..."
+                ]
+                print("\n\(escalationMessages[level] ?? "Trying next escalation level...")")
 
                 let history: [(description: String, envDiff: [String: String], errorSummary: String)] = allAttempts.map { attempt in
                     let errorSummary = attempt.errors.map { $0.detail }.joined(separator: "; ")
@@ -101,13 +125,14 @@ struct LaunchCommand: ParsableCommand {
                     gameId: game,
                     gameName: entry.name,
                     currentEnvironment: recipeEnv,
-                    attemptHistory: history
+                    attemptHistory: history,
+                    escalationLevel: level
                 ) {
                 case .success(let aiResult):
-                    print("\nAI analysis: \(aiResult.reasoning)")
+                    print("AI analysis: \(aiResult.reasoning)")
                     print("Generating \(aiResult.variants.count) alternative configuration(s)...\n")
                     for variant in aiResult.variants {
-                        envConfigs.append((description: variant.description, environment: variant.environment))
+                        envConfigs.append((description: variant.description, environment: variant.environment, actions: variant.actions))
                     }
                 case .unavailable:
                     break  // Silent — no API key is not an error
@@ -115,10 +140,15 @@ struct LaunchCommand: ParsableCommand {
                     print("AI variant generation failed: \(msg)")
                 }
 
-                // If no variants were added, exit
+                // If no variants were added at this level, try next level immediately
                 if configIndex >= envConfigs.count {
-                    break
+                    continue
                 }
+            }
+
+            // Guard: if all escalation levels exhausted and no variants left, stop
+            if configIndex >= envConfigs.count {
+                break
             }
 
             totalAttempts += 1
@@ -127,6 +157,20 @@ struct LaunchCommand: ParsableCommand {
 
             if totalAttempts > 1 {
                 print("\nAttempt \(totalAttempts): \(config.description)...")
+            }
+
+            // Apply variant-level actions (DLL placements, registry edits, etc.) before launch
+            if !config.actions.isEmpty {
+                var actionDescriptions: [String] = []
+                for action in config.actions {
+                    let success = executor.execute(action, envConfigs: &envConfigs, configIndex: configIndex, installedDeps: &installedDeps)
+                    if success {
+                        actionDescriptions.append("\(action)")
+                    }
+                }
+                if !actionDescriptions.isEmpty {
+                    appliedActions.append((description: config.description, actions: actionDescriptions))
+                }
             }
 
             // Prepare log file for this attempt
@@ -204,32 +248,12 @@ struct LaunchCommand: ParsableCommand {
             lastErrors = errors
             allAttempts.append((description: config.description, environment: config.environment, errors: errors))
 
-            // Check for winetricks fix BEFORE advancing to next variant
+            // Apply any error-diagnosed fix via WineActionExecutor BEFORE advancing variant
             var depInstalled = false
-            if let firstFix = errors.compactMap({ error -> String? in
-                if case .installWinetricks(let verb) = error.suggestedFix { return verb }
-                return nil
-            }).first, !installedDeps.contains(firstFix) {
-                // Try installing the dep and retry same config
-                if let winetricksURL = DependencyChecker().checkAll().winetricks {
-                    print("Diagnosed: missing dependency '\(firstFix)'. Installing via winetricks...")
-                    let runner = WinetricksRunner(
-                        winetricksURL: winetricksURL,
-                        wineBinary: wineURL,
-                        bottlePath: bottleURL.path
-                    )
-                    let wtResult = try runner.install(verb: firstFix)
-                    installedDeps.insert(firstFix)
-                    if wtResult.success {
-                        print("Installed \(firstFix). Retrying same configuration...")
-                        depInstalled = true
-                        // Don't advance configIndex — retry same config with dep installed
-                    } else if wtResult.timedOut {
-                        print("Warning: \(firstFix) install timed out. Advancing to next variant...")
-                    } else {
-                        print("Warning: \(firstFix) install failed. Advancing to next variant...")
-                    }
-                }
+            if let suggestedFix = errors.first?.suggestedFix {
+                print("Diagnosed: \(errors.first!.detail)")
+                let success = executor.execute(suggestedFix, envConfigs: &envConfigs, configIndex: configIndex, installedDeps: &installedDeps)
+                if success { depInstalled = true }
             }
 
             if !depInstalled {
@@ -241,42 +265,9 @@ struct LaunchCommand: ParsableCommand {
                     case .success(let diagnosis):
                         print("\nAI diagnosis: \(diagnosis.explanation)")
                         if let fix = diagnosis.suggestedFix {
-                            // AI suggested a fix -- try to apply it
-                            switch fix {
-                            case .installWinetricks(let verb):
-                                if !installedDeps.contains(verb),
-                                   let winetricksURL = DependencyChecker().checkAll().winetricks {
-                                    print("AI suggests installing '\(verb)' via winetricks...")
-                                    let runner = WinetricksRunner(
-                                        winetricksURL: winetricksURL,
-                                        wineBinary: wineURL,
-                                        bottlePath: bottleURL.path
-                                    )
-                                    let wtResult = try runner.install(verb: verb)
-                                    installedDeps.insert(verb)
-                                    if wtResult.success {
-                                        print("Installed \(verb). Retrying...")
-                                        depInstalled = true
-                                    }
-                                }
-                            case .setEnvVar(let key, let value):
-                                // Inject env var into current config for next retry
-                                print("AI suggests setting \(key)=\(value)")
-                                envConfigs[configIndex].environment[key] = value
-                                // Don't advance -- retry same config with new env
-                                depInstalled = true  // reuse flag to prevent configIndex advance
-                            case .setDLLOverride(let dll, let mode):
-                                let key = "WINEDLLOVERRIDES"
-                                let override = "\(dll)=\(mode)"
-                                let current = envConfigs[configIndex].environment[key] ?? ""
-                                let newValue = current.isEmpty ? override : "\(current);\(override)"
-                                print("AI suggests DLL override: \(override)")
-                                envConfigs[configIndex].environment[key] = newValue
-                                depInstalled = true
-                            case .placeDLL, .setRegistry, .compound:
-                                // Advanced fixes handled by WineActionExecutor in future plan
-                                break
-                            }
+                            print("AI suggests: \(fix)")
+                            let success = executor.execute(fix, envConfigs: &envConfigs, configIndex: configIndex, installedDeps: &installedDeps)
+                            if success { depInstalled = true }
                         }
                     case .unavailable:
                         break  // Silent -- no API key is not an error during launch
@@ -286,10 +277,10 @@ struct LaunchCommand: ParsableCommand {
                 }
 
                 if !depInstalled {
-                    // No dep installed (or dep already tried) — advance to next variant
+                    // No fix applied — advance to next variant
                     if errors.isEmpty {
                         print("Wine exited in \(String(format: "%.1f", result.elapsed))s with no diagnosed errors.")
-                    } else {
+                    } else if errors.first?.suggestedFix == nil {
                         print("Diagnosed: \(errors.first!.detail)")
                     }
                     configIndex += 1
@@ -391,6 +382,17 @@ struct LaunchCommand: ParsableCommand {
             } else {
                 reportLines.append("No specific errors diagnosed.")
             }
+            // Applied actions section
+            if !appliedActions.isEmpty {
+                reportLines.append("")
+                reportLines.append("--- Applied Actions ---")
+                for actionEntry in appliedActions {
+                    reportLines.append("Variant: \(actionEntry.description)")
+                    for action in actionEntry.actions {
+                        reportLines.append("  \(action)")
+                    }
+                }
+            }
             reportLines.append("")
             reportLines.append("--- Logs ---")
             reportLines.append("Log directory: \(CellarPaths.logDir(for: game).path)")
@@ -418,7 +420,9 @@ struct LaunchCommand: ParsableCommand {
         // Save winning AI variant as user recipe if it came from AI stage
         if winningConfigIndex >= originalEnvConfigsCount,
            let baseRecipe = recipe {
-            let winningEnv = envConfigs[winningConfigIndex].environment
+            let winningConfig = envConfigs[winningConfigIndex]
+            let winningEnv = winningConfig.environment
+            let winningActions = winningConfig.actions
             // Show winning config diff
             let diffKeys = winningEnv.filter { baseRecipe.environment[$0.key] != $0.value }
             if !diffKeys.isEmpty {
@@ -432,13 +436,39 @@ struct LaunchCommand: ParsableCommand {
             for (key, value) in winningEnv {
                 mergedEnv[key] = value
             }
+            // Include actions as a new retry variant if present
+            var updatedVariants = baseRecipe.retryVariants ?? []
+            if !winningActions.isEmpty {
+                let actionDicts: [[String: String]] = winningActions.compactMap { fix -> [String: String]? in
+                    switch fix {
+                    case .placeDLL(let name, let target):
+                        return ["type": "place_dll", "dll": name, "target": target == .system32 ? "system32" : "game_dir"]
+                    case .setRegistry(let key, let valueName, let data):
+                        return ["type": "set_registry", "key": key, "value_name": valueName, "data": data]
+                    case .setDLLOverride(let dll, let mode):
+                        return ["type": "set_dll_override", "dll": dll, "mode": mode]
+                    case .installWinetricks(let verb):
+                        return ["type": "install_winetricks", "verb": verb]
+                    case .setEnvVar(let k, let v):
+                        return ["type": "set_env", "key": k, "value": v]
+                    case .compound:
+                        return nil  // compound not serialized directly
+                    }
+                }
+                let winningVariant = RetryVariant(
+                    description: winningConfig.description,
+                    environment: diffKeys,
+                    actions: actionDicts.isEmpty ? nil : actionDicts
+                )
+                updatedVariants.append(winningVariant)
+            }
             let updatedRecipe = Recipe(
                 id: baseRecipe.id, name: baseRecipe.name, version: baseRecipe.version,
                 source: baseRecipe.source, executable: baseRecipe.executable,
                 wineTested: baseRecipe.wineTested, environment: mergedEnv,
                 registry: baseRecipe.registry, launchArgs: baseRecipe.launchArgs,
                 notes: baseRecipe.notes, setupDeps: baseRecipe.setupDeps,
-                installDir: baseRecipe.installDir, retryVariants: baseRecipe.retryVariants
+                installDir: baseRecipe.installDir, retryVariants: updatedVariants.isEmpty ? nil : updatedVariants
             )
             try RecipeEngine.saveUserRecipe(updatedRecipe)
         } else if winningConfigIndex >= originalEnvConfigsCount,
