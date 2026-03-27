@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-27T17:53:14.285Z"
+last_updated: "2026-03-27T18:34:51.356Z"
 progress:
-  total_phases: 3
+  total_phases: 4
   completed_phases: 3
-  total_plans: 10
-  completed_plans: 10
+  total_plans: 12
+  completed_plans: 11
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 
 ## Current Position
 
-Phase: 02-ai-intelligence (Phase 2)
-Plan: 2 of 2 in current phase (02-02 complete — PHASE COMPLETE)
-Status: Complete — Phase 02 complete
-Last activity: 2026-03-27 — Plan 02-02 complete: AI diagnosis wired into LaunchCommand retry loop, AI recipe generation wired into AddCommand post-install flow
+Phase: 03-repair-loop (Phase 3)
+Plan: 1 of 2 in current phase (03-01 complete)
+Status: In Progress — Phase 03 Plan 01 complete, Plan 02 pending
+Last activity: 2026-03-27 — Plan 03-01 complete: WineProcess stale-output hang detection, AIVariantResult model, CellarPaths.repairReportFile, AIService.generateVariants()
 
 Progress: [██████████] Phase 01 complete; Phase 01.1 complete; Phase 02 complete
 
@@ -55,6 +55,7 @@ Progress: [██████████] Phase 01 complete; Phase 01.1 complet
 | Phase 01.1-reactive-dependencies P02 | 6 | 2 tasks | 2 files |
 | Phase 02-ai-intelligence P01 | 3min | 2 tasks | 4 files |
 | Phase 02-ai-intelligence P02 | 3min | 2 tasks | 2 files |
+| Phase 03-repair-loop P01 | 8min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,8 @@ Recent decisions affecting current work:
 - 2026-03-27 (02-02): AI fix application in LaunchCommand reuses depInstalled flag to prevent configIndex advance, keeping retry-loop semantics
 - 2026-03-27 (02-02): var activeRecipe = recipe pattern in AddCommand lets recipe stay let-bound from store while AI augmentation is mutable
 - 2026-03-27 (02-02): AI recipe generation only triggers when recipe == nil — bundled recipes always take precedence
+- [Phase 03-repair-loop]: generateVariants prompt explicitly prohibits registry edits and winetricks — env vars and WINEDLLOVERRIDES only
+- [Phase 03-repair-loop]: Attempt history error summaries capped at 500 chars per entry to prevent prompt token explosion
 
 ### Pending Todos
 
@@ -115,4 +118,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 02-02 — AI wired into LaunchCommand (diagnosis on failure) and AddCommand (recipe generation for unknown games). Phase 02 complete.
+Stopped at: Completed 03-01 — repair loop infrastructure: stale-output hang detection, AIVariantResult, CellarPaths.repairReportFile, AIService.generateVariants. Phase 03 Plan 01 complete.
