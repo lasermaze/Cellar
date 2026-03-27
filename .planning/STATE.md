@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-27T17:45:31Z"
+last_updated: "2026-03-27T17:49:00Z"
 progress:
   total_phases: 2
   completed_phases: 2
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 02-ai-intelligence (Phase 2)
-Plan: 1 of 2 in current phase (02-01 complete)
-Status: In progress — Plan 02-01 complete
-Last activity: 2026-03-27 — Plan 02-01 complete: AIService module with Anthropic/OpenAI provider routing, diagnosis, recipe generation, user-recipe persistence
+Plan: 2 of 2 in current phase (02-02 complete — PHASE COMPLETE)
+Status: Complete — Phase 02 complete
+Last activity: 2026-03-27 — Plan 02-02 complete: AI diagnosis wired into LaunchCommand retry loop, AI recipe generation wired into AddCommand post-install flow
 
-Progress: [██████████] Phase 01 complete; Phase 01.1 complete; Phase 02 plan 1 complete
+Progress: [██████████] Phase 01 complete; Phase 01.1 complete; Phase 02 complete
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Progress: [██████████] Phase 01 complete; Phase 01.1 complet
 | Phase 01.1-reactive-dependencies P01 | 2min | 2 tasks | 4 files |
 | Phase 01.1-reactive-dependencies P02 | 6 | 2 tasks | 2 files |
 | Phase 02-ai-intelligence P01 | 3min | 2 tasks | 4 files |
+| Phase 02-ai-intelligence P02 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,10 @@ Recent decisions affecting current work:
 - 2026-03-27 (02-01): ResultBox @unchecked Sendable class used for URLSession dataTask result capture — avoids Swift 6 captured-var mutation warning
 - 2026-03-27 (02-01): Winetricks verb validation against known-safe allowlist prevents AI hallucinated verb names
 - 2026-03-27 (02-01): AIResult<T> named to avoid shadowing Swift.Result
+- 2026-03-27 (02-02): LaunchCommand AI diagnosis is silent on .unavailable — no API key is not an error during launch
+- 2026-03-27 (02-02): AI fix application in LaunchCommand reuses depInstalled flag to prevent configIndex advance, keeping retry-loop semantics
+- 2026-03-27 (02-02): var activeRecipe = recipe pattern in AddCommand lets recipe stay let-bound from store while AI augmentation is mutable
+- 2026-03-27 (02-02): AI recipe generation only triggers when recipe == nil — bundled recipes always take precedence
 
 ### Pending Todos
 
@@ -110,4 +115,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 02-01 — AIService module with provider routing, diagnose(), generateRecipe(), user-recipe persistence
+Stopped at: Completed 02-02 — AI wired into LaunchCommand (diagnosis on failure) and AddCommand (recipe generation for unknown games). Phase 02 complete.
