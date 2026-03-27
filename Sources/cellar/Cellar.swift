@@ -5,7 +5,7 @@ struct Cellar: ParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "cellar",
         abstract: "Wine game launcher for old PC games on macOS",
-        subcommands: [StatusCommand.self, AddCommand.self, LaunchCommand.self],
+        subcommands: [StatusCommand.self, AddCommand.self, LaunchCommand.self, LogCommand.self],
         defaultSubcommand: StatusCommand.self
     )
 }
