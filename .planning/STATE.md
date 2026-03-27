@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-27T16:59:05Z"
+last_updated: "2026-03-27T17:05:44.208Z"
 progress:
   total_phases: 2
-  completed_phases: 1
-  total_plans: 7
-  completed_plans: 7
+  completed_phases: 2
+  total_plans: 8
+  completed_plans: 8
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 01.1-reactive-dependencies (Phase 1.1)
-Plan: 1 of N in current phase (01.1-01 complete)
-Status: In progress — Plan 01.1-01 complete
-Last activity: 2026-03-27 — Plan 01.1-01 complete: WinetricksRunner service created, WineResult.timedOut added, WineProcess drain fixes applied
+Plan: 2 of 2 in current phase (01.1-02 complete)
+Status: Complete — Phase 01.1 fully complete
+Last activity: 2026-03-27 — Plan 01.1-02 complete: reactive dep pipeline in AddCommand + LaunchCommand retry loop with dep installation
 
-Progress: [██████████] Phase 01 complete; Phase 01.1 Plan 01 complete
+Progress: [██████████] Phase 01 complete; Phase 01.1 complete
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [██████████] Phase 01 complete; Phase 01.1 Plan 01
 | Phase 01-cossacks-launches P05 | 7 | 2 tasks | 9 files |
 | Phase 01-cossacks-launches P06 | 7 | 2 tasks | 5 files |
 | Phase 01.1-reactive-dependencies P01 | 2min | 2 tasks | 4 files |
+| Phase 01.1-reactive-dependencies P02 | 6 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,9 @@ Recent decisions affecting current work:
 - [Phase 01.1-01]: WinetricksRunner always passes -q for unattended (no-dialog) winetricks mode
 - [Phase 01.1-01]: Stale-output timeout is 5 minutes — no output for 5 min = process assumed hung, kill + wineserver cleanup
 - [Phase 01.1-01]: OutputMonitor reuses NSLock + @unchecked Sendable pattern from WineProcess.StderrCapture for Swift 6 compliance
+- [Phase 01.1-reactive-dependencies]: setup_deps semantic change: from must-pre-install to known-fixes-if-needed — eliminates 30+ min dotnet48 upfront install
+- [Phase 01.1-reactive-dependencies]: LaunchCommand while-loop retry retries same envConfig after dep install (configIndex not advanced on dep install)
+- [Phase 01.1-reactive-dependencies]: maxTotalAttempts=5 replaces old min(count,3) cap — covers both dep installs and variant cycling
 
 ### Pending Todos
 
@@ -100,4 +104,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 01.1-01 — WinetricksRunner service + WineResult.timedOut + WineProcess drain fixes
+Stopped at: Completed 01.1-02 — reactive dep pipeline in AddCommand + LaunchCommand retry loop with dep installation
