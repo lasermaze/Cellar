@@ -35,9 +35,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Launch & Logs
 
-- [ ] **LAUNCH-01**: User can launch a game via Wine with correct WINEPREFIX and recipe flags
-- [ ] **LAUNCH-02**: Cellar captures Wine stdout/stderr to per-launch log files
-- [ ] **LAUNCH-03**: After launch, Cellar asks user if the game reached the menu (validation prompt)
+- [x] **LAUNCH-01**: User can launch a game via Wine with correct WINEPREFIX and recipe flags
+- [x] **LAUNCH-02**: Cellar captures Wine stdout/stderr to per-launch log files
+- [x] **LAUNCH-03**: After launch, Cellar asks user if the game reached the menu (validation prompt)
 - [ ] **LAUNCH-04**: AI interprets Wine crash logs and provides human-readable diagnosis
 
 ### Community
@@ -106,9 +106,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BOTTLE-01 | Phase 1 | Complete |
 | RECIPE-01 | Phase 1 | Complete |
 | RECIPE-02 | Phase 1 | Complete |
-| LAUNCH-01 | Phase 1 | Pending |
-| LAUNCH-02 | Phase 1 | Pending |
-| LAUNCH-03 | Phase 1 | Pending |
+| LAUNCH-01 | Phase 1 | Complete |
+| LAUNCH-02 | Phase 1 | Complete |
+| LAUNCH-03 | Phase 1 | Complete |
 | RECIPE-03 | Phase 2 | Pending |
 | LAUNCH-04 | Phase 2 | Pending |
 | RECIPE-04 | Phase 3 | Pending |

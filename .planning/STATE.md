@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-27T01:08:22.927Z"
+last_updated: "2026-03-27T01:13:34.579Z"
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 1 of 5 (Cossacks Launches)
-Plan: 3 of ? in current phase
-Status: In progress
-Last activity: 2026-03-27 — Plan 03 complete: WineProcess, BottleManager, RecipeEngine, Cossacks recipe JSON
+Plan: 4 of 4 in current phase
+Status: Awaiting human verification (Task 3 checkpoint — cellar add + cellar launch pipeline test)
+Last activity: 2026-03-27 — Plan 04 Tasks 1-2 complete: CellarStore, AddCommand, LaunchCommand, LogCommand, ValidationPrompt
 
-Progress: [██░░░░░░░░] 10%
+Progress: [██████████] 100% (Phase 1 code complete, pending human verify)
 
 ## Performance Metrics
 
@@ -48,6 +48,7 @@ Progress: [██░░░░░░░░] 10%
 
 *Updated after each plan completion*
 | Phase 01-cossacks-launches P03 | 2 | 2 tasks | 4 files |
+| Phase 01-cossacks-launches P04 | 3min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,9 @@ Recent decisions affecting current work:
 - 2026-03-27 (01-02): StatusCommand re-checks DependencyChecker after each install attempt for accurate updated status
 - [Phase 01-03]: logHandle captured as let constant — Swift 6 Sendable requires let binding for values captured in concurrently-executing closures like readabilityHandler
 - [Phase 01-03]: RecipeEngine.findBundledRecipe uses Bundle.main first then CWD fallback — covers both release bundle and swift run development workflow
+- [Phase 01-04]: GOG install path hardcoded as drive_c/GOG Games/Cossacks - European Wars/ — predictable GOG behavior, trivial fix if it differs in practice
+- [Phase 01-04]: SIGINT handler kills wineserver (-k) rather than Process.terminate() — WineProcess.run() is synchronous and doesn't expose the underlying Process; wineserver -k is Wine-aware termination for all prefix processes
+- [Phase 01-04]: slugify() produces stable game IDs from directory names: lowercase + spaces-to-hyphens + strip non-alphanumeric — e.g., Cossacks European Wars -> cossacks-european-wars
 
 ### Pending Todos
 
@@ -84,5 +88,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 01-03-PLAN.md — WineProcess, BottleManager, RecipeEngine, Cossacks recipe JSON
+Stopped at: Completed 01-04 Tasks 1-2 — CellarStore, AddCommand, LogCommand, LaunchCommand, ValidationPrompt. Paused at Task 3: human-verify checkpoint (test cellar add + cellar launch with real Cossacks installer).
 Resume file: None
