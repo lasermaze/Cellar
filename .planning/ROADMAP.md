@@ -12,7 +12,7 @@ Cellar is built in five vertical slices. Each phase delivers a working capabilit
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [x] **Phase 1: Cossacks Launches** - Prove the core pipeline end-to-end: dependency check, bottle creation, hardcoded recipe, launch, log capture, validation prompt (completed 2026-03-27)
+- [ ] **Phase 1: Cossacks Launches** - Prove the core pipeline end-to-end with self-healing agentic behavior: dependency check, bottle creation, winetricks deps, installer, executable discovery, recipe application, error diagnosis, retry loop, validation prompt
 - [ ] **Phase 2: AI Intelligence** - Add AI log interpretation and AI recipe generation to the working launch loop
 - [ ] **Phase 3: Repair Loop** - When launch fails, AI diagnoses and retries with variant configs; self-healing pipeline
 - [ ] **Phase 4: Multi-Game Management** - Generalize beyond Cossacks; add/remove games, bottle reset, winecfg, full CLI surface
@@ -21,22 +21,26 @@ Decimal phases appear between their surrounding integers in numeric order.
 ## Phase Details
 
 ### Phase 1: Cossacks Launches
-**Goal**: Cossacks: European Wars launches end-to-end through the full pipeline on a fresh Mac, with no manual Wine configuration required
+**Goal**: Cossacks: European Wars launches end-to-end through a self-healing agentic pipeline on a fresh Mac, with no manual Wine configuration required
 **Depends on**: Nothing (first phase)
-**Requirements**: SETUP-01, SETUP-02, SETUP-03, SETUP-04, SETUP-05, BOTTLE-01, RECIPE-01, RECIPE-02, LAUNCH-01, LAUNCH-02, LAUNCH-03
+**Requirements**: SETUP-01, SETUP-02, SETUP-03, SETUP-04, SETUP-05, BOTTLE-01, RECIPE-01, RECIPE-02, LAUNCH-01, LAUNCH-02, LAUNCH-03, AGENT-01, AGENT-02, AGENT-03, AGENT-04, AGENT-05, AGENT-06, AGENT-07, AGENT-08, AGENT-09, AGENT-10, AGENT-11, AGENT-12
 **Success Criteria** (what must be TRUE):
-  1. Running `cellar` on a fresh Mac reports the status of Homebrew, Wine (Gcenx tap), and GPTK — missing dependencies are named explicitly
+  1. Running `cellar` on a fresh Mac reports the status of Homebrew, Wine (Gcenx tap), winetricks, and GPTK — missing dependencies are named explicitly
   2. A user without Homebrew or Wine is guided through installation step-by-step and can complete the setup by following the on-screen instructions
-  3. Running `cellar launch cossacks` with a valid game path creates an isolated WINEPREFIX for Cossacks automatically and applies the bundled recipe (registry edits, DLL overrides, env vars, launch args)
-  4. The game process launches with Wine and its stdout/stderr is written to a per-launch log file
-  5. After launch exits, Cellar asks "Did the game reach the menu? (y/n)" and records the response
-**Plans:** 4/4 plans complete
+  3. Running `cellar add /path/to/setup.exe` creates a bottle, installs winetricks dependencies, runs the GOG installer, scans for executables, and validates the installation
+  4. Running `cellar launch cossacks` applies the bundled recipe, launches the game, and retries with variant configurations on failure (up to 3 attempts with error diagnosis)
+  5. The game process launches with Wine and its stdout/stderr is written to a per-launch log file
+  6. After launch exits, Cellar asks "Did the game reach the menu? (y/n)" and records the response with attempt count and diagnosis
+  7. After exhausting retries, Cellar reports what was tried and the best diagnosis
+**Plans:** 6 plans (4 complete, 2 new)
 
 Plans:
 - [ ] 01-01-PLAN.md — Swift package scaffold, models, dependency checker (SETUP-01, SETUP-02, SETUP-05)
 - [ ] 01-02-PLAN.md — Guided install UX and StatusCommand wiring (SETUP-03, SETUP-04)
 - [ ] 01-03-PLAN.md — Bottle manager, recipe engine, Cossacks recipe (BOTTLE-01, RECIPE-01, RECIPE-02)
 - [ ] 01-04-PLAN.md — Add/Launch/Log commands, validation prompt, end-to-end pipeline (LAUNCH-01, LAUNCH-02, LAUNCH-03)
+- [ ] 01-05-PLAN.md — Agentic infrastructure: Recipe schema extension, WineResult, WineErrorParser, BottleScanner, winetricks detection, quarantine fix (AGENT-01, AGENT-03, AGENT-04, AGENT-07, AGENT-08, AGENT-12)
+- [ ] 01-06-PLAN.md — Agentic commands: winetricks deps in add, post-install validation, executable discovery, retry loop, variant cycling, exhaustion report (AGENT-02, AGENT-05, AGENT-06, AGENT-09, AGENT-10, AGENT-11)
 
 ### Phase 2: AI Intelligence
 **Goal**: The launch pipeline uses AI to interpret crash logs in plain English and to generate recipes for games that have no bundled recipe
@@ -86,7 +90,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Cossacks Launches | 4/4 | Complete   | 2026-03-27 |
+| 1. Cossacks Launches | 4/6 | In progress | - |
 | 2. AI Intelligence | 0/? | Not started | - |
 | 3. Repair Loop | 0/? | Not started | - |
 | 4. Multi-Game Management | 0/? | Not started | - |
