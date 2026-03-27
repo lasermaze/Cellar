@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-27T01:13:34.579Z"
+last_updated: "2026-03-27T05:11:39.458Z"
 progress:
   total_phases: 1
-  completed_phases: 1
-  total_plans: 4
-  completed_plans: 4
+  completed_phases: 0
+  total_plans: 6
+  completed_plans: 5
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 1 of 5 (Cossacks Launches)
-Plan: 4 of 4 in current phase
-Status: Awaiting human verification (Task 3 checkpoint — cellar add + cellar launch pipeline test)
-Last activity: 2026-03-27 — Plan 04 Tasks 1-2 complete: CellarStore, AddCommand, LaunchCommand, LogCommand, ValidationPrompt
+Plan: 5 of 6 in current phase
+Status: In progress — Plan 05 complete, ready for Plan 06
+Last activity: 2026-03-26 — Plan 05 complete: WineResult, WineErrorParser, BottleScanner, winetricks dependency, quarantine fix
 
 Progress: [██████████] 100% (Phase 1 code complete, pending human verify)
 
@@ -49,6 +49,7 @@ Progress: [██████████] 100% (Phase 1 code complete, pending 
 *Updated after each plan completion*
 | Phase 01-cossacks-launches P03 | 2 | 2 tasks | 4 files |
 | Phase 01-cossacks-launches P04 | 3min | 2 tasks | 6 files |
+| Phase 01-cossacks-launches P05 | 7 | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,9 @@ Recent decisions affecting current work:
 - [Phase 01-04]: GOG install path hardcoded as drive_c/GOG Games/Cossacks - European Wars/ — predictable GOG behavior, trivial fix if it differs in practice
 - [Phase 01-04]: SIGINT handler kills wineserver (-k) rather than Process.terminate() — WineProcess.run() is synchronous and doesn't expose the underlying Process; wineserver -k is Wine-aware termination for all prefix processes
 - [Phase 01-04]: slugify() produces stable game IDs from directory names: lowercase + spaces-to-hyphens + strip non-alphanumeric — e.g., Cossacks European Wars -> cossacks-european-wars
+- [Phase 01-05]: StderrCapture uses NSLock wrapper class for Swift 6 Sendable compliance in WineProcess readabilityHandler
+- [Phase 01-05]: allRequired now requires winetricks — DependencyStatus and guided install flow updated
+- [Phase 01-05]: GuidedInstaller.installWine() uses plain brew install with xattr fallback — no --no-quarantine flag
 
 ### Pending Todos
 
@@ -88,5 +92,5 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-26
-Stopped at: Updated phase docs (01-RESEARCH.md, REQUIREMENTS.md, 01-CONTEXT.md) with agentic architecture. Ready to plan 01-05 and 01-06.
+Stopped at: Completed 01-05-PLAN.md — agentic infrastructure layer complete. Ready for 01-06.
 Resume file: .planning/phases/01-cossacks-launches/.continue-here.md
