@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-27T22:35:18.334Z"
+last_updated: "2026-03-27T22:40:58.350Z"
 progress:
   total_phases: 6
   completed_phases: 5
   total_plans: 17
-  completed_plans: 15
+  completed_plans: 16
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 06-implement-agentic-launch-architecture-with-ai-tool-use-loop (Phase 6)
-Plan: 1 of N complete (06-01 complete)
+Plan: 2 of N complete (06-01, 06-02 complete)
 Status: Phase 06 In Progress
-Last activity: 2026-03-27 — Plan 06-01 complete: JSONValue, ToolContentBlock, MessageContent, ToolDefinition, AnthropicToolRequest/Response added to AIModels.swift; AgentLoop state machine created in AgentLoop.swift.
+Last activity: 2026-03-27 — Plan 06-02 complete: AgentTools class with all 10 tool implementations (inspect_game, read_log, read_registry, ask_user, set_environment, set_registry, install_winetricks, place_dll, launch_game, save_recipe).
 
 Progress: [██████████] Phase 01 complete; Phase 01.1 complete; Phase 02 complete; Phase 03 complete; Phase 03.1 in progress (1/2)
 
@@ -61,6 +61,7 @@ Progress: [██████████] Phase 01 complete; Phase 01.1 complet
 | Phase 03.1-expand-ai-repair-system P01 | 8min | 2 tasks | 8 files |
 | Phase 03.1-expand-ai-repair-system P02 | 6min | 2 tasks | 5 files |
 | Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop P01 | 2min | 2 tasks | 2 files |
+| Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop P02 | 3 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,9 @@ Recent decisions affecting current work:
 - [Phase 06-01]: JSONValue decodes Bool before Double — critical ordering to prevent true/false becoming 1.0/0.0
 - [Phase 06-01]: ToolContentBlock named to avoid collision with AnthropicResponse.ContentBlock
 - [Phase 06-01]: AgentLoop struct with private callAPI — mirrors AIService DispatchSemaphore+ResultBox pattern without exposing internals
+- [Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop]: AgentTools is a class not struct — mutable state persists across tool calls within one agent session
+- [Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop]: All tool methods catch errors internally and return JSON error strings — agent loop contract is String return, never throw
+- [Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop]: AIService.agentValidWinetricksVerbs added as public extension rather than duplicating private validWinetricksVerbs — single source of truth
 
 ### Pending Todos
 
@@ -142,4 +146,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-27
-Stopped at: Completed 06-01 — JSONValue recursive Codable enum, ToolContentBlock tagged union, MessageContent, ToolDefinition, AnthropicToolRequest/Response types, and AgentLoop state machine. Phase 06 plan 1 of N complete.
+Stopped at: Completed 06-02 — AgentTools class with 10 tool definitions and implementations: inspect_game, read_log, read_registry, ask_user, set_environment, set_registry, install_winetricks, place_dll, launch_game, save_recipe. Phase 06 plan 2 of N complete.
