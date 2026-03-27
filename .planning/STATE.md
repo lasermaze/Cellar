@@ -112,6 +112,10 @@ Recent decisions affecting current work:
 
 None.
 
+### Roadmap Evolution
+
+- Phase 03.1 inserted after Phase 03: Expand AI repair system to support DLL replacements and advanced fixes beyond env vars (URGENT)
+
 ### Blockers/Concerns
 
 - Swift TUI ecosystem is weak — v1 is CLI-only (TUI deferred to v2), but raw ANSI may be needed for good UX
