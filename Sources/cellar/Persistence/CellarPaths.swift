@@ -10,6 +10,14 @@ struct CellarPaths {
 
     static let logsDir: URL = base.appendingPathComponent("logs")
 
+    static let userRecipesDir: URL = base.appendingPathComponent("recipes")
+
+    static func userRecipeFile(for gameId: String) -> URL {
+        userRecipesDir.appendingPathComponent("\(gameId).json")
+    }
+
+    static let aiTipSentinel: URL = base.appendingPathComponent(".ai-tip-shown")
+
     static func bottleDir(for gameId: String) -> URL {
         bottlesDir.appendingPathComponent(gameId)
     }
