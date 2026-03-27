@@ -135,3 +135,15 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 3. Repair Loop | 0/? | Not started | - |
 | 4. Multi-Game Management | 0/? | Not started | - |
 | 5. Community | 0/? | Not started | - |
+
+### Phase 6: Implement agentic launch architecture with AI tool-use loop
+
+**Goal:** Replace the ~500-line hardcoded LaunchCommand pipeline with an AI agent loop that has tools to inspect, configure, launch, and diagnose Wine games — no fixed escalation levels, no hardcoded retry logic. Graceful degradation to recipe-only launch when no API key is set.
+**Requirements**: None (INSERTED phase — extends existing launch architecture)
+**Depends on:** Phase 3.1
+**Plans:** 3 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Tool-use API types (JSONValue, ContentBlock, ToolDefinition) and AgentLoop state machine
+- [ ] 06-02-PLAN.md — 10 agent tool implementations (inspect_game, read_log, read_registry, ask_user, set_environment, set_registry, install_winetricks, place_dll, launch_game, save_recipe)
+- [ ] 06-03-PLAN.md — Wire agent into LaunchCommand with system prompt and graceful degradation fallback
