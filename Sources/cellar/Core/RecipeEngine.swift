@@ -31,6 +31,22 @@ struct RecipeEngine {
             return try loadRecipe(from: cwdRecipePath)
         }
 
+        // Strategy 3: Scan all recipes for one whose ID is a substring of the game ID
+        // e.g., recipe "cossacks-european-wars" matches game ID "gog-galaxy-cossacks-european-wars"
+        let recipesDir = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("recipes")
+        if let contents = try? FileManager.default.contentsOfDirectory(
+            at: recipesDir,
+            includingPropertiesForKeys: nil
+        ) {
+            for file in contents where file.pathExtension == "json" {
+                let recipeId = file.deletingPathExtension().lastPathComponent
+                if gameId.contains(recipeId) {
+                    return try loadRecipe(from: file)
+                }
+            }
+        }
+
         // No recipe found for this game ID
         return nil
     }

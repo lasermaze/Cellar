@@ -27,10 +27,10 @@ struct AddCommand: ParsableCommand {
             throw ExitCode.failure
         }
 
-        // 3. Derive game name and ID from installer's parent directory name
-        let parentDirName = installerURL.deletingLastPathComponent().lastPathComponent
-        let gameName = parentDirName
-        let gameId = slugify(parentDirName)
+        // 3. Derive game name and ID from installer filename (strip extension)
+        let installerName = installerURL.deletingPathExtension().lastPathComponent
+        let gameName = installerName.replacingOccurrences(of: "_", with: " ")
+        let gameId = slugify(installerName)
 
         // 4. Check if game already exists
         if let existing = try? CellarStore.findGame(id: gameId) {
@@ -119,6 +119,7 @@ struct AddCommand: ParsableCommand {
             let expectedDir = bottleURL
                 .appendingPathComponent("drive_c")
                 .appendingPathComponent(installDir)
+                .resolvingSymlinksInPath()
             if !FileManager.default.fileExists(atPath: expectedDir.path) {
                 print("Warning: Expected install directory not found: \(installDir)")
                 print("The installer may have used a different path. Checking for executables...")
@@ -132,7 +133,15 @@ struct AddCommand: ParsableCommand {
         } else {
             print("Found \(discovered.count) executable(s):")
             for exe in discovered.prefix(5) {
-                let relativePath = exe.path.replacingOccurrences(of: bottleURL.path + "/drive_c/", with: "")
+                let resolvedDriveC: String = {
+                    guard let r = realpath(bottleURL.appendingPathComponent("drive_c").path, nil) else {
+                        return bottleURL.appendingPathComponent("drive_c").path + "/"
+                    }
+                    let s = String(cString: r) + "/"
+                    free(r)
+                    return s
+                }()
+                let relativePath = exe.path.replacingOccurrences(of: resolvedDriveC, with: "")
                 print("  \(relativePath)")
             }
         }
@@ -171,7 +180,11 @@ struct AddCommand: ParsableCommand {
     /// Convert a directory name to a slug: lowercase, spaces to hyphens, strip non-alphanumeric except hyphens.
     private func slugify(_ name: String) -> String {
         name.lowercased()
+            .replacingOccurrences(of: "_", with: "-")
             .replacingOccurrences(of: " ", with: "-")
             .filter { $0.isLetter || $0.isNumber || $0 == "-" }
+            .components(separatedBy: "-")
+            .filter { !$0.isEmpty }
+            .joined(separator: "-")
     }
 }

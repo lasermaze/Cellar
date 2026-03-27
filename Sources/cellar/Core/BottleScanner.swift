@@ -5,7 +5,7 @@ struct BottleScanner {
     /// Skips Wine system directories and known non-game executables.
     /// Returns discovered .exe paths sorted by depth (shallowest first).
     static func scanForExecutables(bottlePath: URL) -> [URL] {
-        let driveC = bottlePath.appendingPathComponent("drive_c")
+        let driveC = BottleScanner.resolvedURL(bottlePath.appendingPathComponent("drive_c"))
 
         // Directories to skip — Wine system dirs that contain non-game executables
         let skipDirs: Set<String> = ["windows", "programdata", "users"]
@@ -56,6 +56,14 @@ struct BottleScanner {
         }
 
         return results
+    }
+
+    /// Resolve a URL through the filesystem, handling macOS firmlinks (/var → /private/var).
+    private static func resolvedURL(_ url: URL) -> URL {
+        guard let resolved = realpath(url.path, nil) else { return url }
+        let result = URL(fileURLWithPath: String(cString: resolved))
+        free(resolved)
+        return result
     }
 
     /// Match a recipe's expected executable name against scan results.
