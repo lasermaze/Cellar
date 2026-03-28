@@ -312,6 +312,113 @@ final class AgentTools {
                 ]),
                 "required": .array([.string("dll_name")])
             ])
+        ),
+
+        // 15. query_successdb — optional query params
+        ToolDefinition(
+            name: "query_successdb",
+            description: "Query the local success database for known-working game configurations. Query by game_id (exact), tags (overlap), engine (substring), graphics_api (substring), or symptom (fuzzy keyword match against pitfalls). Call this BEFORE web research — local knowledge is faster and more reliable.",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "game_id": .object([
+                        "type": .string("string"),
+                        "description": .string("Exact game ID to look up (e.g. 'cossacks-european-wars')")
+                    ]),
+                    "tags": .object([
+                        "type": .string("array"),
+                        "description": .string("Tags to match (any overlap). E.g. ['directdraw', '2d-rts']"),
+                        "items": .object(["type": .string("string")])
+                    ]),
+                    "engine": .object([
+                        "type": .string("string"),
+                        "description": .string("Engine name substring to match (e.g. 'unreal', 'source')")
+                    ]),
+                    "graphics_api": .object([
+                        "type": .string("string"),
+                        "description": .string("Graphics API substring to match (e.g. 'directdraw', 'd3d9')")
+                    ]),
+                    "symptom": .object([
+                        "type": .string("string"),
+                        "description": .string("Symptom description for fuzzy matching against known pitfalls (e.g. 'black screen on launch')")
+                    ])
+                ]),
+                "required": .array([])
+            ])
+        ),
+
+        // 16. save_success — required game_name, many optional detail params
+        ToolDefinition(
+            name: "save_success",
+            description: "Save a comprehensive success record after the game launches successfully. Captures everything: environment, DLL overrides with placement details, game config files, registry settings, pitfalls (what went wrong and how it was fixed), and a resolution narrative. This replaces save_recipe for detailed records.",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "game_name": .object([
+                        "type": .string("string"),
+                        "description": .string("Human-readable game name (e.g. 'Cossacks: European Wars')")
+                    ]),
+                    "game_version": .object([
+                        "type": .string("string"),
+                        "description": .string("Game version if known")
+                    ]),
+                    "source": .object([
+                        "type": .string("string"),
+                        "description": .string("Game source: 'gog', 'steam', 'disc', 'other'")
+                    ]),
+                    "engine": .object([
+                        "type": .string("string"),
+                        "description": .string("Game engine if known (e.g. 'custom', 'unreal', 'source')")
+                    ]),
+                    "graphics_api": .object([
+                        "type": .string("string"),
+                        "description": .string("Primary graphics API: 'directdraw', 'direct3d8', 'direct3d9', 'opengl'")
+                    ]),
+                    "bottle_type": .object([
+                        "type": .string("string"),
+                        "description": .string("Wine bottle type: 'wow64' or 'standard'")
+                    ]),
+                    "working_directory_notes": .object([
+                        "type": .string("string"),
+                        "description": .string("Notes about working directory requirements")
+                    ]),
+                    "dll_overrides": .object([
+                        "type": .string("array"),
+                        "description": .string("DLL overrides applied. Each object: {dll, mode, placement?, source?}"),
+                        "items": .object(["type": .string("object")])
+                    ]),
+                    "game_config_files": .object([
+                        "type": .string("array"),
+                        "description": .string("Game config files modified. Each: {path, purpose, critical_settings?}"),
+                        "items": .object(["type": .string("object")])
+                    ]),
+                    "registry": .object([
+                        "type": .string("array"),
+                        "description": .string("Registry entries set. Each: {key, value_name, data, purpose?}"),
+                        "items": .object(["type": .string("object")])
+                    ]),
+                    "game_specific_dlls": .object([
+                        "type": .string("array"),
+                        "description": .string("Game-specific DLLs placed. Each: {filename, source, placement, version?}"),
+                        "items": .object(["type": .string("object")])
+                    ]),
+                    "pitfalls": .object([
+                        "type": .string("array"),
+                        "description": .string("Pitfalls encountered. Each: {symptom, cause, fix, wrong_fix?}"),
+                        "items": .object(["type": .string("object")])
+                    ]),
+                    "resolution_narrative": .object([
+                        "type": .string("string"),
+                        "description": .string("Free-text narrative of the resolution process and what finally worked")
+                    ]),
+                    "tags": .object([
+                        "type": .string("array"),
+                        "description": .string("Searchable tags for this game (e.g. ['directdraw', '2d-rts', 'gog', 'cnc-ddraw'])"),
+                        "items": .object(["type": .string("string")])
+                    ])
+                ]),
+                "required": .array([.string("game_name")])
+            ])
         )
     ]
 
@@ -331,6 +438,11 @@ final class AgentTools {
         case "launch_game":       return launchGame(input: input)
         case "save_recipe":       return saveRecipe(input: input)
         case "write_game_file":   return writeGameFile(input: input)
+        case "query_successdb":   return querySuccessdb(input: input)
+        case "save_success":      return saveSuccess(input: input)
+        case "trace_launch":      return traceLaunch(input: input)
+        case "check_file_access": return checkFileAccess(input: input)
+        case "verify_dll_override": return verifyDllOverride(input: input)
         default:
             return jsonResult(["error": "Unknown tool: \(toolName)"])
         }
@@ -418,11 +530,91 @@ final class AgentTools {
             ]
         }
 
+        // PE imports via objdump -p
+        var peImports: [String] = []
+        let objdumpProcess = Process()
+        objdumpProcess.executableURL = URL(fileURLWithPath: "/usr/bin/objdump")
+        objdumpProcess.arguments = ["-p", executablePath]
+        let objdumpPipe = Pipe()
+        objdumpProcess.standardOutput = objdumpPipe
+        objdumpProcess.standardError = Pipe()
+        do {
+            try objdumpProcess.run()
+            objdumpProcess.waitUntilExit()
+            let objdumpData = objdumpPipe.fileHandleForReading.readDataToEndOfFile()
+            if let output = String(data: objdumpData, encoding: .utf8) {
+                // Primary format: "DLL Name: kernel32.dll"
+                let dllNameLines = output.components(separatedBy: "\n")
+                    .filter { $0.contains("DLL Name:") }
+                for line in dllNameLines {
+                    if let colonRange = line.range(of: "DLL Name:") {
+                        let name = String(line[colonRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                        if !name.isEmpty {
+                            peImports.append(name)
+                        }
+                    }
+                }
+                // Fallback: scan for .dll references if no DLL Name: lines found
+                if peImports.isEmpty {
+                    let dllRefs = output.components(separatedBy: "\n")
+                        .compactMap { line -> String? in
+                            guard let range = line.range(of: #"\b\w+\.dll\b"#, options: [.regularExpression, .caseInsensitive]) else { return nil }
+                            return String(line[range])
+                        }
+                    peImports = Array(Set(dllRefs)).sorted()
+                }
+            }
+        } catch {
+            // objdump failure is non-fatal — return empty array
+        }
+
+        // Bottle type detection: check for syswow64 directory
+        let syswow64Dir = bottleURL
+            .appendingPathComponent("drive_c")
+            .appendingPathComponent("windows")
+            .appendingPathComponent("syswow64")
+        let bottleType = FileManager.default.fileExists(atPath: syswow64Dir.path) ? "wow64" : "standard"
+
+        // Data files listing: common config/data extensions (up to 50)
+        let dataExtensions: Set<String> = ["dat", "ini", "cfg", "txt", "xml", "json"]
+        var dataFiles: [String] = []
+        if let contents = try? FileManager.default.contentsOfDirectory(
+            at: gameDir,
+            includingPropertiesForKeys: nil
+        ) {
+            dataFiles = contents
+                .filter { dataExtensions.contains($0.pathExtension.lowercased()) }
+                .map { $0.lastPathComponent }
+                .sorted()
+            if dataFiles.count > 50 { dataFiles = Array(dataFiles.prefix(50)) }
+        }
+
+        // Known shim DLL detection from PE imports
+        let knownShimDLLs: [String: String] = [
+            "ddraw.dll": "DirectDraw game — consider cnc-ddraw for improved rendering",
+            "d3d8.dll": "Direct3D 8 game — may need d3d8 wrapper or wined3d config",
+            "d3d9.dll": "Direct3D 9 game — standard wined3d path",
+            "d3d11.dll": "Direct3D 11 game — may need DXVK or wined3d",
+            "dinput.dll": "Uses DirectInput — may need dinput winetricks verb",
+            "dinput8.dll": "Uses DirectInput8 — may need dinput8 winetricks verb",
+            "dsound.dll": "Uses DirectSound — may need dsound winetricks verb"
+        ]
+        var notableImports: [[String: String]] = []
+        for importName in peImports {
+            if let note = knownShimDLLs[importName.lowercased()] {
+                notableImports.append(["dll": importName, "note": note])
+            }
+        }
+
         var result: [String: Any] = [
             "exe_type": exeType,
             "game_files": gameFiles,
             "bottle_exists": bottleExists,
-            "system32_dlls": system32DLLs
+            "system32_dlls": system32DLLs,
+            "pe_imports": peImports,
+            "bottle_type": bottleType,
+            "data_files": dataFiles,
+            "notable_imports": notableImports
         ]
         if !recipeInfo.isEmpty {
             result["recipe"] = recipeInfo
@@ -1095,6 +1287,115 @@ final class AgentTools {
         return jsonResult(["results": results, "game_dir": gameDir.path])
     }
 
+    // MARK: 14. verify_dll_override
+
+    private func verifyDllOverride(input: JSONValue) -> String {
+        guard let dllName = input["dll_name"]?.asString, !dllName.isEmpty else {
+            return jsonResult(["error": "dll_name is required"])
+        }
+
+        let dllFileName = dllName.hasSuffix(".dll") ? dllName : "\(dllName).dll"
+        let baseName = dllName.replacingOccurrences(of: ".dll", with: "").lowercased()
+
+        // 1. Check configured override in accumulatedEnv
+        let configuredOverride: String?
+        if let overrides = accumulatedEnv["WINEDLLOVERRIDES"] {
+            // Parse override string like "ddraw=n,b;dsound=b"
+            let pairs = overrides.components(separatedBy: ";")
+            configuredOverride = pairs.first(where: { $0.lowercased().hasPrefix(baseName + "=") })
+        } else {
+            configuredOverride = nil
+        }
+
+        // 2. Check where native DLL files exist
+        let gameDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
+        let system32Dir = bottleURL
+            .appendingPathComponent("drive_c/windows/system32")
+        let syswow64Dir = bottleURL
+            .appendingPathComponent("drive_c/windows/syswow64")
+
+        let fm = FileManager.default
+        var nativeDllLocations: [String] = []
+        if fm.fileExists(atPath: gameDir.appendingPathComponent(dllFileName).path) {
+            nativeDllLocations.append("game_dir")
+        }
+        if fm.fileExists(atPath: system32Dir.appendingPathComponent(dllFileName).path) {
+            nativeDllLocations.append("system32")
+        }
+        if fm.fileExists(atPath: syswow64Dir.appendingPathComponent(dllFileName).path) {
+            nativeDllLocations.append("syswow64")
+        }
+
+        // 3. Run a short trace launch to see what Wine actually loaded
+        let traceInput = JSONValue.object([
+            "debug_channels": .array([.string("+loaddll")]),
+            "timeout_seconds": .number(3)
+        ])
+        let traceResultStr = traceLaunch(input: traceInput)
+
+        // Parse trace result to find the DLL
+        var actualLoadPath: String? = nil
+        var actualLoadType: String? = nil
+        if let traceData = traceResultStr.data(using: .utf8),
+           let traceJSON = try? JSONSerialization.jsonObject(with: traceData) as? [String: Any],
+           let loadedDLLs = traceJSON["loaded_dlls"] as? [[String: String]] {
+            for dll in loadedDLLs {
+                if let name = dll["name"], name.lowercased() == dllFileName.lowercased() {
+                    actualLoadPath = dll["path"]
+                    actualLoadType = dll["type"]
+                    break
+                }
+            }
+        }
+
+        // 4. Build explanation
+        let explanation: String
+        let working: Bool
+
+        if let override = configuredOverride {
+            if let loadType = actualLoadType {
+                let wantsNative = override.contains("n,b") || override.contains("=n")
+                if wantsNative && loadType == "native" {
+                    explanation = "Override working correctly: configured \(override), loaded native from \(actualLoadPath ?? "unknown")"
+                    working = true
+                } else if wantsNative && loadType == "builtin" {
+                    if nativeDllLocations.isEmpty {
+                        explanation = "Override set to \(override) but Wine loaded builtin — no native DLL file found in game_dir, system32, or syswow64"
+                    } else {
+                        explanation = "Override set to \(override) but Wine loaded builtin from \(actualLoadPath ?? "unknown") — native DLL found in \(nativeDllLocations.joined(separator: ", ")) but Wine did not use it. For system DLLs in wow64 bottles, place in syswow64."
+                    }
+                    working = false
+                } else {
+                    explanation = "Override \(override) active, loaded \(loadType) from \(actualLoadPath ?? "unknown")"
+                    working = true
+                }
+            } else {
+                explanation = "Override \(override) is configured but DLL '\(dllFileName)' was not observed in trace output — game may not load this DLL at startup"
+                working = false
+            }
+        } else {
+            if let loadType = actualLoadType {
+                explanation = "No override configured. Wine loaded \(loadType) \(dllFileName) from \(actualLoadPath ?? "unknown")"
+                working = loadType == "builtin" // builtin is expected default
+            } else {
+                explanation = "No override configured and DLL '\(dllFileName)' was not observed in trace output"
+                working = true // nothing to verify
+            }
+        }
+
+        return jsonResult([
+            "dll_name": baseName,
+            "configured_override": configuredOverride ?? "none",
+            "native_dll_locations": nativeDllLocations,
+            "actual_load": [
+                "path": actualLoadPath ?? "not_found",
+                "type": actualLoadType ?? "not_loaded"
+            ],
+            "explanation": explanation,
+            "working": working
+        ])
+    }
+
     // MARK: 11. write_game_file
 
     private func writeGameFile(input: JSONValue) -> String {
@@ -1137,6 +1438,16 @@ final class AgentTools {
         } catch {
             return jsonResult(["error": "Failed to write file: \(error.localizedDescription)"])
         }
+    }
+
+    // MARK: - Success Database Tools (stubs — implemented in 07-04)
+
+    private func querySuccessdb(input: JSONValue) -> String {
+        return jsonResult(["error": "query_successdb not yet implemented"])
+    }
+
+    private func saveSuccess(input: JSONValue) -> String {
+        return jsonResult(["error": "save_success not yet implemented"])
     }
 }
 
