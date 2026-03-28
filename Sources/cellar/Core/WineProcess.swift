@@ -35,6 +35,11 @@ struct WineProcess {
         // Pass binary name and args as an array — NEVER shell string (avoids Windows path escaping issues)
         process.arguments = [binary] + arguments
 
+        // Set CWD to the game binary's parent directory — fixes games that use relative paths
+        // (e.g., Missions/Missions.txt, mode.dat)
+        let binaryURL = URL(fileURLWithPath: binary)
+        process.currentDirectoryURL = binaryURL.deletingLastPathComponent()
+
         // Build environment: start with current process env, set WINEPREFIX, merge additional env
         var env = ProcessInfo.processInfo.environment
         env["WINEPREFIX"] = winePrefix.path

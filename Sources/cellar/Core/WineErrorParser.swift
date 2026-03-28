@@ -15,6 +15,19 @@ enum WineErrorCategory {
 enum DLLPlacementTarget {
     case gameDir    // next to EXE — how cnc-ddraw works
     case system32   // Wine's virtual System32 inside WINEPREFIX
+    case syswow64   // Wine's SysWOW64 — 32-bit system DLLs in wow64 bottles
+
+    /// Auto-detect the correct placement target based on bottle layout and DLL properties.
+    static func autoDetect(bottleURL: URL, dllBitness: Int, isSystemDLL: Bool) -> DLLPlacementTarget {
+        let syswow64Path = bottleURL
+            .appendingPathComponent("drive_c/windows/syswow64")
+        let isWow64 = FileManager.default.fileExists(atPath: syswow64Path.path)
+
+        if isSystemDLL && isWow64 && dllBitness == 32 {
+            return .syswow64
+        }
+        return .gameDir
+    }
 }
 
 enum WineFix {

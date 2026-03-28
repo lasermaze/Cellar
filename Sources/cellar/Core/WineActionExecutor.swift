@@ -76,6 +76,11 @@ struct WineActionExecutor {
                         .appendingPathComponent("drive_c")
                         .appendingPathComponent("windows")
                         .appendingPathComponent("system32")
+                case .syswow64:
+                    targetDir = bottleURL
+                        .appendingPathComponent("drive_c")
+                        .appendingPathComponent("windows")
+                        .appendingPathComponent("syswow64")
                 }
                 let placed = try DLLDownloader.place(cachedDLL: cachedDLL, into: targetDir)
                 print("Placed \(placed.lastPathComponent) in \(targetDir.path)")

@@ -194,8 +194,8 @@ final class AgentTools {
                     ]),
                     "target": .object([
                         "type": .string("string"),
-                        "enum": .array([.string("game_dir"), .string("system32")]),
-                        "description": .string("Placement target: game_dir (next to EXE, default) or system32 (Wine virtual System32)")
+                        "enum": .array([.string("game_dir"), .string("system32"), .string("syswow64")]),
+                        "description": .string("Placement target: game_dir (next to EXE, default), system32 (Wine virtual System32), or syswow64 (32-bit system DLLs in wow64 bottles)")
                     ])
                 ]),
                 "required": .array([.string("dll_name")])
@@ -668,6 +668,11 @@ final class AgentTools {
                 .appendingPathComponent("drive_c")
                 .appendingPathComponent("windows")
                 .appendingPathComponent("system32")
+        } else if targetParam == "syswow64" {
+            targetDir = bottleURL
+                .appendingPathComponent("drive_c")
+                .appendingPathComponent("windows")
+                .appendingPathComponent("syswow64")
         } else {
             targetDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
         }

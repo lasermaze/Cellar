@@ -563,7 +563,12 @@ struct AIService {
             initialMessage: initialMessage,
             toolExecutor: { name, input in tools.execute(toolName: name, input: input) }
         )
-        return .success(result.finalText)
+
+        if result.completed {
+            return .success(result.finalText)
+        } else {
+            return .failed(result.finalText.isEmpty ? "Agent loop did not complete (used \(result.iterationsUsed) iterations)" : result.finalText)
+        }
     }
 
     // MARK: - One-Time Tip
@@ -734,7 +739,12 @@ struct AIService {
             return .installWinetricks(verb)
         case "place_dll":
             guard let dllName = dict["dll"], !dllName.isEmpty else { return nil }
-            let target: DLLPlacementTarget = (dict["target"] == "system32") ? .system32 : .gameDir
+            let target: DLLPlacementTarget
+            switch dict["target"] {
+            case "system32": target = .system32
+            case "syswow64": target = .syswow64
+            default: target = .gameDir
+            }
             return .placeDLL(dllName, target)
         case "set_registry":
             guard let key = dict["key"], !key.isEmpty,
