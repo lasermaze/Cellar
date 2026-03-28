@@ -354,13 +354,26 @@ struct AnthropicToolRequest: Encodable {
 
 // MARK: AnthropicToolResponse
 
+/// Token usage reported by Anthropic API for a single response.
+struct AnthropicToolUsage: Decodable {
+    let inputTokens: Int
+    let outputTokens: Int
+
+    enum CodingKeys: String, CodingKey {
+        case inputTokens = "input_tokens"
+        case outputTokens = "output_tokens"
+    }
+}
+
 /// Anthropic API response containing tool-use or text content blocks.
 struct AnthropicToolResponse: Decodable {
     let content: [ToolContentBlock]
     let stopReason: String
+    let usage: AnthropicToolUsage?
 
     enum CodingKeys: String, CodingKey {
         case content
         case stopReason = "stop_reason"
+        case usage
     }
 }

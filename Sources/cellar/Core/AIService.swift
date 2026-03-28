@@ -578,7 +578,7 @@ struct AIService {
             apiKey: apiKey,
             tools: AgentTools.toolDefinitions,
             systemPrompt: systemPrompt,
-            model: "claude-sonnet-4-20250514",
+            model: "claude-opus-4-6",
             maxIterations: 20,
             maxTokens: 16384
         )

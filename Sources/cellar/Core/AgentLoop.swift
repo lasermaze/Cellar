@@ -10,6 +10,12 @@ struct AgentLoopResult {
     let iterationsUsed: Int
     /// True if loop ended because the model returned "end_turn". False if max iterations reached or error occurred.
     let completed: Bool
+    /// Total input tokens consumed across all iterations.
+    let totalInputTokens: Int
+    /// Total output tokens consumed across all iterations.
+    let totalOutputTokens: Int
+    /// Estimated cost in USD based on token usage.
+    let estimatedCostUSD: Double
 }
 
 // MARK: - AgentLoop
@@ -41,7 +47,7 @@ struct AgentLoop {
         apiKey: String,
         tools: [ToolDefinition],
         systemPrompt: String,
-        model: String = "claude-sonnet-4-20250514",
+        model: String = "claude-opus-4-6",
         maxIterations: Int = 20,
         maxTokens: Int = 4096
     ) {
@@ -84,7 +90,7 @@ struct AgentLoop {
             } catch {
                 let errorMessage = "Agent API error (iteration \(iterationCount)): \(error.localizedDescription)"
                 print(errorMessage)
-                return AgentLoopResult(finalText: errorMessage, iterationsUsed: iterationCount, completed: false)
+                return AgentLoopResult(finalText: errorMessage, iterationsUsed: iterationCount, completed: false, totalInputTokens: 0, totalOutputTokens: 0, estimatedCostUSD: 0.0)
             }
 
             // Step 2b: Print and collect text blocks
@@ -101,7 +107,10 @@ struct AgentLoop {
                 return AgentLoopResult(
                     finalText: allText.joined(separator: "\n"),
                     iterationsUsed: iterationCount,
-                    completed: true
+                    completed: true,
+                    totalInputTokens: 0,
+                    totalOutputTokens: 0,
+                    estimatedCostUSD: 0.0
                 )
 
             case "tool_use":
@@ -134,7 +143,10 @@ struct AgentLoop {
                 return AgentLoopResult(
                     finalText: allText.joined(separator: "\n"),
                     iterationsUsed: iterationCount,
-                    completed: false
+                    completed: false,
+                    totalInputTokens: 0,
+                    totalOutputTokens: 0,
+                    estimatedCostUSD: 0.0
                 )
             }
         }
@@ -143,7 +155,10 @@ struct AgentLoop {
         return AgentLoopResult(
             finalText: allText.joined(separator: "\n"),
             iterationsUsed: iterationCount,
-            completed: false
+            completed: false,
+            totalInputTokens: 0,
+            totalOutputTokens: 0,
+            estimatedCostUSD: 0.0
         )
     }
 
