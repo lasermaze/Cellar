@@ -147,3 +147,17 @@ Plans:
 - [ ] 06-01-PLAN.md — Tool-use API types (JSONValue, ContentBlock, ToolDefinition) and AgentLoop state machine
 - [ ] 06-02-PLAN.md — 10 agent tool implementations (inspect_game, read_log, read_registry, ask_user, set_environment, set_registry, install_winetricks, place_dll, launch_game, save_recipe)
 - [ ] 06-03-PLAN.md — Wire agent into LaunchCommand with system prompt and graceful degradation fallback
+
+### Phase 7: Agentic v2: research-diagnose-adapt loop with web search, diagnostic traces, and success database
+
+**Goal:** Replace the v1 agent's linear config-search loop with a three-phase Research-Diagnose-Adapt architecture: add web research tools, diagnostic trace launches, DLL verification, file access checks, a success database for game knowledge, and correct macOS/Wine domain knowledge in the system prompt
+**Requirements**: None (INSERTED phase — extends agent architecture from Phase 6)
+**Depends on:** Phase 6
+**Plans:** 5 plans
+
+Plans:
+- [ ] 07-01-PLAN.md — P0 infrastructure fixes: WineProcess CWD, DLLPlacementTarget.syswow64, KnownDLL companion files, CellarPaths extensions
+- [ ] 07-02-PLAN.md — write_game_file tool + enhanced place_dll with syswow64/companion file support
+- [ ] 07-03-PLAN.md — Diagnostic tools: trace_launch, check_file_access, verify_dll_override, enhanced inspect_game
+- [ ] 07-04-PLAN.md — Success database: SuccessRecord schema, SuccessDatabase CRUD, query_successdb + save_success tools
+- [ ] 07-05-PLAN.md — Research tools: search_web + fetch_page with cache, enhanced launch_game, v2 system prompt
