@@ -30,12 +30,15 @@ Any user can go from "I have these old game files" to "the game launches and wor
 
 <!-- v1.1: Agentic Independence -->
 
-- [ ] Agent stays in diagnosis loop after game failure (doesn't exit prematurely)
-- [ ] Agent detects Wine dialog boxes (renderer selection, error dialogs) via msgbox traces
-- [ ] Agent pre-configures game settings to skip dialogs (INI files, registry)
-- [ ] Agent performs deep research (PCGamingWiki API, structured extraction, cross-game patterns)
-- [ ] Agent detects game engine type and applies engine-specific knowledge
-- [ ] Agent uses macOS window detection to observe dialog/game state
+- [ ] Agent persists through failures — stays in diagnosis loop, handles max_tokens mid-response, budget-aware escalation
+- [ ] Agent detects Wine dialog boxes via trace:msgbox parsing
+- [ ] Agent detects game/dialog state via macOS window list (CGWindowListCopyWindowInfo) — size/title heuristics distinguish dialogs from game windows
+- [ ] Agent uses hybrid signal: Wine traces + window list combined to determine if game is stuck on a dialog
+- [ ] Agent detects game engine type from exe metadata, file patterns, and registry
+- [ ] Agent pre-configures game settings to skip known dialogs (renderer selection, resolution) via INI files and registry before first launch
+- [ ] Agent uses smarter search strategies — engine-aware, symptom-aware web queries across the full internet
+- [ ] Agent extracts actionable fixes from web pages (not just reads them)
+- [ ] Agent cross-references success database with current symptoms to find similar-game solutions
 
 ### Out of Scope
 
@@ -79,10 +82,10 @@ Any user can go from "I have these old game files" to "the game launches and wor
 **Goal:** Make the agent truly autonomous — it should detect dialog errors, deeply research game fixes, and persist through failures instead of giving up after one attempt.
 
 **Target features:**
-- Loop resilience: agent continues diagnosing after failures, handles max_tokens gracefully
-- Dialog awareness: parse trace:msgbox output, detect Wine windows via CGWindowListCopyWindowInfo
-- Game-aware pre-configuration: detect engine type (UE1, etc.), pre-set renderer in INI/registry to skip dialogs
-- Deep research: PCGamingWiki Cargo API integration, structured data extraction, cross-game engine pattern database
+- Loop resilience: agent persists through failures, handles max_tokens, budget-aware escalation
+- Dialog awareness: hybrid Wine trace parsing + macOS window list detection
+- Game-aware pre-configuration: engine detection, pre-set renderer/settings in INI/registry to skip dialogs
+- Smart research: engine-aware and symptom-aware web search, actionable fix extraction, cross-game success matching
 
 ## Key Decisions
 
@@ -101,4 +104,4 @@ Any user can go from "I have these old game files" to "the game launches and wor
 | GPTK detect-only (not bundled) | Apple EULA prohibits redistribution of D3DMetal. Detect if installed. | — Pending |
 
 ---
-*Last updated: 2026-03-28 after v1.1 milestone start*
+*Last updated: 2026-03-28 after v1.1 scope refinement*
