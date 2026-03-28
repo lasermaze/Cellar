@@ -54,7 +54,10 @@ Plans:
   2. PE import table analysis identifies the primary graphics API (ddraw.dll = DirectDraw, d3d9.dll = DX9, opengl32.dll = OpenGL) and includes it in the inspect_game result
   3. For a recognized engine, the agent writes INI and registry pre-configuration before the first launch attempt — the game directory has the expected ddraw.ini or equivalent without any agent iteration spent diagnosing the dialog
   4. Web search queries constructed after engine detection include engine name and graphics API in addition to game name — search results are visibly more targeted than game-name-only queries
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 09-01-PLAN.md — Engine registry data model, detection logic, inspectGame() extension with binary string extraction
+- [ ] 09-02-PLAN.md — System prompt update: engine-aware pre-configuration, search enrichment, success DB cross-referencing
 
 ### Phase 10: Dialog Detection
 **Goal**: The agent can detect when a Wine game is stuck on a dialog box — via Wine trace:msgbox parsing as the primary signal and macOS window list inspection as an optional complement — and uses the combined signal to distinguish dialog-stuck from running-normally

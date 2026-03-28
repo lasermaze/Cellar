@@ -8,7 +8,7 @@ progress:
   total_phases: 8
   completed_phases: 8
   total_plans: 24
-  completed_plans: 24
+  completed_plans: 25
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** Any user can go from "I have these old game files" to "the game launches and works" without manually configuring Wine.
-**Current focus:** Phase 8 — Loop Resilience (executing)
+**Current focus:** Phase 9 — Engine Detection and Pre-configuration (executing)
 
 ## Current Position
 
-Phase: 8 of 11 (Loop Resilience) -- COMPLETE
-Plan: 2 of 2 complete
-Status: Phase 8 complete, ready for Phase 9
-Last activity: 2026-03-28 — Completed 08-02 (resilient agent loop with retry, truncation, budget, cost summary).
+Phase: 9 of 11 (Engine Detection and Pre-configuration)
+Plan: 1 of 2 complete
+Status: Plan 09-01 complete, ready for Plan 09-02
+Last activity: 2026-03-28 — Completed 09-01 (EngineRegistry with 8 engine families, detection wired into inspectGame).
 
-Progress: [██████████] v1.1 ~25% (Phase 8 complete, 2/2 plans done)
+Progress: [██████████] v1.1 ~50% (Phase 9 in progress, 1/2 plans done)
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [██████████] v1.1 ~25% (Phase 8 complete, 2/2 plan
 |-------|------|----------|
 | Phase 8 | 08-01 | 1 min |
 | Phase 8 | 08-02 | 2 min |
+| Phase 9 | 09-01 | 6 min |
 
 ## Accumulated Context
 
@@ -66,6 +67,8 @@ Progress: [██████████] v1.1 ~25% (Phase 8 complete, 2/2 plan
 - [Phase 08-01]: Usage field optional on AnthropicToolResponse; token/cost fields zeroed until Plan 02 wires accumulation
 - [Phase 08-02]: Budget warning injected as .text block alongside tool_result blocks (avoids extra message turn)
 - [Phase 08-02]: max_tokens escalation retries do NOT count as iterations; budget ceiling overrides escalation at 80%
+- [Phase 09-01]: Unique file pattern weight 0.6 (not 0.5) so single definitive file reaches high confidence
+- [Phase 09-01]: swift-testing added as package dependency for CLI test support (Command Line Tools lacks built-in frameworks)
 
 ### Pending Todos
 
@@ -80,4 +83,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-28
-Stopped at: Completed 08-02-PLAN.md — Phase 8 (Loop Resilience) fully complete. Phase 9 next.
+Stopped at: Completed 09-01-PLAN.md — EngineRegistry with 8 engine families wired into inspectGame(). Plan 09-02 next.

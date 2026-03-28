@@ -50,8 +50,8 @@ Requirements for v1.1 Agentic Independence. Each maps to roadmap phases.
 
 ### Engine Detection
 
-- [ ] **ENGN-01**: Agent detects game engine type from file patterns (GSC/DMCR, Unreal 1, Build, id Tech 2/3, Unity, UE4/5, Westwood, Blizzard) with confidence levels
-- [ ] **ENGN-02**: Agent uses PE import table as secondary engine signal (ddraw.dll = DirectDraw, d3d9.dll = DX9, etc.)
+- [x] **ENGN-01**: Agent detects game engine type from file patterns (GSC/DMCR, Unreal 1, Build, id Tech 2/3, Unity, UE4/5, Westwood, Blizzard) with confidence levels
+- [x] **ENGN-02**: Agent uses PE import table as secondary engine signal (ddraw.dll = DirectDraw, d3d9.dll = DX9, etc.)
 - [ ] **ENGN-03**: Agent pre-configures game settings before first launch based on detected engine — writes INI files and registry entries to skip renderer selection dialogs
 - [ ] **ENGN-04**: Agent constructs engine-aware web search queries using engine type, graphics API, and symptoms instead of just game name
 
@@ -159,8 +159,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LOOP-02 | Phase 8 | Complete |
 | LOOP-03 | Phase 8 | Complete |
 | LOOP-04 | Phase 8 | Complete |
-| ENGN-01 | Phase 9 | Pending |
-| ENGN-02 | Phase 9 | Pending |
+| ENGN-01 | Phase 9 | Complete |
+| ENGN-02 | Phase 9 | Complete |
 | ENGN-03 | Phase 9 | Pending |
 | ENGN-04 | Phase 9 | Pending |
 | DIAG-01 | Phase 10 | Pending |
