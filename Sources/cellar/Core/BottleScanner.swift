@@ -10,12 +10,19 @@ struct BottleScanner {
         // Directories to skip — Wine system dirs that contain non-game executables
         let skipDirs: Set<String> = ["windows", "programdata", "users"]
 
+        // System subdirectories under Program Files to skip — these contain OS/runtime programs, not games
+        let skipProgramDirs: Set<String> = [
+            "windows media player", "windows nt", "internet explorer",
+            "common files", "microsoft", "directx",
+        ]
+
         // Known non-game executables to exclude (prefix-matched against lowercased filename without extension)
         let skipExePatterns: [String] = [
             "unins000", "unins001", "uninstall",
             "vcredist", "dxsetup", "dxwebsetup",
             "setup", "install",
-            "crashreporter", "updater", "launcher"
+            "crashreporter", "updater", "launcher",
+            "wmplayer", "iexplore", "notepad", "regedit", "winhlp32",
         ]
 
         var results: [URL] = []
@@ -39,6 +46,12 @@ struct BottleScanner {
 
             // Only consider .exe files
             guard fileURL.pathExtension.lowercased() == "exe" else { continue }
+
+            // Skip system subdirectories under Program Files (e.g., Windows Media Player, Common Files)
+            let pathComponents = relativePath.lowercased().components(separatedBy: "/")
+            if pathComponents.contains(where: { skipProgramDirs.contains($0) }) {
+                continue
+            }
 
             // Skip known non-game executables
             let filename = fileURL.deletingPathExtension().lastPathComponent.lowercased()
