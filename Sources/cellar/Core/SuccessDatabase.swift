@@ -1,0 +1,169 @@
+import Foundation
+
+// MARK: - Success Record Schema
+
+/// Executable binary metadata captured at verification time.
+struct ExecutableInfo: Codable {
+    let path: String
+    let type: String       // "PE32", "PE32+"
+    let peImports: [String]?
+}
+
+/// Working directory requirement for the game.
+struct WorkingDirectoryInfo: Codable {
+    let requirement: String  // "must_be_exe_parent", "any"
+    let notes: String?
+}
+
+/// A DLL override applied via WINEDLLOVERRIDES or registry.
+struct DLLOverrideRecord: Codable {
+    let dll: String
+    let mode: String       // "n,b", "native", "builtin"
+    let placement: String? // "game_dir", "system32", "syswow64"
+    let source: String?    // "cnc-ddraw", "manual"
+}
+
+/// A game configuration file that was modified or is required.
+struct GameConfigFile: Codable {
+    let path: String       // relative to game dir
+    let purpose: String
+    let criticalSettings: [String: String]?
+}
+
+/// A Wine registry entry that was set for the game.
+struct RegistryRecord: Codable {
+    let key: String
+    let valueName: String
+    let data: String
+    let purpose: String?
+}
+
+/// A game-specific DLL placed from an external source.
+struct GameSpecificDLL: Codable {
+    let filename: String
+    let source: String     // "cnc-ddraw", "dgvoodoo2"
+    let placement: String  // "game_dir", "syswow64"
+    let version: String?
+}
+
+/// A pitfall encountered during setup and how it was resolved.
+struct PitfallRecord: Codable {
+    let symptom: String
+    let cause: String
+    let fix: String
+    let wrongFix: String?
+}
+
+/// Comprehensive record of a working game configuration.
+/// Stored as JSON in ~/.cellar/successdb/<gameId>.json.
+struct SuccessRecord: Codable {
+    let schemaVersion: Int       // 1
+    let gameId: String
+    let gameName: String
+    let gameVersion: String?
+    let source: String?          // "gog", "steam"
+    let engine: String?
+    let graphicsApi: String?     // "directdraw", "direct3d8"
+    let verifiedAt: String       // ISO8601 string
+    let wineVersion: String?
+    let bottleType: String?      // "wow64", "standard"
+    let os: String?
+    let executable: ExecutableInfo
+    let workingDirectory: WorkingDirectoryInfo?
+    let environment: [String: String]
+    let dllOverrides: [DLLOverrideRecord]
+    let gameConfigFiles: [GameConfigFile]
+    let registry: [RegistryRecord]
+    let gameSpecificDlls: [GameSpecificDLL]
+    let pitfalls: [PitfallRecord]
+    let resolutionNarrative: String?
+    let tags: [String]
+}
+
+// MARK: - Success Database
+
+/// File-backed success database stored in ~/.cellar/successdb/.
+/// Provides CRUD operations and query methods for success records.
+struct SuccessDatabase {
+
+    /// Load a success record for a specific game.
+    static func load(gameId: String) -> SuccessRecord? {
+        let url = CellarPaths.successdbFile(for: gameId)
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(SuccessRecord.self, from: data)
+    }
+
+    /// Save a success record (overwrites existing).
+    static func save(_ record: SuccessRecord) throws {
+        try FileManager.default.createDirectory(
+            at: CellarPaths.successdbDir,
+            withIntermediateDirectories: true
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(record)
+        try data.write(to: CellarPaths.successdbFile(for: record.gameId), options: .atomic)
+    }
+
+    /// Load all success records (in-memory scan for queries).
+    static func loadAll() -> [SuccessRecord] {
+        let dir = CellarPaths.successdbDir
+        guard let files = try? FileManager.default.contentsOfDirectory(
+            at: dir, includingPropertiesForKeys: nil
+        ) else { return [] }
+        return files.filter { $0.pathExtension == "json" }.compactMap { url in
+            guard let data = try? Data(contentsOf: url) else { return nil }
+            return try? JSONDecoder().decode(SuccessRecord.self, from: data)
+        }
+    }
+
+    /// Query by game_id (exact match).
+    static func queryByGameId(_ gameId: String) -> SuccessRecord? {
+        return load(gameId: gameId)
+    }
+
+    /// Query by tags (any overlap).
+    static func queryByTags(_ tags: [String]) -> [SuccessRecord] {
+        let lowerTags = Set(tags.map { $0.lowercased() })
+        return loadAll().filter { record in
+            !Set(record.tags.map { $0.lowercased() }).isDisjoint(with: lowerTags)
+        }
+    }
+
+    /// Query by engine (substring match).
+    static func queryByEngine(_ engine: String) -> [SuccessRecord] {
+        let lower = engine.lowercased()
+        return loadAll().filter {
+            $0.engine?.lowercased().contains(lower) == true
+        }
+    }
+
+    /// Query by graphics API (substring match).
+    static func queryByGraphicsApi(_ api: String) -> [SuccessRecord] {
+        let lower = api.lowercased()
+        return loadAll().filter {
+            $0.graphicsApi?.lowercased().contains(lower) == true
+        }
+    }
+
+    /// Query by symptom using keyword overlap fuzzy matching.
+    /// Returns records sorted by relevance score (descending).
+    static func queryBySymptom(_ symptom: String) -> [(record: SuccessRecord, score: Double)] {
+        let queryWords = Set(symptom.lowercased().split(separator: " ").map(String.init)
+            .filter { $0.count > 2 })  // skip tiny words
+        guard !queryWords.isEmpty else { return [] }
+
+        return loadAll().flatMap { record in
+            record.pitfalls.map { pitfall -> (SuccessRecord, Double) in
+                let symptomWords = Set(pitfall.symptom.lowercased().split(separator: " ")
+                    .map(String.init).filter { $0.count > 2 })
+                let overlap = queryWords.intersection(symptomWords).count
+                let maxWords = max(queryWords.count, symptomWords.count)
+                let score = maxWords > 0 ? Double(overlap) / Double(maxWords) : 0
+                return (record, score)
+            }
+        }
+        .filter { $0.1 > 0.3 }
+        .sorted { $0.1 > $1.1 }
+    }
+}
