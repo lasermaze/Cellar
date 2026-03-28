@@ -574,13 +574,16 @@ struct AIService {
             wineProcess: wineProcess
         )
 
+        let config = CellarConfig.load()
+
         let agentLoop = AgentLoop(
             apiKey: apiKey,
             tools: AgentTools.toolDefinitions,
             systemPrompt: systemPrompt,
             model: "claude-opus-4-6",
             maxIterations: 20,
-            maxTokens: 16384
+            maxTokens: 16384,
+            budgetCeiling: config.budgetCeiling
         )
 
         let initialMessage = "Launch the game '\(entry.name)' (ID: \(gameId)). The executable is at: \(executablePath). Follow the Research-Diagnose-Adapt workflow: start by querying the success database, then inspect the game."
@@ -589,6 +592,10 @@ struct AIService {
             initialMessage: initialMessage,
             toolExecutor: { name, input in tools.execute(toolName: name, input: input) }
         )
+
+        // Always print cost summary
+        let costStr = String(format: "%.2f", result.estimatedCostUSD)
+        print("Session cost: $\(costStr) (\(result.totalInputTokens) input + \(result.totalOutputTokens) output tokens, \(result.iterationsUsed) iterations)")
 
         if result.completed {
             return .success(result.finalText)
