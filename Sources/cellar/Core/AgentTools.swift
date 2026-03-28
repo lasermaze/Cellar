@@ -50,7 +50,7 @@ final class AgentTools {
 
     // MARK: - Tool Definitions
 
-    /// JSON Schema tool definitions for all 10 agent tools.
+    /// JSON Schema tool definitions for all agent tools.
     static let toolDefinitions: [ToolDefinition] = [
 
         // 1. inspect_game — no required params; game context is implicit
@@ -236,6 +236,26 @@ final class AgentTools {
                 ]),
                 "required": .array([.string("name")])
             ])
+        ),
+
+        // 11. write_game_file — required relative_path, content
+        ToolDefinition(
+            name: "write_game_file",
+            description: "Write a config or data file into the game directory. Use for files like ddraw.ini, mode.dat, or custom config files the game needs. Paths are relative to the game executable's directory. Windows backslash paths are auto-converted.",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "relative_path": .object([
+                        "type": .string("string"),
+                        "description": .string("File path relative to the game executable directory (e.g. 'ddraw.ini' or 'data/mode.dat')")
+                    ]),
+                    "content": .object([
+                        "type": .string("string"),
+                        "description": .string("The text content to write to the file")
+                    ])
+                ]),
+                "required": .array([.string("relative_path"), .string("content")])
+            ])
         )
     ]
 
@@ -254,6 +274,7 @@ final class AgentTools {
         case "place_dll":         return placeDLL(input: input)
         case "launch_game":       return launchGame(input: input)
         case "save_recipe":       return saveRecipe(input: input)
+        case "write_game_file":   return writeGameFile(input: input)
         default:
             return jsonResult(["error": "Unknown tool: \(toolName)"])
         }
@@ -834,6 +855,50 @@ final class AgentTools {
             ])
         } catch {
             return jsonResult(["error": "Failed to save recipe: \(error.localizedDescription)"])
+        }
+    }
+
+    // MARK: 11. write_game_file
+
+    private func writeGameFile(input: JSONValue) -> String {
+        guard let relativePath = input["relative_path"]?.asString, !relativePath.isEmpty else {
+            return jsonResult(["error": "relative_path is required"])
+        }
+        guard let content = input["content"]?.asString else {
+            return jsonResult(["error": "content is required"])
+        }
+
+        let gameDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
+
+        // Normalize: replace backslashes with forward slashes
+        let normalizedPath = relativePath.replacingOccurrences(of: "\\", with: "/")
+
+        // Build target URL and resolve to canonical path
+        let targetURL = gameDir.appendingPathComponent(normalizedPath).standardized
+
+        // Security check: resolved path must be under gameDir
+        let gameDirPath = gameDir.standardized.path
+        guard targetURL.path.hasPrefix(gameDirPath) else {
+            return jsonResult(["error": "Path traversal denied: resolved path is outside the game directory"])
+        }
+
+        // Create intermediate directories
+        let parentDir = targetURL.deletingLastPathComponent()
+        do {
+            try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
+        } catch {
+            return jsonResult(["error": "Failed to create directories: \(error.localizedDescription)"])
+        }
+
+        // Write file atomically
+        do {
+            try content.write(to: targetURL, atomically: true, encoding: .utf8)
+            return jsonResult([
+                "status": "ok",
+                "written_to": targetURL.path
+            ])
+        } catch {
+            return jsonResult(["error": "Failed to write file: \(error.localizedDescription)"])
         }
     }
 }
