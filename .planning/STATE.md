@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: unknown
-last_updated: "2026-03-27T22:49:52.888Z"
+last_updated: "2026-03-28T01:52:21.960Z"
 progress:
-  total_phases: 6
+  total_phases: 7
   completed_phases: 6
-  total_plans: 17
-  completed_plans: 17
+  total_plans: 22
+  completed_plans: 18
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 
 ## Current Position
 
-Phase: 06-implement-agentic-launch-architecture-with-ai-tool-use-loop (Phase 6)
-Plan: 2 of N complete (06-01, 06-02 complete)
-Status: Phase 06 In Progress
-Last activity: 2026-03-27 — Plan 06-02 complete: AgentTools class with all 10 tool implementations (inspect_game, read_log, read_registry, ask_user, set_environment, set_registry, install_winetricks, place_dll, launch_game, save_recipe).
+Phase: 07-agentic-v2-research-diagnose-adapt-loop-with-web-search-diagnostic-traces-and-success-database (Phase 7)
+Plan: 1 of N complete (07-01 complete)
+Status: Phase 07 In Progress
+Last activity: 2026-03-28 — Plan 07-01 complete: WineProcess CWD fix, DLLPlacementTarget.syswow64, KnownDLL extensions (companionFiles/preferredTarget/isSystemDLL/variants), CellarPaths successDB and research cache directories.
 
-Progress: [██████████] Phase 01 complete; Phase 01.1 complete; Phase 02 complete; Phase 03 complete; Phase 03.1 in progress (1/2)
+Progress: [██████████] Phase 01-06 complete; Phase 07 in progress (1/N)
 
 ## Performance Metrics
 
@@ -63,6 +63,7 @@ Progress: [██████████] Phase 01 complete; Phase 01.1 complet
 | Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop P01 | 2min | 2 tasks | 2 files |
 | Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop P02 | 3 | 2 tasks | 1 files |
 | Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop P03 | 5 | 2 tasks | 2 files |
+| Phase 07 P01 | 2min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,8 @@ Recent decisions affecting current work:
 - [Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop]: All tool methods catch errors internally and return JSON error strings — agent loop contract is String return, never throw
 - [Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop]: AIService.agentValidWinetricksVerbs added as public extension rather than duplicating private validWinetricksVerbs — single source of truth
 - [Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop]: Agent loop is Anthropic-only — OpenAI returns .unavailable; recipeFallbackLaunch() is the no-key path
+- [Phase 07]: CompanionFile as standalone struct for DLL config file co-placement reusability
+- [Phase 07]: DLLPlacementTarget.autoDetect checks filesystem for syswow64 presence rather than bottle metadata
 
 ### Pending Todos
 
@@ -148,5 +151,5 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-27
-Stopped at: Completed 06-02 — AgentTools class with 10 tool definitions and implementations: inspect_game, read_log, read_registry, ask_user, set_environment, set_registry, install_winetricks, place_dll, launch_game, save_recipe. Phase 06 plan 2 of N complete.
+Last session: 2026-03-28
+Stopped at: Completed 07-01-PLAN.md — P0 infrastructure: WineProcess CWD fix, DLLPlacementTarget.syswow64 with autoDetect, KnownDLL extensions (companionFiles/preferredTarget/isSystemDLL/variants), CellarPaths successDB and research cache directories.
