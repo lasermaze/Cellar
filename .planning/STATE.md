@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Agentic Independence
-status: roadmap-ready
-last_updated: "2026-03-28T00:00:00.000Z"
+status: executing
+last_updated: "2026-03-28T23:14:18.000Z"
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 2
+  completed_plans: 1
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** Any user can go from "I have these old game files" to "the game launches and works" without manually configuring Wine.
-**Current focus:** Phase 8 — Loop Resilience (ready to plan)
+**Current focus:** Phase 8 — Loop Resilience (executing)
 
 ## Current Position
 
 Phase: 8 of 11 (Loop Resilience)
-Plan: — (not yet planned)
-Status: Ready to plan
-Last activity: 2026-03-28 — v1.1 roadmap created. 4 phases (8–11), 14 requirements mapped.
+Plan: 1 of 2 complete
+Status: Executing
+Last activity: 2026-03-28 — Completed 08-01 (data layer for loop resilience).
 
-Progress: [░░░░░░░░░░] v1.1 0% (Phase 8 of 11 ready)
+Progress: [█████░░░░░] v1.1 ~12% (Phase 8 Plan 1/2 done)
 
 ## Performance Metrics
 
@@ -46,6 +46,12 @@ Progress: [░░░░░░░░░░] v1.1 0% (Phase 8 of 11 ready)
 | Phase 6 | 3 | 3 min |
 | Phase 7 | 5 | 5 min |
 
+**v1.1:**
+
+| Phase | Plan | Duration |
+|-------|------|----------|
+| Phase 8 | 08-01 | 1 min |
+
 ## Accumulated Context
 
 ### Decisions
@@ -55,6 +61,8 @@ Progress: [░░░░░░░░░░] v1.1 0% (Phase 8 of 11 ready)
 - [v1.1 roadmap]: Loop resilience first — max_tokens truncation is a correctness bug affecting all new feature testing
 - [v1.1 roadmap]: Engine detection and pre-config in same phase — ProactiveConfigurator directly calls GameEngineDetector (code dependency)
 - [v1.1 roadmap]: SwiftSoup 2.8.7 is the only new SPM dependency for v1.1
+- [Phase 08-01]: Budget default $5.00, configurable via CELLAR_BUDGET env or ~/.cellar/config.json
+- [Phase 08-01]: Usage field optional on AnthropicToolResponse; token/cost fields zeroed until Plan 02 wires accumulation
 
 ### Pending Todos
 
@@ -69,4 +77,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-28
-Stopped at: v1.1 roadmap created — Phase 8 ready to plan. Run /gsd:plan-phase 8 to begin.
+Stopped at: Completed 08-01-PLAN.md — data layer for loop resilience. 08-02 next.
