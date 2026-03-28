@@ -184,7 +184,7 @@ final class AgentTools {
         // 8. place_dll — required dll_name, optional target
         ToolDefinition(
             name: "place_dll",
-            description: "Download and place a DLL replacement from the known registry. Currently available: cnc-ddraw (DirectDraw replacement for classic 2D games). Auto-applies required WINEDLLOVERRIDES.",
+            description: "Download and place a DLL replacement from the known registry. Targets: game_dir (next to EXE), system32 (Wine System32), syswow64 (Wine SysWOW64 for 32-bit system DLLs in wow64 bottles). If target is omitted, auto-detects based on bottle type and DLL metadata. Auto-applies required WINEDLLOVERRIDES and writes companion config files.",
             inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
@@ -195,7 +195,7 @@ final class AgentTools {
                     "target": .object([
                         "type": .string("string"),
                         "enum": .array([.string("game_dir"), .string("system32"), .string("syswow64")]),
-                        "description": .string("Placement target: game_dir (next to EXE, default), system32 (Wine virtual System32), or syswow64 (32-bit system DLLs in wow64 bottles)")
+                        "description": .string("Placement target. If omitted, auto-detects: system DLLs use syswow64 in wow64 bottles, others use game_dir.")
                     ])
                 ]),
                 "required": .array([.string("dll_name")])
@@ -255,6 +255,62 @@ final class AgentTools {
                     ])
                 ]),
                 "required": .array([.string("relative_path"), .string("content")])
+            ])
+        ),
+
+        // --- Diagnostic Tools (Phase 07-03) ---
+
+        // 12. trace_launch — optional debug_channels, timeout_seconds
+        ToolDefinition(
+            name: "trace_launch",
+            description: "Run a short diagnostic Wine launch with debug channels enabled. The game is killed after timeout_seconds. Returns structured DLL load analysis (which DLLs loaded, from where, native vs builtin) and any errors detected. Use this BEFORE configuring — trace first, then fix. Does NOT count toward the launch limit.",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "debug_channels": .object([
+                        "type": .string("array"),
+                        "description": .string("Wine debug channels to enable (default [\"+loaddll\"])"),
+                        "items": .object(["type": .string("string")])
+                    ]),
+                    "timeout_seconds": .object([
+                        "type": .string("number"),
+                        "description": .string("Seconds to wait before killing the process (default 5)")
+                    ])
+                ]),
+                "required": .array([])
+            ])
+        ),
+
+        // 13. check_file_access — required paths array
+        ToolDefinition(
+            name: "check_file_access",
+            description: "Check if the game can find files it needs by verifying file existence relative to the game executable's directory. Use to diagnose 'file not found' errors caused by wrong working directory.",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "paths": .object([
+                        "type": .string("array"),
+                        "description": .string("Relative file paths to check from the game executable's directory"),
+                        "items": .object(["type": .string("string")])
+                    ])
+                ]),
+                "required": .array([.string("paths")])
+            ])
+        ),
+
+        // 14. verify_dll_override — required dll_name
+        ToolDefinition(
+            name: "verify_dll_override",
+            description: "Verify that a DLL override is actually working by comparing the configured override (env/registry) with what Wine actually loaded (via a short trace). Explains discrepancies like 'native DLL exists in game_dir but Wine loaded builtin from syswow64'.",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "dll_name": .object([
+                        "type": .string("string"),
+                        "description": .string("DLL name to verify (e.g. \"ddraw\")")
+                    ])
+                ]),
+                "required": .array([.string("dll_name")])
             ])
         )
     ]
@@ -673,7 +729,6 @@ final class AgentTools {
         guard let dllName = input["dll_name"]?.asString, !dllName.isEmpty else {
             return jsonResult(["error": "dll_name is required"])
         }
-        let targetParam = input["target"]?.asString ?? "game_dir"
 
         guard let knownDLL = KnownDLLRegistry.find(name: dllName) else {
             let available = KnownDLLRegistry.registry.map { $0.name }.joined(separator: ", ")
@@ -682,20 +737,34 @@ final class AgentTools {
             ])
         }
 
-        // Determine target directory
-        let targetDir: URL
-        if targetParam == "system32" {
-            targetDir = bottleURL
-                .appendingPathComponent("drive_c")
-                .appendingPathComponent("windows")
-                .appendingPathComponent("system32")
-        } else if targetParam == "syswow64" {
-            targetDir = bottleURL
-                .appendingPathComponent("drive_c")
-                .appendingPathComponent("windows")
-                .appendingPathComponent("syswow64")
+        // Determine placement target: explicit param or auto-detect
+        let detectedTarget: DLLPlacementTarget
+        if let targetStr = input["target"]?.asString {
+            switch targetStr {
+            case "syswow64": detectedTarget = .syswow64
+            case "system32": detectedTarget = .system32
+            default: detectedTarget = .gameDir
+            }
         } else {
+            // Auto-detect using KnownDLL metadata and bottle layout
+            detectedTarget = knownDLL.isSystemDLL
+                ? DLLPlacementTarget.autoDetect(bottleURL: bottleURL, dllBitness: 32, isSystemDLL: true)
+                : .gameDir
+        }
+
+        // Map target enum to actual directory URL
+        let targetDir: URL
+        let targetName: String
+        switch detectedTarget {
+        case .gameDir:
             targetDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
+            targetName = "game_dir"
+        case .system32:
+            targetDir = bottleURL.appendingPathComponent("drive_c/windows/system32")
+            targetName = "system32"
+        case .syswow64:
+            targetDir = bottleURL.appendingPathComponent("drive_c/windows/syswow64")
+            targetName = "syswow64"
         }
 
         do {
@@ -703,6 +772,15 @@ final class AgentTools {
             let cachedDLL = try DLLDownloader.downloadAndCache(knownDLL)
             let placedDLL = try DLLDownloader.place(cachedDLL: cachedDLL, into: targetDir)
             print("Placed \(placedDLL.lastPathComponent) in \(targetDir.path)")
+
+            // Write companion files to the same directory as the DLL
+            var companionPaths: [String] = []
+            for companion in knownDLL.companionFiles {
+                let companionURL = targetDir.appendingPathComponent(companion.filename)
+                try companion.content.write(to: companionURL, atomically: true, encoding: .utf8)
+                companionPaths.append(companionURL.path)
+                print("Wrote companion file: \(companion.filename)")
+            }
 
             // Apply required DLL overrides by accumulating into env
             var appliedOverrides: [String: String] = [:]
@@ -719,6 +797,8 @@ final class AgentTools {
                 "dll_name": knownDLL.name,
                 "dll_file": knownDLL.dllFileName,
                 "placed_at": placedDLL.path,
+                "target": targetName,
+                "companion_files": companionPaths,
                 "applied_overrides": appliedOverrides
             ])
         } catch {
@@ -856,6 +936,163 @@ final class AgentTools {
         } catch {
             return jsonResult(["error": "Failed to save recipe: \(error.localizedDescription)"])
         }
+    }
+
+    // MARK: - Diagnostic Trace Tools (Phase 07-03)
+
+    /// Thread-safe stderr capture for trace_launch (mirrors WineProcess.StderrCapture pattern).
+    private final class TraceStderrCapture: @unchecked Sendable {
+        private var buffer = ""
+        private let lock = NSLock()
+        func append(_ str: String) { lock.lock(); buffer += str; lock.unlock() }
+        var value: String { lock.lock(); defer { lock.unlock() }; return buffer }
+    }
+
+    // MARK: 12. trace_launch
+
+    /// Run a short diagnostic Wine launch with debug channels, kill after timeout.
+    /// Returns structured DLL load analysis. Does NOT count toward launch limit.
+    func traceLaunch(input: JSONValue) -> String {
+        // Extract parameters with defaults
+        let debugChannels: [String]
+        if let channels = input["debug_channels"]?.asArray {
+            debugChannels = channels.compactMap { $0.asString }
+        } else {
+            debugChannels = ["+loaddll"]
+        }
+        let timeoutSeconds: Int
+        if let ts = input["timeout_seconds"]?.asDouble {
+            timeoutSeconds = Int(ts)
+        } else {
+            timeoutSeconds = 5
+        }
+
+        // Build environment: copy accumulated, merge WINEDEBUG channels
+        var env = ProcessInfo.processInfo.environment
+        env["WINEPREFIX"] = wineProcess.winePrefix.path
+        for (key, value) in accumulatedEnv {
+            env[key] = value
+        }
+        let existingDebug = env["WINEDEBUG"] ?? ""
+        let channelsStr = debugChannels.joined(separator: ",")
+        env["WINEDEBUG"] = existingDebug.isEmpty ? channelsStr : "\(existingDebug),\(channelsStr)"
+
+        // Create process
+        let process = Process()
+        process.executableURL = wineProcess.wineBinary
+        process.arguments = [executablePath]
+        process.environment = env
+
+        // Set CWD to binary's parent directory (matches WineProcess CWD fix)
+        let binaryURL = URL(fileURLWithPath: executablePath)
+        process.currentDirectoryURL = binaryURL.deletingLastPathComponent()
+
+        // Capture stderr
+        let stderrPipe = Pipe()
+        process.standardOutput = Pipe() // discard stdout
+        process.standardError = stderrPipe
+
+        let stderrCapture = TraceStderrCapture()
+        stderrPipe.fileHandleForReading.readabilityHandler = { handle in
+            let data = handle.availableData
+            guard !data.isEmpty else { return }
+            if let str = String(data: data, encoding: .utf8) {
+                stderrCapture.append(str)
+            }
+        }
+
+        // Start process
+        do {
+            try process.run()
+        } catch {
+            return jsonResult(["error": "Failed to start trace launch: \(error.localizedDescription)"])
+        }
+
+        // Kill timer: terminate process + kill wineserver after timeout
+        let killWork = DispatchWorkItem { [weak self] in
+            process.terminate()
+            try? self?.wineProcess.killWineserver()
+        }
+        DispatchQueue.global().asyncAfter(deadline: .now() + Double(timeoutSeconds), execute: killWork)
+
+        process.waitUntilExit()
+        killWork.cancel()
+
+        // Drain remaining stderr
+        let remainingData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+        if !remainingData.isEmpty, let str = String(data: remainingData, encoding: .utf8) {
+            stderrCapture.append(str)
+        }
+        stderrPipe.fileHandleForReading.readabilityHandler = nil
+
+        // Kill wineserver to clean up (in case timeout didn't fire)
+        try? wineProcess.killWineserver()
+
+        let stderr = stderrCapture.value
+
+        // Parse +loaddll lines: trace:loaddll:...Loaded L"path" at addr: native|builtin
+        let lines = stderr.components(separatedBy: "\n")
+        var dllEntries: [String: [String: String]] = [:] // keyed by DLL name, last occurrence wins
+
+        for line in lines {
+            // Match lines containing loaddll trace output
+            guard line.contains("trace:loaddll") || line.contains("Loaded") else { continue }
+
+            // Regex: Loaded L"<path>".*: native|builtin
+            if let match = line.range(of: #"Loaded L"([^"]+)".*\b(native|builtin)\b"#, options: .regularExpression) {
+                let matchStr = String(line[match])
+                // Extract path between L" and "
+                if let pathStart = matchStr.range(of: #"L""#),
+                   let pathEnd = matchStr[pathStart.upperBound...].range(of: "\"") {
+                    let fullPath = String(matchStr[pathStart.upperBound..<pathEnd.lowerBound])
+                    let dllName = URL(fileURLWithPath: fullPath.replacingOccurrences(of: "\\", with: "/")).lastPathComponent.lowercased()
+                    let loadType = matchStr.hasSuffix("native") ? "native" : "builtin"
+                    // Deduplicate by DLL name (keep last occurrence)
+                    dllEntries[dllName] = [
+                        "name": dllName,
+                        "path": fullPath,
+                        "type": loadType
+                    ]
+                }
+            }
+        }
+
+        let loadedDLLs = dllEntries.values.sorted { ($0["name"] ?? "") < ($1["name"] ?? "") }
+
+        // Extract Wine error lines (err: prefix)
+        let errors = lines.filter { $0.contains("err:") }.prefix(50).map { String($0) }
+
+        return jsonResult([
+            "loaded_dlls": loadedDLLs,
+            "errors": Array(errors),
+            "timeout_applied": true,
+            "raw_line_count": lines.count
+        ])
+    }
+
+    // MARK: 13. check_file_access
+
+    private func checkFileAccess(input: JSONValue) -> String {
+        guard let paths = input["paths"]?.asArray?.compactMap({ $0.asString }), !paths.isEmpty else {
+            return jsonResult(["error": "paths array is required and must not be empty"])
+        }
+
+        let gameDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
+        let fm = FileManager.default
+
+        var results: [[String: Any]] = []
+        for relativePath in paths {
+            let normalizedPath = relativePath.replacingOccurrences(of: "\\", with: "/")
+            let fullURL = gameDir.appendingPathComponent(normalizedPath)
+            let exists = fm.fileExists(atPath: fullURL.path)
+            results.append([
+                "path": relativePath,
+                "exists_from_game_dir": exists,
+                "absolute_path": fullURL.path
+            ])
+        }
+
+        return jsonResult(["results": results, "game_dir": gameDir.path])
     }
 
     // MARK: 11. write_game_file
