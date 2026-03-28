@@ -8,6 +8,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.7.0"),
+        .package(url: "https://github.com/apple/swift-testing", from: "0.12.0"),
     ],
     targets: [
         .executableTarget(
@@ -18,7 +19,10 @@ let package = Package(
         ),
         .testTarget(
             name: "cellarTests",
-            dependencies: ["cellar"]
+            dependencies: [
+                "cellar",
+                .product(name: "Testing", package: "swift-testing"),
+            ]
         ),
     ]
 )
