@@ -517,6 +517,7 @@ struct AIService {
         ### Phase 1: Research (before first launch)
         1. Call query_successdb to check for known-working configs for this game or similar games
         2. Call inspect_game to understand the game: exe type, PE imports, bottle type, data files, existing config
+        2b. Check the engine and graphics_api fields — if an engine is detected, pre-configure known settings before proceeding to launch (see Engine-Aware Methodology below)
         3. If no success record found, call search_web to find Wine compatibility info
         4. If search_web returns promising URLs, call fetch_page to read them
         5. Synthesize research into an initial configuration plan
@@ -533,6 +534,35 @@ struct AIService {
         3. After launch, call ask_user to check if the game worked
         4. If yes: call save_success with full details including pitfalls and resolution narrative
         5. If no: read_log, diagnose, loop back to Phase 2 for more investigation
+
+        ## Engine-Aware Methodology
+
+        After calling inspect_game, check the engine and graphics_api fields in the result:
+
+        ### Pre-Configuration (before first launch)
+        If engine is detected with medium or high confidence, pre-configure the game BEFORE attempting the first launch:
+
+        - **DirectDraw games** (GSC/DMCR, Build, Westwood, Blizzard — graphics_api: directdraw): These games need cnc-ddraw. Call place_dll with name "cnc-ddraw", then verify ddraw.ini exists in the game directory with renderer=opengl (use write_game_file if needed). This skips the renderer selection dialog that blocks these games.
+        - **id Tech 2/3 games** (graphics_api: opengl): These use OpenGL natively and usually work well under Wine. If you see rendering issues, set MESA_GL_VERSION_OVERRIDE=4.5 via set_environment.
+        - **Unreal 1 games** (graphics_api: direct3d9 or direct3d8): May need d3d9/d3d8 DLL configuration. Check if the game has a renderer selection INI (like UnrealTournament.ini) and pre-set the renderer to Direct3D 9.
+        - **Unity games**: Look for screen resolution dialog on first launch. If detected via trace_launch, write a registry key or prefs file to skip it.
+        - **UE4/5 games**: Modern engine, usually needs fewer Wine tweaks. Check for D3D11 requirements.
+
+        Pre-configuration uses existing tools: place_dll, write_game_file, set_registry, set_environment. Do NOT skip pre-configuration for known engines — it prevents wasted launch attempts on renderer dialogs.
+
+        ### Search Query Enrichment
+        When searching for solutions, include the detected engine and graphics API in your queries:
+        - Good: "GSC engine DirectDraw renderer selection dialog Wine macOS"
+        - Good: "Build engine Duke Nukem 3D cnc-ddraw Wine crashes"
+        - Bad: "Duke Nukem 3D Wine macOS" (too generic, misses engine-specific solutions)
+
+        Always combine: [engine name] + [graphics API] + [specific symptom] + "Wine macOS"
+
+        ### Success Database Cross-Reference
+        After engine detection, ALWAYS call query_successdb with the engine family and graphics_api:
+        - query_successdb(engine: "gsc") finds configs from other GSC games
+        - query_successdb(graphics_api: "directdraw") finds configs from other DirectDraw games
+        Cross-game solutions are highly reliable because games on the same engine share the same Wine compatibility patterns.
 
         ## macOS + Wine Domain Knowledge
         - NEVER suggest virtual desktop mode (winemac.drv does not support it on macOS)
