@@ -223,16 +223,20 @@ final class AgentTools {
             ])
         ),
 
-        // 9. launch_game — optional extra_winedebug
+        // 9. launch_game — optional extra_winedebug, diagnostic
         ToolDefinition(
             name: "launch_game",
-            description: "Launch the game with Wine using the currently accumulated environment variables. Returns exit code, elapsed time, stderr tail, and detected errors. Maximum 8 launches per session.",
+            description: "Launch the game with Wine using the currently accumulated environment variables. Runs pre-flight checks (exe exists, DLL files present), returns exit code, elapsed time, stderr tail, detected errors, and loaded DLL summary. Maximum 8 real launches per session. Diagnostic launches (diagnostic=true) do NOT count toward the limit.",
             inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
                     "extra_winedebug": .object([
                         "type": .string("string"),
                         "description": .string("Optional additional WINEDEBUG channels (e.g. +d3d,+opengl). Merged with existing WINEDEBUG.")
+                    ]),
+                    "diagnostic": .object([
+                        "type": .string("boolean"),
+                        "description": .string("If true, this is a quick diagnostic launch (shorter timeout, more verbose output). Does NOT count toward the 8-launch limit. Default false.")
                     ])
                 ]),
                 "required": .array([])
@@ -1058,16 +1062,51 @@ final class AgentTools {
     // MARK: 9. launch_game
 
     private func launchGame(input: JSONValue) -> String {
-        // Enforce max launch limit
-        if launchCount >= maxLaunches {
-            return jsonResult([
-                "error": "Maximum launches (\(maxLaunches)) reached for this session. Save a recipe if you found a working configuration.",
-                "launch_number": launchCount
-            ])
+        let isDiagnostic = input["diagnostic"]?.asBool ?? false
+
+        // Enforce max launch limit (diagnostic launches are free)
+        if !isDiagnostic {
+            if launchCount >= maxLaunches {
+                return jsonResult([
+                    "error": "Maximum launches (\(maxLaunches)) reached for this session. Save a recipe if you found a working configuration.",
+                    "launch_number": launchCount
+                ])
+            }
+            launchCount += 1
+        }
+        let thisLaunchNumber = launchCount
+
+        // Pre-flight checks
+        var preflightWarnings: [String] = []
+        let fm = FileManager.default
+
+        // a. Verify executable exists
+        if !fm.fileExists(atPath: executablePath) {
+            preflightWarnings.append("Executable not found at: \(executablePath)")
         }
 
-        launchCount += 1
-        let thisLaunchNumber = launchCount
+        // b. Check DLL override files exist where expected
+        if let overrides = accumulatedEnv["WINEDLLOVERRIDES"], !overrides.isEmpty {
+            let gameDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
+            let system32Dir = bottleURL.appendingPathComponent("drive_c/windows/system32")
+            let syswow64Dir = bottleURL.appendingPathComponent("drive_c/windows/syswow64")
+            let pairs = overrides.components(separatedBy: ";")
+            for pair in pairs {
+                let parts = pair.components(separatedBy: "=")
+                guard let dllBase = parts.first?.trimmingCharacters(in: .whitespaces), !dllBase.isEmpty else { continue }
+                let mode = parts.count > 1 ? parts[1] : ""
+                // Only check native overrides (n or n,b)
+                if mode.contains("n") {
+                    let dllFile = dllBase.hasSuffix(".dll") ? dllBase : "\(dllBase).dll"
+                    let inGameDir = fm.fileExists(atPath: gameDir.appendingPathComponent(dllFile).path)
+                    let inSystem32 = fm.fileExists(atPath: system32Dir.appendingPathComponent(dllFile).path)
+                    let inSyswow64 = fm.fileExists(atPath: syswow64Dir.appendingPathComponent(dllFile).path)
+                    if !inGameDir && !inSystem32 && !inSyswow64 {
+                        preflightWarnings.append("DLL override '\(dllBase)=\(mode)' set but \(dllFile) not found in game_dir, system32, or syswow64")
+                    }
+                }
+            }
+        }
 
         // Build environment: start with accumulated env
         var env = accumulatedEnv
@@ -1085,7 +1124,8 @@ final class AgentTools {
         let logDir = logFile.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
 
-        print("\n[Agent launch \(thisLaunchNumber)/\(maxLaunches)] Starting game...")
+        let launchLabel = isDiagnostic ? "diagnostic" : "\(thisLaunchNumber)/\(maxLaunches)"
+        print("\n[Agent launch \(launchLabel)] Starting game...")
 
         // Run game via wineProcess
         let result: WineResult
@@ -1099,7 +1139,8 @@ final class AgentTools {
         } catch {
             return jsonResult([
                 "error": "Failed to launch game: \(error.localizedDescription)",
-                "launch_number": thisLaunchNumber
+                "launch_number": thisLaunchNumber,
+                "diagnostic": isDiagnostic
             ])
         }
 
@@ -1119,17 +1160,42 @@ final class AgentTools {
             return dict
         }
 
+        // Parse +loaddll lines from stderr for DLL load analysis
+        let stderrLines = result.stderr.components(separatedBy: "\n")
+        var loadedDLLEntries: [String: [String: String]] = [:]
+        for line in stderrLines {
+            guard line.contains("loaddll") || line.contains("Loaded") else { continue }
+            if let match = line.range(of: #"Loaded L"([^"]+)".*\b(native|builtin)\b"#, options: .regularExpression) {
+                let matchStr = String(line[match])
+                if let pathStart = matchStr.range(of: #"L""#),
+                   let pathEnd = matchStr[pathStart.upperBound...].range(of: "\"") {
+                    let fullPath = String(matchStr[pathStart.upperBound..<pathEnd.lowerBound])
+                    let dllName = URL(fileURLWithPath: fullPath.replacingOccurrences(of: "\\", with: "/")).lastPathComponent.lowercased()
+                    let loadType = matchStr.hasSuffix("native") ? "native" : "builtin"
+                    loadedDLLEntries[dllName] = ["name": dllName, "path": fullPath, "type": loadType]
+                }
+            }
+        }
+        let loadedDLLs = loadedDLLEntries.values.sorted { ($0["name"] ?? "") < ($1["name"] ?? "") }
+
         let stderrTail = String(result.stderr.suffix(4000))
 
-        return jsonResult([
+        var resultDict: [String: Any] = [
             "exit_code": Int(result.exitCode),
             "elapsed_seconds": result.elapsed,
             "timed_out": result.timedOut,
             "stderr_tail": stderrTail,
             "detected_errors": errorDicts,
+            "loaded_dlls": loadedDLLs,
             "log_file": logFile.path,
-            "launch_number": thisLaunchNumber
-        ])
+            "launch_number": thisLaunchNumber,
+            "diagnostic": isDiagnostic
+        ]
+        if !preflightWarnings.isEmpty {
+            resultDict["preflight_warnings"] = preflightWarnings
+        }
+
+        return jsonResult(resultDict)
     }
 
     /// Describe a WineFix as a human-readable string for the agent.
