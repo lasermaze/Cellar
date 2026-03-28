@@ -560,6 +560,20 @@ final class AgentTools {
             gameFiles = contents.map { $0.lastPathComponent }.sorted()
         }
 
+        // Subdirectory name scanning (one level deep, directory names only)
+        var allGameFiles = gameFiles
+        if let contents = try? FileManager.default.contentsOfDirectory(
+            at: gameDir,
+            includingPropertiesForKeys: [.isDirectoryKey]
+        ) {
+            for item in contents {
+                if let values = try? item.resourceValues(forKeys: [.isDirectoryKey]),
+                   values.isDirectory == true {
+                    allGameFiles.append(item.lastPathComponent + "/")
+                }
+            }
+        }
+
         // Check bottle existence
         let bottleExists = FileManager.default.fileExists(atPath: bottleURL.path)
 
@@ -665,6 +679,17 @@ final class AgentTools {
             }
         }
 
+        // Binary string extraction for engine detection
+        let binaryStrings = Self.extractBinaryStrings(executablePath)
+
+        // Engine detection from file patterns, PE imports, and binary strings
+        let engineResult = EngineRegistry.detect(
+            gameFiles: allGameFiles,
+            peImports: peImports,
+            binaryStrings: binaryStrings
+        )
+        let graphicsApi = EngineRegistry.detectGraphicsApi(peImports: peImports)
+
         var result: [String: Any] = [
             "exe_type": exeType,
             "game_files": gameFiles,
@@ -680,7 +705,43 @@ final class AgentTools {
         } else {
             result["recipe"] = NSNull()
         }
+
+        // Add engine detection results (only when detection succeeds)
+        if let engine = engineResult {
+            result["engine"] = engine.name
+            result["engine_confidence"] = engine.confidence
+            result["engine_family"] = engine.family
+            result["detected_signals"] = engine.signals
+        }
+        if let api = graphicsApi {
+            result["graphics_api"] = api
+        }
+
         return jsonResult(result)
+    }
+
+    /// Extract printable strings from a binary using /usr/bin/strings.
+    /// Returns up to 5000 lines of strings with minimum 10-char length.
+    /// Returns empty array on failure (non-fatal).
+    private static func extractBinaryStrings(_ path: String) -> [String] {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/strings")
+        process.arguments = ["-n", "10", path]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let output = String(data: data, encoding: .utf8) else { return [] }
+            let lines = output.components(separatedBy: "\n")
+            // Cap at 5000 lines to avoid performance issues on large executables
+            return Array(lines.prefix(5000))
+        } catch {
+            return []
+        }
     }
 
     // MARK: 2. read_log
