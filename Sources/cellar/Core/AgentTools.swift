@@ -961,7 +961,7 @@ final class AgentTools {
             debugChannels = ["+loaddll"]
         }
         let timeoutSeconds: Int
-        if let ts = input["timeout_seconds"]?.asDouble {
+        if let ts = input["timeout_seconds"]?.asNumber {
             timeoutSeconds = Int(ts)
         } else {
             timeoutSeconds = 5
