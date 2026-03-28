@@ -41,31 +41,30 @@ brew install --cask wine-crossover
 brew install winetricks
 ```
 
-### 2. Build Cellar
+### 2. Build and install Cellar
 
 ```bash
 git clone https://github.com/lasermaze/Cellar.git
 cd Cellar
 swift build -c release
+sudo cp .build/release/cellar /usr/local/bin/
 ```
 
-The binary will be at `.build/release/cellar`.
-
-Optionally, copy it to your PATH:
+Verify the installation:
 
 ```bash
-cp .build/release/cellar /usr/local/bin/
+cellar status
 ```
 
 ### 3. Set your API key
+
+The AI agent requires an Anthropic API key. Without one, Cellar falls back to recipe-only launches (no AI diagnosis or research).
 
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-..."
 ```
 
-Add this to your `~/.zshrc` or `~/.bashrc` to persist it.
-
-The AI agent requires an Anthropic API key. Without one, Cellar falls back to recipe-only launches (no AI diagnosis or research).
+To persist across sessions, add that line to your shell config (`~/.zshrc` or `~/.bashrc`).
 
 ## Usage
 
