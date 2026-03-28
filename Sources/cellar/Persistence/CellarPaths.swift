@@ -16,6 +16,8 @@ struct CellarPaths {
         userRecipesDir.appendingPathComponent("\(gameId).json")
     }
 
+    static let configFile: URL = base.appendingPathComponent("config.json")
+
     static let aiTipSentinel: URL = base.appendingPathComponent(".ai-tip-shown")
 
     static let dllsDir: URL = base.appendingPathComponent("dlls")
