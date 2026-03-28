@@ -1,8 +1,29 @@
 import Foundation
 
+// MARK: - Research Cache
+
+private struct ResearchCache: Codable {
+    let gameId: String
+    let fetchedAt: String  // ISO8601
+    let results: [ResearchResult]
+
+    func isStale() -> Bool {
+        let formatter = ISO8601DateFormatter()
+        guard let date = formatter.date(from: fetchedAt) else { return true }
+        return Date().timeIntervalSince(date) > 7 * 24 * 3600
+    }
+}
+
+private struct ResearchResult: Codable {
+    let source: String  // "winehq", "pcgamingwiki", "duckduckgo"
+    let url: String
+    let title: String
+    let snippet: String
+}
+
 // MARK: - AgentTools
 
-/// Container for all 10 agent tool implementations.
+/// Container for all 18 agent tool implementations.
 ///
 /// Reference type (class) to allow mutable state accumulation across tool calls
 /// within a single agent loop run — env vars, launch count, installed deps.
@@ -419,6 +440,38 @@ final class AgentTools {
                 ]),
                 "required": .array([.string("game_name")])
             ])
+        ),
+
+        // 17. search_web — required query
+        ToolDefinition(
+            name: "search_web",
+            description: "Search the web for game-specific Wine compatibility info. Targets WineHQ, ProtonDB, PCGamingWiki, and forums. Results are cached per game for 7 days. Returns structured snippets, not full pages — use fetch_page to read a specific URL. Call this after checking query_successdb.",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "query": .object([
+                        "type": .string("string"),
+                        "description": .string("Search query for Wine compatibility info (e.g. 'Cossacks European Wars Wine compatibility')")
+                    ])
+                ]),
+                "required": .array([.string("query")])
+            ])
+        ),
+
+        // 18. fetch_page — required url
+        ToolDefinition(
+            name: "fetch_page",
+            description: "Fetch a specific URL and extract readable text content. Use after search_web to read a promising result page. Returns up to 8000 characters of cleaned text. Good for WineHQ AppDB pages, PCGamingWiki articles, and forum threads.",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "url": .object([
+                        "type": .string("string"),
+                        "description": .string("URL to fetch and extract text from")
+                    ])
+                ]),
+                "required": .array([.string("url")])
+            ])
         )
     ]
 
@@ -443,6 +496,8 @@ final class AgentTools {
         case "trace_launch":      return traceLaunch(input: input)
         case "check_file_access": return checkFileAccess(input: input)
         case "verify_dll_override": return verifyDllOverride(input: input)
+        case "search_web":        return searchWeb(input: input)
+        case "fetch_page":        return fetchPage(input: input)
         default:
             return jsonResult(["error": "Unknown tool: \(toolName)"])
         }
@@ -1617,6 +1672,213 @@ final class AgentTools {
             return ["game_id": record.gameId, "game_name": record.gameName]
         }
         return dict
+    }
+
+    // MARK: - Research Tools
+
+    // MARK: 17. search_web
+
+    private func searchWeb(input: JSONValue) -> String {
+        guard let query = input["query"]?.asString, !query.isEmpty else {
+            return jsonResult(["error": "query is required"])
+        }
+
+        // Check research cache
+        let cacheFile = CellarPaths.researchCacheFile(for: gameId)
+        if let cacheData = try? Data(contentsOf: cacheFile),
+           let cache = try? JSONDecoder().decode(ResearchCache.self, from: cacheData),
+           !cache.isStale() {
+            let resultDicts: [[String: String]] = cache.results.map { r in
+                ["source": r.source, "url": r.url, "title": r.title, "snippet": r.snippet]
+            }
+            return jsonResult([
+                "results": resultDicts,
+                "from_cache": true,
+                "result_count": cache.results.count,
+                "game_id": gameId
+            ])
+        }
+
+        // Build DuckDuckGo HTML search URL
+        let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
+        let searchURLString = "https://html.duckduckgo.com/html/?q=\(encodedQuery)+wine+compatibility"
+        guard let searchURL = URL(string: searchURLString) else {
+            return jsonResult(["error": "Failed to build search URL"])
+        }
+
+        // Fetch using DispatchSemaphore + ResultBox pattern
+        final class ResultBox: @unchecked Sendable {
+            var value: Result<Data, Error> = .failure(URLError(.unknown))
+        }
+        let box = ResultBox()
+        let semaphore = DispatchSemaphore(value: 0)
+
+        var request = URLRequest(url: searchURL)
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 15
+
+        URLSession.shared.dataTask(with: request) { data, _, error in
+            if let error = error {
+                box.value = .failure(error)
+            } else if let data = data {
+                box.value = .success(data)
+            }
+            semaphore.signal()
+        }.resume()
+
+        semaphore.wait()
+
+        guard case .success(let htmlData) = box.value,
+              let html = String(data: htmlData, encoding: .utf8) else {
+            let errorMsg: String
+            if case .failure(let err) = box.value {
+                errorMsg = err.localizedDescription
+            } else {
+                errorMsg = "Failed to decode response"
+            }
+            return jsonResult(["error": "Search failed: \(errorMsg)"])
+        }
+
+        // Parse HTML results
+        var results: [ResearchResult] = []
+
+        // Extract result blocks: look for result__a links and result__snippet
+        let linkPattern = #"<a rel="nofollow" class="result__a" href="([^"]+)"[^>]*>(.*?)</a>"#
+        let snippetPattern = #"<a class="result__snippet"[^>]*>(.*?)</a>"#
+
+        let linkRegex = try? NSRegularExpression(pattern: linkPattern, options: [.dotMatchesLineSeparators])
+        let snippetRegex = try? NSRegularExpression(pattern: snippetPattern, options: [.dotMatchesLineSeparators])
+
+        let nsHTML = html as NSString
+        let linkMatches = linkRegex?.matches(in: html, range: NSRange(location: 0, length: nsHTML.length)) ?? []
+        let snippetMatches = snippetRegex?.matches(in: html, range: NSRange(location: 0, length: nsHTML.length)) ?? []
+
+        let maxResults = min(linkMatches.count, 8)
+        for i in 0..<maxResults {
+            let linkMatch = linkMatches[i]
+            let urlStr = nsHTML.substring(with: linkMatch.range(at: 1))
+            let rawTitle = nsHTML.substring(with: linkMatch.range(at: 2))
+
+            // Strip HTML tags from title
+            let title = rawTitle.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // Get snippet if available
+            var snippet = ""
+            if i < snippetMatches.count {
+                let snippetMatch = snippetMatches[i]
+                let rawSnippet = nsHTML.substring(with: snippetMatch.range(at: 1))
+                snippet = rawSnippet.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+
+            // Determine source from URL
+            let source: String
+            if urlStr.contains("winehq.org") {
+                source = "winehq"
+            } else if urlStr.contains("pcgamingwiki.com") {
+                source = "pcgamingwiki"
+            } else if urlStr.contains("protondb.com") {
+                source = "protondb"
+            } else {
+                source = "duckduckgo"
+            }
+
+            results.append(ResearchResult(source: source, url: urlStr, title: title, snippet: snippet))
+        }
+
+        // Save to research cache (single write after all results collected)
+        let formatter = ISO8601DateFormatter()
+        let cache = ResearchCache(gameId: gameId, fetchedAt: formatter.string(from: Date()), results: results)
+        if let cacheData = try? JSONEncoder().encode(cache) {
+            try? FileManager.default.createDirectory(at: CellarPaths.researchCacheDir, withIntermediateDirectories: true)
+            try? cacheData.write(to: cacheFile)
+        }
+
+        let resultDicts: [[String: String]] = results.map { r in
+            ["source": r.source, "url": r.url, "title": r.title, "snippet": r.snippet]
+        }
+        return jsonResult([
+            "results": resultDicts,
+            "from_cache": false,
+            "result_count": results.count,
+            "game_id": gameId
+        ])
+    }
+
+    // MARK: 18. fetch_page
+
+    private func fetchPage(input: JSONValue) -> String {
+        guard let urlStr = input["url"]?.asString, !urlStr.isEmpty,
+              let pageURL = URL(string: urlStr) else {
+            return jsonResult(["error": "url is required and must be a valid URL"])
+        }
+
+        // Fetch using DispatchSemaphore + ResultBox pattern
+        final class ResultBox: @unchecked Sendable {
+            var value: Result<Data, Error> = .failure(URLError(.unknown))
+        }
+        let box = ResultBox()
+        let semaphore = DispatchSemaphore(value: 0)
+
+        var request = URLRequest(url: pageURL)
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 15
+
+        URLSession.shared.dataTask(with: request) { data, _, error in
+            if let error = error {
+                box.value = .failure(error)
+            } else if let data = data {
+                box.value = .success(data)
+            }
+            semaphore.signal()
+        }.resume()
+
+        semaphore.wait()
+
+        guard case .success(let pageData) = box.value,
+              let rawHTML = String(data: pageData, encoding: .utf8) ?? String(data: pageData, encoding: .ascii) else {
+            let errorMsg: String
+            if case .failure(let err) = box.value {
+                errorMsg = err.localizedDescription
+            } else {
+                errorMsg = "Failed to decode page content"
+            }
+            return jsonResult(["error": "Fetch failed: \(errorMsg)", "url": urlStr])
+        }
+
+        // Strip scripts and styles first
+        var cleaned = rawHTML
+            .replacingOccurrences(of: #"<script[^>]*>[\s\S]*?</script>"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: #"<style[^>]*>[\s\S]*?</style>"#, with: "", options: .regularExpression)
+
+        // Strip remaining HTML tags
+        cleaned = cleaned.replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
+
+        // Decode basic HTML entities
+        cleaned = cleaned
+            .replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&lt;", with: "<")
+            .replacingOccurrences(of: "&gt;", with: ">")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&#39;", with: "'")
+
+        // Collapse multiple whitespace/newlines into single spaces
+        cleaned = cleaned.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Truncate to 8000 characters
+        let truncated = cleaned.count > 8000
+        if truncated {
+            cleaned = String(cleaned.prefix(8000))
+        }
+
+        return jsonResult([
+            "url": urlStr,
+            "content": cleaned,
+            "length": cleaned.count,
+            "truncated": truncated
+        ])
     }
 }
 
