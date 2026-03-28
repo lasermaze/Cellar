@@ -1447,12 +1447,17 @@ final class AgentTools {
             nativeDllLocations.append("syswow64")
         }
 
-        // 3. Run a short trace launch to see what Wine actually loaded
-        let traceInput = JSONValue.object([
-            "debug_channels": .array([.string("+loaddll")]),
-            "timeout_seconds": .number(3)
-        ])
-        let traceResultStr = traceLaunch(input: traceInput)
+        // 3. Run a short trace launch to see what Wine actually loaded (skip if no executable found)
+        let traceResultStr: String
+        if fm.fileExists(atPath: executablePath) {
+            let traceInput = JSONValue.object([
+                "debug_channels": .array([.string("+loaddll")]),
+                "timeout_seconds": .number(8)
+            ])
+            traceResultStr = traceLaunch(input: traceInput)
+        } else {
+            traceResultStr = jsonResult(["error": "no executable to trace"])
+        }
 
         // Parse trace result to find the DLL
         var actualLoadPath: String? = nil
