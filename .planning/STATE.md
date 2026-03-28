@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Agentic Independence
-status: defining-requirements
-last_updated: "2026-03-28T05:30:00.000Z"
+status: roadmap-ready
+last_updated: "2026-03-28T00:00:00.000Z"
 progress:
-  total_phases: 0
+  total_phases: 4
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -15,156 +15,58 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-25)
+See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** Any user can go from "I have these old game files" to "the game launches and works" without manually configuring Wine.
-**Current focus:** Phase 1 — Cossacks Launches
+**Current focus:** Phase 8 — Loop Resilience (ready to plan)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-03-28 — Milestone v1.1 Agentic Independence started. PROJECT.md updated with validated v1.0 requirements and v1.1 active scope.
+Phase: 8 of 11 (Loop Resilience)
+Plan: — (not yet planned)
+Status: Ready to plan
+Last activity: 2026-03-28 — v1.1 roadmap created. 4 phases (8–11), 14 requirements mapped.
 
-Progress: [░░░░░░░░░░] v1.1 not started
+Progress: [░░░░░░░░░░] v1.1 0% (Phase 8 of 11 ready)
 
 ## Performance Metrics
 
-**Velocity:**
-- Total plans completed: 2
+**Velocity (v1.0):**
+- Total plans completed: 21
 - Average duration: 4.5 min
-- Total execution time: 0.15 hours
+- Total execution time: ~1.6 hours
 
-**By Phase:**
+**By Phase (v1.0 reference):**
 
-| Phase | Plans | Total | Avg/Plan |
-|-------|-------|-------|----------|
-| 01-cossacks-launches | 2 | 9 min | 4.5 min |
-
-**Recent Trend:**
-- Last 5 plans: 7 min, 2 min
-- Trend: faster
-
-*Updated after each plan completion*
-| Phase 03.1-expand-ai-repair-system P01 | 8min | 2 tasks | 8 files |
-| Phase 01-cossacks-launches P03 | 2 | 2 tasks | 4 files |
-| Phase 01-cossacks-launches P04 | 3min | 2 tasks | 6 files |
-| Phase 01-cossacks-launches P05 | 7 | 2 tasks | 9 files |
-| Phase 01-cossacks-launches P06 | 7 | 2 tasks | 5 files |
-| Phase 01.1-reactive-dependencies P01 | 2min | 2 tasks | 4 files |
-| Phase 01.1-reactive-dependencies P02 | 6 | 2 tasks | 2 files |
-| Phase 02-ai-intelligence P01 | 3min | 2 tasks | 4 files |
-| Phase 02-ai-intelligence P02 | 3min | 2 tasks | 2 files |
-| Phase 03-repair-loop P01 | 8min | 2 tasks | 4 files |
-| Phase 03-repair-loop P02 | 1 | 2 tasks | 1 files |
-| Phase 03.1-expand-ai-repair-system P01 | 8min | 2 tasks | 8 files |
-| Phase 03.1-expand-ai-repair-system P02 | 6min | 2 tasks | 5 files |
-| Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop P01 | 2min | 2 tasks | 2 files |
-| Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop P02 | 3 | 2 tasks | 1 files |
-| Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop P03 | 5 | 2 tasks | 2 files |
-| Phase 07 P01 | 2min | 2 tasks | 7 files |
-| Phase 07 P02 | 3min | 2 tasks | 1 files |
-| Phase 07 P03 | 7min | 2 tasks | 1 files |
-| Phase 07 P04 | 7min | 2 tasks | 2 files |
-| Phase 07 P05 | 4min | 2 tasks | 2 files |
+| Phase | Plans | Avg/Plan |
+|-------|-------|----------|
+| Phase 1 + 1.1 | 8 | 4 min |
+| Phase 2 | 2 | 3 min |
+| Phase 3 + 3.1 | 4 | 6 min |
+| Phase 6 | 3 | 3 min |
+| Phase 7 | 5 | 5 min |
 
 ## Accumulated Context
 
 ### Decisions
 
-Decisions are logged in PROJECT.md Key Decisions table.
-Recent decisions affecting current work:
-
-- Pre-planning: Wine via Gcenx tap (not bundled) — wine-stable deprecated Sep 2026
-- Pre-planning: wined3d/OpenGL for DX8/DX9 — only viable path for old-game wedge
-- Pre-planning: API-first AI — simpler than local inference for MVP
-- Pre-planning: Cossacks: European Wars as flagship test game
-- 2026-03-25: Roadmap restructured from horizontal layers to vertical functional slices — Phase 1 delivers the full pipeline for one game rather than foundation infrastructure only
-- 2026-03-27 (01-01): macOS 14 minimum required for Swift Testing framework on Command Line Tools
-- 2026-03-27 (01-01): DependencyChecker uses testable init(existingPaths:) pattern instead of protocol injection — simpler, avoids Sendable complexity in Swift 6
-- 2026-03-27 (01-01): swift test requires -Xswiftc -F flag to find Testing.framework on Command Line Tools
-- 2026-03-27 (01-02): installHomebrew() uses /bin/bash -c directly; brew binary doesn't exist yet at that stage
-- 2026-03-27 (01-02): installWine() resolves brew path via DependencyChecker().detectHomebrew() for ARM/Intel correctness
-- 2026-03-27 (01-02): StatusCommand re-checks DependencyChecker after each install attempt for accurate updated status
-- [Phase 01-03]: logHandle captured as let constant — Swift 6 Sendable requires let binding for values captured in concurrently-executing closures like readabilityHandler
-- [Phase 01-03]: RecipeEngine.findBundledRecipe uses Bundle.main first then CWD fallback — covers both release bundle and swift run development workflow
-- [Phase 01-04]: GOG install path hardcoded as drive_c/GOG Games/Cossacks - European Wars/ — predictable GOG behavior, trivial fix if it differs in practice
-- [Phase 01-04]: SIGINT handler kills wineserver (-k) rather than Process.terminate() — WineProcess.run() is synchronous and doesn't expose the underlying Process; wineserver -k is Wine-aware termination for all prefix processes
-- [Phase 01-04]: slugify() produces stable game IDs from directory names: lowercase + spaces-to-hyphens + strip non-alphanumeric — e.g., Cossacks European Wars -> cossacks-european-wars
-- [Phase 01-05]: StderrCapture uses NSLock wrapper class for Swift 6 Sendable compliance in WineProcess readabilityHandler
-- [Phase 01-05]: allRequired now requires winetricks — DependencyStatus and guided install flow updated
-- [Phase 01-05]: GuidedInstaller.installWine() uses plain brew install with xattr fallback — no --no-quarantine flag
-- [Phase 01-06]: ValidationPrompt.run() returns Bool? (reachedMenu) instead of LaunchResult — LaunchCommand constructs full result with attemptCount and diagnosis
-- [Phase 01-06]: Retry loop capped at min(envConfigs.count, 3) — if no retryVariants, only 1 attempt made (no pointless identical retries)
-- [Phase 01-06]: Legacy backward compat: entries without executablePath fall back to hardcoded GOG path + recipe.executable
-- [Phase 01.1-01]: WinetricksRunner always passes -q for unattended (no-dialog) winetricks mode
-- [Phase 01.1-01]: Stale-output timeout is 5 minutes — no output for 5 min = process assumed hung, kill + wineserver cleanup
-- [Phase 01.1-01]: OutputMonitor reuses NSLock + @unchecked Sendable pattern from WineProcess.StderrCapture for Swift 6 compliance
-- [Phase 01.1-reactive-dependencies]: setup_deps semantic change: from must-pre-install to known-fixes-if-needed — eliminates 30+ min dotnet48 upfront install
-- [Phase 01.1-reactive-dependencies]: LaunchCommand while-loop retry retries same envConfig after dep install (configIndex not advanced on dep install)
-- [Phase 01.1-reactive-dependencies]: maxTotalAttempts=5 replaces old min(count,3) cap — covers both dep installs and variant cycling
-- 2026-03-27 (02-01): detectProvider() checks ANTHROPIC_API_KEY first — prefer Claude if both keys set
-- 2026-03-27 (02-01): URLSession.shared used exclusively (not custom session) to prevent semaphore deadlock on background delegate queue
-- 2026-03-27 (02-01): ResultBox @unchecked Sendable class used for URLSession dataTask result capture — avoids Swift 6 captured-var mutation warning
-- 2026-03-27 (02-01): Winetricks verb validation against known-safe allowlist prevents AI hallucinated verb names
-- 2026-03-27 (02-01): AIResult<T> named to avoid shadowing Swift.Result
-- 2026-03-27 (02-02): LaunchCommand AI diagnosis is silent on .unavailable — no API key is not an error during launch
-- 2026-03-27 (02-02): AI fix application in LaunchCommand reuses depInstalled flag to prevent configIndex advance, keeping retry-loop semantics
-- 2026-03-27 (02-02): var activeRecipe = recipe pattern in AddCommand lets recipe stay let-bound from store while AI augmentation is mutable
-- 2026-03-27 (02-02): AI recipe generation only triggers when recipe == nil — bundled recipes always take precedence
-- [Phase 03-repair-loop]: generateVariants prompt explicitly prohibits registry edits and winetricks — env vars and WINEDLLOVERRIDES only
-- [Phase 03-repair-loop]: Attempt history error summaries capped at 500 chars per entry to prevent prompt token explosion
-- [Phase 03-repair-loop]: maxTotalAttempts raised from 5 to 10 to accommodate AI variant budget
-- [Phase 03-repair-loop]: AI variant injection uses same loop body as bundled variants — no code duplication
-- [Phase 03-repair-loop]: Exhaustion condition broadened to include timedOut — hung launches that exhaust attempt budget trigger repair report
-- [Phase 03.1-01]: cnc-ddraw only in KnownDLLRegistry v1 — dgVoodoo2 excluded (does not work on Wine)
-- [Phase 03.1-01]: DLLDownloader download failures non-fatal: WineActionExecutor continues on failure, prints warning
-- [Phase 03.1-01]: placeDLL auto-applies requiredOverrides from KnownDLLRegistry (cnc-ddraw needs WINEDLLOVERRIDES=ddraw=n,b)
-- [Phase 03.1-02]: AIVariant (runtime, parsed [WineFix]) distinct from RetryVariant (Codable) — two structs for two contexts
-- [Phase 03.1-02]: WineActionExecutor.execute() tuple updated to include actions field — consistent across all callers
-- [Phase 03.1-02]: Escalation loop uses continue (not break+call) when level produces no variants — immediately tries next
-- [Phase 03.1-02]: parseWineFix(from:) made internal for LaunchCommand recipe-action parsing at load time
-- [Phase 03.1-02]: Winning config serializes WineFix actions back to [[String:String]] for RetryVariant.actions persistence
-- [Phase 06-01]: JSONValue decodes Bool before Double — critical ordering to prevent true/false becoming 1.0/0.0
-- [Phase 06-01]: ToolContentBlock named to avoid collision with AnthropicResponse.ContentBlock
-- [Phase 06-01]: AgentLoop struct with private callAPI — mirrors AIService DispatchSemaphore+ResultBox pattern without exposing internals
-- [Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop]: AgentTools is a class not struct — mutable state persists across tool calls within one agent session
-- [Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop]: All tool methods catch errors internally and return JSON error strings — agent loop contract is String return, never throw
-- [Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop]: AIService.agentValidWinetricksVerbs added as public extension rather than duplicating private validWinetricksVerbs — single source of truth
-- [Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop]: Agent loop is Anthropic-only — OpenAI returns .unavailable; recipeFallbackLaunch() is the no-key path
-- [Phase 07]: CompanionFile as standalone struct for DLL config file co-placement reusability
-- [Phase 07]: DLLPlacementTarget.autoDetect checks filesystem for syswow64 presence rather than bottle metadata
-- [Phase 07-04]: SuccessRecord uses ISO8601 string for verifiedAt — simpler JSON serialization than Date
-- [Phase 07-04]: save_success also saves backward-compatible user recipe via RecipeEngine
-- [Phase 07-04]: Symptom fuzzy matching uses keyword overlap with 0.3 threshold, skips words under 3 chars
-- [Phase 07-02]: write_game_file uses URL.standardized for path traversal protection
-- [Phase 07-02]: place_dll auto-detect only triggers for isSystemDLL entries; non-system DLLs default to gameDir
-- [Phase 07-03]: traceLaunch is non-private so verifyDllOverride can call it internally for closed-loop verification
-- [Phase 07-03]: DLL trace deduplication keeps last occurrence per name (Wine may load/unload/reload)
-- [Phase 07-03]: Known shim DLL annotations hardcoded (ddraw, d3d8, d3d9, d3d11, dinput, dinput8, dsound)
-- [Phase 07-05]: DuckDuckGo HTML search (no API key) for search_web tool; research cache per-game with 7-day TTL
-- [Phase 07-05]: Diagnostic launches exempt from 8-launch limit; virtual desktop removed from system prompt (winemac.drv incompatible)
+- [Phase 07-05]: DuckDuckGo HTML search (no API key) for search_web; research cache per-game with 7-day TTL
 - [Phase 07-05]: V2 system prompt uses three-phase Research-Diagnose-Adapt workflow referencing all 18 tools
+- [v1.1 roadmap]: Loop resilience first — max_tokens truncation is a correctness bug affecting all new feature testing
+- [v1.1 roadmap]: Engine detection and pre-config in same phase — ProactiveConfigurator directly calls GameEngineDetector (code dependency)
+- [v1.1 roadmap]: SwiftSoup 2.8.7 is the only new SPM dependency for v1.1
 
 ### Pending Todos
 
 None.
 
-### Roadmap Evolution
-
-- Phase 03.1 inserted after Phase 03: Expand AI repair system to support DLL replacements and advanced fixes beyond env vars (URGENT)
-- Phase 6 added: Implement agentic launch architecture with AI tool-use loop
-- Phase 7 added: Agentic v2: research-diagnose-adapt loop with web search, diagnostic traces, and success database
-
 ### Blockers/Concerns
 
-- Swift TUI ecosystem is weak — v1 is CLI-only (TUI deferred to v2), but raw ANSI may be needed for good UX
-- Gcenx tap is a single-maintainer dependency — worth monitoring
-- macOS OpenGL is deprecated — only DX8/DX9 path, could break in a future macOS version
-- `swift test` requires framework search path flag for Swift Testing — future plans should document this or configure it in Package.swift
+- Phase 10 research flag: Must capture actual Gcenx wine-crossover trace:msgbox output before shipping parser — do not rely on Wine source docs alone
+- Phase 10 research flag: Screen Recording permission behavior for CLI tools on macOS 15 Sequoia requires device verification
+- Phase 11 research flag: DuckDuckGo anti-bot rate limiting under multiple queries per session needs validation
 
 ## Session Continuity
 
 Last session: 2026-03-28
-Stopped at: Completed 07-05-PLAN.md — search_web/fetch_page research tools, enhanced launch_game, v2 Research-Diagnose-Adapt system prompt. Phase 07 complete.
+Stopped at: v1.1 roadmap created — Phase 8 ready to plan. Run /gsd:plan-phase 8 to begin.

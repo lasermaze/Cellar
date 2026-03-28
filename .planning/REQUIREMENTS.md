@@ -155,26 +155,26 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LAUNCH-04 | Phase 2 | Complete |
 | RECIPE-04 | Phase 3 | Complete |
 | AGENT-01–12 | Phase 6-7 | Complete |
-| LOOP-01 | TBD | Pending |
-| LOOP-02 | TBD | Pending |
-| LOOP-03 | TBD | Pending |
-| LOOP-04 | TBD | Pending |
-| ENGN-01 | TBD | Pending |
-| ENGN-02 | TBD | Pending |
-| ENGN-03 | TBD | Pending |
-| ENGN-04 | TBD | Pending |
-| DIAG-01 | TBD | Pending |
-| DIAG-02 | TBD | Pending |
-| DIAG-03 | TBD | Pending |
-| RSRCH-01 | TBD | Pending |
-| RSRCH-02 | TBD | Pending |
-| RSRCH-03 | TBD | Pending |
+| LOOP-01 | Phase 8 | Pending |
+| LOOP-02 | Phase 8 | Pending |
+| LOOP-03 | Phase 8 | Pending |
+| LOOP-04 | Phase 8 | Pending |
+| ENGN-01 | Phase 9 | Pending |
+| ENGN-02 | Phase 9 | Pending |
+| ENGN-03 | Phase 9 | Pending |
+| ENGN-04 | Phase 9 | Pending |
+| DIAG-01 | Phase 10 | Pending |
+| DIAG-02 | Phase 10 | Pending |
+| DIAG-03 | Phase 10 | Pending |
+| RSRCH-01 | Phase 11 | Pending |
+| RSRCH-02 | Phase 11 | Pending |
+| RSRCH-03 | Phase 11 | Pending |
 
 **Coverage:**
 - v1.1 requirements: 14 total
-- Mapped to phases: 0
-- Unmapped: 14 ⚠️
+- Mapped to phases: 14
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-28 after v1.1 requirement definition*
+*Last updated: 2026-03-28 after v1.1 roadmap creation*

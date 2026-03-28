@@ -1,163 +1,87 @@
 # Roadmap: Cellar
 
-## Overview
+## Milestones
 
-Cellar is built in five vertical slices. Each phase delivers a working capability end-to-end — not a layer of infrastructure. Phase 1 proves the complete pipeline by getting Cossacks: European Wars actually launching through the whole stack (dependency check, bottle creation, hardcoded recipe, launch, log capture, validation prompt). Phase 2 adds AI intelligence to that working loop. Phase 3 adds the self-healing repair loop. Phase 4 generalizes beyond Cossacks to multi-game management. Phase 5 adds community sharing. At every phase boundary, something real works.
+- ✅ **v1.0 Research-Diagnose-Adapt** — Phases 1–7 (shipped 2026-03-28)
+- 🚧 **v1.1 Agentic Independence** — Phases 8–11 (in progress)
 
 ## Phases
 
-**Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
-- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+<details>
+<summary>✅ v1.0 Research-Diagnose-Adapt (Phases 1–7) — SHIPPED 2026-03-28</summary>
 
-Decimal phases appear between their surrounding integers in numeric order.
+- [x] **Phase 1: Cossacks Launches** — Full pipeline: dependency check, bottle, recipe, launch, log capture, validation prompt (2026-03-27)
+- [x] **Phase 1.1: Reactive Dependencies** (INSERTED) — Try-first/install-on-failure deps, winetricks timeout protection (2026-03-27)
+- [x] **Phase 2: AI Intelligence** — AI log interpretation and AI recipe generation (2026-03-27)
+- [x] **Phase 3: Repair Loop** — AI-driven retry loop with variant configs (2026-03-27)
+- [x] **Phase 3.1: Advanced Repair** (INSERTED) — DLL replacements, registry edits, three-tier escalation system (2026-03-27)
+- [x] **Phase 6: Agentic Loop** (INSERTED) — 18-tool agent loop replacing hardcoded LaunchCommand pipeline (2026-03-27)
+- [x] **Phase 7: Research-Diagnose-Adapt** (INSERTED) — Web search, diagnostic traces, DLL verification, success database (2026-03-28)
 
-- [x] **Phase 1: Cossacks Launches** - Prove the core pipeline end-to-end with self-healing agentic behavior: dependency check, bottle creation, winetricks deps, installer, executable discovery, recipe application, error diagnosis, retry loop, validation prompt (completed 2026-03-27)
-- [ ] **Phase 1.1: Reactive Dependencies** — INSERTED — Fix dependency pipeline: try-first/install-on-failure instead of blind pre-install, add timeout/deadlock protection for winetricks
-- [x] **Phase 2: AI Intelligence** - Add AI log interpretation and AI recipe generation to the working launch loop (completed 2026-03-27)
-- [ ] **Phase 3: Repair Loop** - When launch fails, AI diagnoses and retries with variant configs; self-healing pipeline
-- [ ] **Phase 4: Multi-Game Management** - Generalize beyond Cossacks; add/remove games, bottle reset, winecfg, full CLI surface
-- [ ] **Phase 5: Community** - Export working recipes as shareable JSON files
+</details>
+
+### 🚧 v1.1 Agentic Independence (In Progress)
+
+**Milestone Goal:** Make the agent truly autonomous — it persists through failures, detects dialog blockers, pre-configures games before launch, and extracts actionable fixes from web research.
+
+- [ ] **Phase 8: Loop Resilience** — Fix max_tokens truncation bug, retry on transient errors, budget tracking with ceiling
+- [ ] **Phase 9: Engine Detection and Pre-configuration** — Detect game engine from file patterns and PE imports; pre-configure games before first launch to skip known dialogs
+- [ ] **Phase 10: Dialog Detection** — Wine trace:msgbox parsing and macOS window list monitoring to detect stuck-on-dialog state
+- [ ] **Phase 11: Smarter Research** — Actionable fix extraction from web pages, engine-aware search queries, cross-game success matching
 
 ## Phase Details
 
-### Phase 1: Cossacks Launches
-**Goal**: Cossacks: European Wars launches end-to-end through a self-healing agentic pipeline on a fresh Mac, with no manual Wine configuration required
-**Depends on**: Nothing (first phase)
-**Requirements**: SETUP-01, SETUP-02, SETUP-03, SETUP-04, SETUP-05, BOTTLE-01, RECIPE-01, RECIPE-02, LAUNCH-01, LAUNCH-02, LAUNCH-03, AGENT-01, AGENT-02, AGENT-03, AGENT-04, AGENT-05, AGENT-06, AGENT-07, AGENT-08, AGENT-09, AGENT-10, AGENT-11, AGENT-12
+### Phase 8: Loop Resilience
+**Goal**: The agent loop is correct and observable — it handles max_tokens truncation without corrupting state, retries transient failures, and reports session cost against a configurable budget
+**Depends on**: Phase 7
+**Requirements**: LOOP-01, LOOP-02, LOOP-03, LOOP-04
 **Success Criteria** (what must be TRUE):
-  1. Running `cellar` on a fresh Mac reports the status of Homebrew, Wine (Gcenx tap), winetricks, and GPTK — missing dependencies are named explicitly
-  2. A user without Homebrew or Wine is guided through installation step-by-step and can complete the setup by following the on-screen instructions
-  3. Running `cellar add /path/to/setup.exe` creates a bottle, installs winetricks dependencies, runs the GOG installer, scans for executables, and validates the installation
-  4. Running `cellar launch cossacks` applies the bundled recipe, launches the game, and retries with variant configurations on failure (up to 3 attempts with error diagnosis)
-  5. The game process launches with Wine and its stdout/stderr is written to a per-launch log file
-  6. After launch exits, Cellar asks "Did the game reach the menu? (y/n)" and records the response with attempt count and diagnosis
-  7. After exhausting retries, Cellar reports what was tried and the best diagnosis
-**Plans:** 6/6 plans complete
-
-Plans:
-- [ ] 01-01-PLAN.md — Swift package scaffold, models, dependency checker (SETUP-01, SETUP-02, SETUP-05)
-- [ ] 01-02-PLAN.md — Guided install UX and StatusCommand wiring (SETUP-03, SETUP-04)
-- [ ] 01-03-PLAN.md — Bottle manager, recipe engine, Cossacks recipe (BOTTLE-01, RECIPE-01, RECIPE-02)
-- [ ] 01-04-PLAN.md — Add/Launch/Log commands, validation prompt, end-to-end pipeline (LAUNCH-01, LAUNCH-02, LAUNCH-03)
-- [ ] 01-05-PLAN.md — Agentic infrastructure: Recipe schema extension, WineResult, WineErrorParser, BottleScanner, winetricks detection, quarantine fix (AGENT-01, AGENT-03, AGENT-04, AGENT-07, AGENT-08, AGENT-12)
-- [ ] 01-06-PLAN.md — Agentic commands: wiretricks deps in add, post-install validation, executable discovery, retry loop, variant cycling, exhaustion report (AGENT-02, AGENT-05, AGENT-06, AGENT-09, AGENT-10, AGENT-11)
-
-### Phase 1.1: Reactive Dependencies
-**Goal**: Dependency installation uses try-first/install-on-failure instead of blind pre-install; winetricks runs have timeout and deadlock protection
-**Depends on**: Phase 1
-**Requirements**: AGENT-02 (revised), AGENT-09 (extended)
-**Success Criteria** (what must be TRUE):
-  1. `cellar add` runs the game installer WITHOUT pre-installing winetricks deps — deps are only installed if the installer fails with a diagnosable error
-  2. Winetricks runs have stale-output detection — if no output for 5 minutes, the process is killed and the user is informed
-  3. When `cellar launch` detects a missing DLL at runtime, it auto-installs the needed dep via winetricks and retries before advancing to the next variant
-  4. Users can override with `--force-proactive-deps` to restore old pre-install behavior
-  5. WinetricksRunner is a reusable service (not inline in AddCommand)
-**Plans**: 1/? complete
-
-Plans:
-- [x] 01.1-01-PLAN.md — WinetricksRunner service, WineResult.timedOut, WineProcess drain fixes (AGENT-02)
-
-### Phase 2: AI Intelligence
-**Goal**: The launch pipeline uses AI to interpret crash logs in plain English and to generate recipes for games that have no bundled recipe
-**Depends on**: Phase 1
-**Requirements**: RECIPE-03, LAUNCH-04
-**Success Criteria** (what must be TRUE):
-  1. When a launch fails, Cellar calls an AI API with the captured Wine log and returns a plain-English diagnosis to the user (not raw Wine errors)
-  2. When a game has no bundled recipe, Cellar calls an AI API to generate a candidate recipe and applies it automatically before launching
-  3. The AI integration is configurable (API key from environment) and fails gracefully with a clear message when unavailable
-**Plans:** 2/2 plans complete
-
-Plans:
-- [ ] 02-01-PLAN.md — AIService module: provider detection, HTTP calls, prompts, retry logic + RecipeEngine user-recipe support (RECIPE-03, LAUNCH-04)
-- [ ] 02-02-PLAN.md — Wire AI into LaunchCommand (diagnosis) and AddCommand (recipe generation) (LAUNCH-04, RECIPE-03)
-
-### Phase 3: Repair Loop
-**Goal**: When a launch fails, Cellar automatically retries with AI-suggested variant configurations before declaring failure
-**Depends on**: Phase 2
-**Requirements**: RECIPE-04
-**Success Criteria** (what must be TRUE):
-  1. When a launch fails, Cellar generates at least one alternative recipe variant (via AI or permutation) and retries automatically
-  2. The user sees each retry attempt labeled (e.g., "Trying variant 2/3...") so the loop is transparent
-  3. After exhausting variants, Cellar reports what was tried and surfaces the best diagnosis before stopping
+  1. When the API returns stop_reason="max_tokens" with an incomplete tool_use block, the agent retries with doubled max_tokens and does not append the truncated response to message history — the loop continues correctly
+  2. When a 5xx or network error occurs, the agent retries up to 3 times with exponential backoff before surfacing the error; 4xx errors (except 429) abort immediately with a clear message
+  3. At the end of an agent session, total token usage and estimated cost are printed; a configurable budget ceiling halts the session with a warning at 80% and stops at 100%
+  4. When the API returns an empty end_turn response (no tool calls, no text), the agent sends a continuation prompt instead of silently aborting
 **Plans**: TBD
 
-### Phase 03.1: Expand AI repair system to support DLL replacements and advanced fixes beyond env vars (INSERTED)
-
-**Goal:** Expand the AI repair system from env-vars-only to a three-tier graduated escalation system supporting DLL replacements (cnc-ddraw), registry edits, wiretricks verbs, and compound multi-step fixes — with AI reasoning driving what fixes are attempted
-**Requirements**: None (INSERTED phase — extends RECIPE-04 capabilities)
-**Depends on:** Phase 3
+### Phase 9: Engine Detection and Pre-configuration
+**Goal**: The agent detects a game's engine and graphics API from files and PE imports, and pre-configures Wine settings before the first launch to eliminate renderer-selection and first-run dialogs for known engines
+**Depends on**: Phase 8
+**Requirements**: ENGN-01, ENGN-02, ENGN-03, ENGN-04
 **Success Criteria** (what must be TRUE):
-  1. When bundled variants are exhausted, AI generates fixes at escalating power levels: Level 1 (env vars) -> Level 2 (+ winetricks/DLL overrides) -> Level 3 (+ DLL replacements/registry edits)
-  2. cnc-ddraw is automatically downloaded from GitHub, cached in ~/.cellar/dlls/, and placed in the game directory when AI or bundled recipe suggests it
-  3. The Cossacks: European Wars bundled recipe includes cnc-ddraw as a first-class retry variant
-  4. User sees escalation progression messages during the repair loop
-  5. Repair reports include all action types attempted (DLL placements, registry edits, not just env vars)
-  6. Unknown DLLs are not auto-downloaded — user is told where to get them manually
-  7. All file operations are sandboxed to the game's WINEPREFIX and ~/.cellar/dlls/ cache
-**Plans:** 2/2 plans complete
-
-Plans:
-- [ ] 03.1-01-PLAN.md — Expand WineFix enum, KnownDLLRegistry, DLLDownloader, WineActionExecutor, CellarPaths, RetryVariant actions
-- [ ] 03.1-02-PLAN.md — Progressive AI prompts, escalation wiring in LaunchCommand, Cossacks recipe update, repair report expansion
-
-### Phase 4: Multi-Game Management
-**Goal**: Users can manage any number of games — add, remove, reset bottles, open winecfg — and the full CLI command surface is in place
-**Depends on**: Phase 3
-**Requirements**: GAME-01, GAME-02, BOTTLE-02, BOTTLE-03, CLI-01
-**Success Criteria** (what must be TRUE):
-  1. User can run `cellar add /path/to/game` to register a new game in the library (not just Cossacks)
-  2. User can run `cellar remove <game>` to delete the library entry and optionally wipe its bottle
-  3. User can run `cellar reset <game>` to wipe and recreate a clean WINEPREFIX for any game
-  4. User can run `cellar config <game>` to open winecfg scoped to that game's bottle
-  5. All documented CLI commands (`add`, `launch`, `remove`, `reset`, `config`, `log`, `status`) are implemented and produce useful output
+  1. The inspect_game tool result includes an engine field with detected engine family (GSC/DMCR, Unreal 1, Build, id Tech 2/3, Unity, UE4/5, Westwood, Blizzard), confidence level, detected signals, and a known-config hint
+  2. PE import table analysis identifies the primary graphics API (ddraw.dll = DirectDraw, d3d9.dll = DX9, opengl32.dll = OpenGL) and includes it in the inspect_game result
+  3. For a recognized engine, the agent writes INI and registry pre-configuration before the first launch attempt — the game directory has the expected ddraw.ini or equivalent without any agent iteration spent diagnosing the dialog
+  4. Web search queries constructed after engine detection include engine name and graphics API in addition to game name — search results are visibly more targeted than game-name-only queries
 **Plans**: TBD
 
-### Phase 5: Community
-**Goal**: Users can share a working recipe so others with the same game can use it
-**Depends on**: Phase 4
-**Requirements**: COMM-01
+### Phase 10: Dialog Detection
+**Goal**: The agent can detect when a Wine game is stuck on a dialog box — via Wine trace:msgbox parsing as the primary signal and macOS window list inspection as an optional complement — and uses the combined signal to distinguish dialog-stuck from running-normally
+**Depends on**: Phase 9
+**Requirements**: DIAG-01, DIAG-02, DIAG-03
 **Success Criteria** (what must be TRUE):
-  1. User can run a command that exports the working recipe for a game as a standalone JSON file
-  2. The exported file contains all fields needed for another user to import and apply the recipe
+  1. When a Wine program displays a MessageBox, trace_launch captures the dialog title, message text, and type as structured fields in its result — without requiring any additional permissions
+  2. When a Wine game is running, the agent can query the macOS window list to report window titles and sizes for Wine processes; when Screen Recording permission is denied, the tool returns bounds and owner name only (no silent failure or crash)
+  3. After a launch_game call, the tool result indicates whether the game appeared stuck on a dialog (hybrid signal: dialog_detected from trace:msgbox and/or small-window heuristic from window list), distinct from a crash or normal exit
+**Plans**: TBD
+
+### Phase 11: Smarter Research
+**Goal**: The agent extracts specific, actionable fixes from web pages rather than raw text dumps, finds cross-game solutions from the success database using engine and API tags, and uses structured HTML parsing via SwiftSoup
+**Depends on**: Phase 10
+**Requirements**: RSRCH-01, RSRCH-02, RSRCH-03
+**Success Criteria** (what must be TRUE):
+  1. fetch_page returns an extracted_fixes field containing specific env vars, registry paths, DLL names, winetricks verbs, and INI changes found on the page — not just raw text; raw text_content is still included as fallback
+  2. When query_successdb is called with engine type and graphics API tags, it returns solutions from similar games (not just exact game matches) ranked by signal overlap
+  3. fetch_page uses SwiftSoup CSS-selector extraction for known sources (WineHQ AppDB, PCGamingWiki, forums) — code blocks, tables, and list items are parsed structurally rather than stripped as plain text
 **Plans**: TBD
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
+Phases execute in numeric order: 8 → 9 → 10 → 11
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 1. Cossacks Launches | 6/6 | Complete | 2026-03-27 |
-| 1.1 Reactive Dependencies | 1/? | In progress | - |
-| 2. AI Intelligence | 2/2 | Complete   | 2026-03-27 |
-| 3. Repair Loop | 0/? | Not started | - |
-| 4. Multi-Game Management | 0/? | Not started | - |
-| 5. Community | 0/? | Not started | - |
-
-### Phase 6: Implement agentic launch architecture with AI tool-use loop
-
-**Goal:** Replace the ~500-line hardcoded LaunchCommand pipeline with an AI agent loop that has tools to inspect, configure, launch, and diagnose Wine games — no fixed escalation levels, no hardcoded retry logic. Graceful degradation to recipe-only launch when no API key is set.
-**Requirements**: None (INSERTED phase — extends existing launch architecture)
-**Depends on:** Phase 3.1
-**Plans:** 3/3 plans complete
-
-Plans:
-- [ ] 06-01-PLAN.md — Tool-use API types (JSONValue, ContentBlock, ToolDefinition) and AgentLoop state machine
-- [ ] 06-02-PLAN.md — 10 agent tool implementations (inspect_game, read_log, read_registry, ask_user, set_environment, set_registry, install_winetricks, place_dll, launch_game, save_recipe)
-- [ ] 06-03-PLAN.md — Wire agent into LaunchCommand with system prompt and graceful degradation fallback
-
-### Phase 7: Agentic v2: research-diagnose-adapt loop with web search, diagnostic traces, and success database
-
-**Goal:** Replace the v1 agent's linear config-search loop with a three-phase Research-Diagnose-Adapt architecture: add web research tools, diagnostic trace launches, DLL verification, file access checks, a success database for game knowledge, and correct macOS/Wine domain knowledge in the system prompt
-**Requirements**: None (INSERTED phase — extends agent architecture from Phase 6)
-**Depends on:** Phase 6
-**Plans:** 5 plans
-
-Plans:
-- [ ] 07-01-PLAN.md — P0 infrastructure fixes: WineProcess CWD, DLLPlacementTarget.syswow64, KnownDLL companion files, CellarPaths extensions
-- [ ] 07-02-PLAN.md — write_game_file tool + enhanced place_dll with syswow64/companion file support
-- [ ] 07-03-PLAN.md — Diagnostic tools: trace_launch, check_file_access, verify_dll_override, enhanced inspect_game
-- [ ] 07-04-PLAN.md — Success database: SuccessRecord schema, SuccessDatabase CRUD, query_successdb + save_success tools
-- [ ] 07-05-PLAN.md — Research tools: search_web + fetch_page with cache, enhanced launch_game, v2 system prompt
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1–7. v1.0 phases | v1.0 | All complete | Complete | 2026-03-28 |
+| 8. Loop Resilience | v1.1 | 0/? | Not started | - |
+| 9. Engine Detection and Pre-configuration | v1.1 | 0/? | Not started | - |
+| 10. Dialog Detection | v1.1 | 0/? | Not started | - |
+| 11. Smarter Research | v1.1 | 0/? | Not started | - |
