@@ -43,10 +43,10 @@ Requirements for v1.1 Agentic Independence. Each maps to roadmap phases.
 
 ### Loop Resilience
 
-- [ ] **LOOP-01**: Agent recovers from max_tokens truncation — detects incomplete tool_use blocks and retries with higher max_tokens instead of sending broken continuation
-- [ ] **LOOP-02**: Agent retries on transient API errors — 3-attempt exponential backoff on 5xx and network errors; 4xx (except 429) are fatal
+- [x] **LOOP-01**: Agent recovers from max_tokens truncation — detects incomplete tool_use blocks and retries with higher max_tokens instead of sending broken continuation
+- [x] **LOOP-02**: Agent retries on transient API errors — 3-attempt exponential backoff on 5xx and network errors; 4xx (except 429) are fatal
 - [x] **LOOP-03**: Agent tracks token usage per session and prints total cost at end — configurable budget ceiling with 80% warning and halt at 100%
-- [ ] **LOOP-04**: Agent handles empty end_turn responses by sending continuation prompt instead of aborting
+- [x] **LOOP-04**: Agent handles empty end_turn responses by sending continuation prompt instead of aborting
 
 ### Engine Detection
 
@@ -155,10 +155,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LAUNCH-04 | Phase 2 | Complete |
 | RECIPE-04 | Phase 3 | Complete |
 | AGENT-01–12 | Phase 6-7 | Complete |
-| LOOP-01 | Phase 8 | Pending |
-| LOOP-02 | Phase 8 | Pending |
+| LOOP-01 | Phase 8 | Complete |
+| LOOP-02 | Phase 8 | Complete |
 | LOOP-03 | Phase 8 | Complete |
-| LOOP-04 | Phase 8 | Pending |
+| LOOP-04 | Phase 8 | Complete |
 | ENGN-01 | Phase 9 | Pending |
 | ENGN-02 | Phase 9 | Pending |
 | ENGN-03 | Phase 9 | Pending |

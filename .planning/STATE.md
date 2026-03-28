@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Agentic Independence
 status: executing
-last_updated: "2026-03-28T23:14:18.000Z"
+last_updated: "2026-03-28T23:18:54.000Z"
 progress:
   total_phases: 4
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-03-28)
 
 ## Current Position
 
-Phase: 8 of 11 (Loop Resilience)
-Plan: 1 of 2 complete
-Status: Executing
-Last activity: 2026-03-28 — Completed 08-01 (data layer for loop resilience).
+Phase: 8 of 11 (Loop Resilience) -- COMPLETE
+Plan: 2 of 2 complete
+Status: Phase 8 complete, ready for Phase 9
+Last activity: 2026-03-28 — Completed 08-02 (resilient agent loop with retry, truncation, budget, cost summary).
 
-Progress: [█████░░░░░] v1.1 ~12% (Phase 8 Plan 1/2 done)
+Progress: [██████████] v1.1 ~25% (Phase 8 complete, 2/2 plans done)
 
 ## Performance Metrics
 
@@ -51,6 +51,7 @@ Progress: [█████░░░░░] v1.1 ~12% (Phase 8 Plan 1/2 done)
 | Phase | Plan | Duration |
 |-------|------|----------|
 | Phase 8 | 08-01 | 1 min |
+| Phase 8 | 08-02 | 2 min |
 
 ## Accumulated Context
 
@@ -63,6 +64,8 @@ Progress: [█████░░░░░] v1.1 ~12% (Phase 8 Plan 1/2 done)
 - [v1.1 roadmap]: SwiftSoup 2.8.7 is the only new SPM dependency for v1.1
 - [Phase 08-01]: Budget default $5.00, configurable via CELLAR_BUDGET env or ~/.cellar/config.json
 - [Phase 08-01]: Usage field optional on AnthropicToolResponse; token/cost fields zeroed until Plan 02 wires accumulation
+- [Phase 08-02]: Budget warning injected as .text block alongside tool_result blocks (avoids extra message turn)
+- [Phase 08-02]: max_tokens escalation retries do NOT count as iterations; budget ceiling overrides escalation at 80%
 
 ### Pending Todos
 
@@ -77,4 +80,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-28
-Stopped at: Completed 08-01-PLAN.md — data layer for loop resilience. 08-02 next.
+Stopped at: Completed 08-02-PLAN.md — Phase 8 (Loop Resilience) fully complete. Phase 9 next.
