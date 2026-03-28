@@ -25,6 +25,12 @@ struct BottleScanner {
             "wmplayer", "iexplore", "notepad", "regedit", "winhlp32",
         ]
 
+        // Config/utility tool suffixes — these are helper tools, not the game itself
+        let skipExeSuffixes: [String] = [
+            "_config", "_configuration", "_settings", "_options",
+            "_editor", "_tool", "_diag", "_benchmark",
+        ]
+
         var results: [URL] = []
 
         guard let enumerator = FileManager.default.enumerator(
@@ -55,10 +61,13 @@ struct BottleScanner {
 
             // Skip known non-game executables
             let filename = fileURL.deletingPathExtension().lastPathComponent.lowercased()
-            let isSkipped = skipExePatterns.contains { pattern in
+            let isSkippedPrefix = skipExePatterns.contains { pattern in
                 filename.hasPrefix(pattern) || filename == pattern
             }
-            if isSkipped { continue }
+            let isSkippedSuffix = skipExeSuffixes.contains { suffix in
+                filename.hasSuffix(suffix)
+            }
+            if isSkippedPrefix || isSkippedSuffix { continue }
 
             results.append(fileURL)
         }

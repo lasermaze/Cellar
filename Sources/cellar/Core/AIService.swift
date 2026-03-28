@@ -580,7 +580,7 @@ struct AIService {
             systemPrompt: systemPrompt,
             model: "claude-sonnet-4-20250514",
             maxIterations: 20,
-            maxTokens: 4096
+            maxTokens: 16384
         )
 
         let initialMessage = "Launch the game '\(entry.name)' (ID: \(gameId)). The executable is at: \(executablePath). Follow the Research-Diagnose-Adapt workflow: start by querying the success database, then inspect the game."

@@ -12,19 +12,30 @@ Any user can go from "I have these old game files" to "the game launches and wor
 
 ### Validated
 
-(None yet — ship to validate)
+<!-- Shipped in v1.0 — 7 phases, 22 plans -->
+
+- ✓ Import game files and identify the game — v1.0
+- ✓ Create isolated per-game Wine bottles — v1.0
+- ✓ Apply configuration recipes (known or AI-generated) — v1.0
+- ✓ Launch games from terminal (`cellar launch <game>`) — v1.0
+- ✓ Detect and guide installation of dependencies (Homebrew, Wine via Gcenx tap) — v1.0
+- ✓ AI-powered log interpretation and recipe generation (API-first) — v1.0
+- ✓ User-confirmed launch validation ("Did the game reach the menu?") — v1.0
+- ✓ Save working recipes for reuse and community sharing — v1.0
+- ✓ Agentic launch with 18-tool Research-Diagnose-Adapt loop — v1.0
+- ✓ Web search and page fetching for compatibility research — v1.0
+- ✓ Diagnostic traces, DLL verification, success database — v1.0
 
 ### Active
 
-- [ ] Import game files and identify the game
-- [ ] Create isolated per-game Wine bottles
-- [ ] Apply configuration recipes (known or AI-generated)
-- [ ] Launch games from terminal (`cellar launch <game>`)
-- [ ] Detect and guide installation of dependencies (Homebrew, Wine via Gcenx tap)
-- [ ] AI-powered log interpretation and recipe generation (API-first)
-- [ ] User-confirmed launch validation ("Did the game reach the menu?")
-- [ ] Save working recipes for reuse and community sharing
-- [ ] CLI commands + interactive TUI (lazygit/btop style)
+<!-- v1.1: Agentic Independence -->
+
+- [ ] Agent stays in diagnosis loop after game failure (doesn't exit prematurely)
+- [ ] Agent detects Wine dialog boxes (renderer selection, error dialogs) via msgbox traces
+- [ ] Agent pre-configures game settings to skip dialogs (INI files, registry)
+- [ ] Agent performs deep research (PCGamingWiki API, structured extraction, cross-game patterns)
+- [ ] Agent detects game engine type and applies engine-specific knowledge
+- [ ] Agent uses macOS window detection to observe dialog/game state
 
 ### Out of Scope
 
@@ -63,6 +74,16 @@ Any user can go from "I have these old game files" to "the game launches and wor
 - **License**: Open source (GPL-3.0 aligns with Whisky/Heroic ecosystem)
 - **Scope**: One game family first (old strategy games), expand from there
 
+## Current Milestone: v1.1 Agentic Independence
+
+**Goal:** Make the agent truly autonomous — it should detect dialog errors, deeply research game fixes, and persist through failures instead of giving up after one attempt.
+
+**Target features:**
+- Loop resilience: agent continues diagnosing after failures, handles max_tokens gracefully
+- Dialog awareness: parse trace:msgbox output, detect Wine windows via CGWindowListCopyWindowInfo
+- Game-aware pre-configuration: detect engine type (UE1, etc.), pre-set renderer in INI/registry to skip dialogs
+- Deep research: PCGamingWiki Cargo API integration, structured data extraction, cross-game engine pattern database
+
 ## Key Decisions
 
 | Decision | Rationale | Outcome |
@@ -80,4 +101,4 @@ Any user can go from "I have these old game files" to "the game launches and wor
 | GPTK detect-only (not bundled) | Apple EULA prohibits redistribution of D3DMetal. Detect if installed. | — Pending |
 
 ---
-*Last updated: 2026-03-25 after research*
+*Last updated: 2026-03-28 after v1.1 milestone start*

@@ -77,11 +77,13 @@ struct AgentLoop {
             iterationCount += 1
 
             // Step 2a: Call Anthropic API
+            print("[Agent iteration \(iterationCount)/\(maxIterations)]")
             let response: AnthropicToolResponse
             do {
                 response = try callAnthropic(messages: messages)
             } catch {
-                let errorMessage = "Agent API error: \(error.localizedDescription)"
+                let errorMessage = "Agent API error (iteration \(iterationCount)): \(error.localizedDescription)"
+                print(errorMessage)
                 return AgentLoopResult(finalText: errorMessage, iterationsUsed: iterationCount, completed: false)
             }
 
@@ -120,8 +122,15 @@ struct AgentLoop {
                 // Per Anthropic API: tool_result blocks must be the content of the user turn
                 messages.append(AnthropicToolRequest.Message(role: "user", content: .blocks(resultBlocks)))
 
+            case "max_tokens":
+                // Response was truncated — append what we got and ask the model to continue
+                print("[Agent: response truncated, continuing...]")
+                messages.append(AnthropicToolRequest.Message(role: "assistant", content: .blocks(response.content)))
+                messages.append(AnthropicToolRequest.Message(role: "user", content: .text("Your response was truncated due to length. Please continue where you left off. If you were about to call a tool, call it now.")))
+
             default:
-                // Unexpected stop reason (e.g., "max_tokens") — return what we have
+                // Truly unexpected stop reason — return what we have
+                print("[Agent: unexpected stop_reason '\(response.stopReason)']")
                 return AgentLoopResult(
                     finalText: allText.joined(separator: "\n"),
                     iterationsUsed: iterationCount,
@@ -189,7 +198,8 @@ struct AgentLoop {
             } else if let data = data {
                 let httpResponse = response as? HTTPURLResponse
                 if let code = httpResponse?.statusCode, code >= 400 {
-                    box.value = .failure(AgentLoopError.httpError(statusCode: code))
+                    let body = String(data: data, encoding: .utf8) ?? "(binary)"
+                    box.value = .failure(AgentLoopError.httpError(statusCode: code, body: body))
                 } else {
                     box.value = .success(data)
                 }
@@ -205,14 +215,14 @@ struct AgentLoop {
 // MARK: - AgentLoopError
 
 enum AgentLoopError: Error, LocalizedError {
-    case httpError(statusCode: Int)
+    case httpError(statusCode: Int, body: String)
     case decodingError(String)
     case noResponse
 
     var errorDescription: String? {
         switch self {
-        case .httpError(let statusCode):
-            return "HTTP \(statusCode)"
+        case .httpError(let statusCode, let body):
+            return "HTTP \(statusCode): \(body.prefix(500))"
         case .decodingError(let detail):
             return "Failed to decode agent response: \(detail)"
         case .noResponse:

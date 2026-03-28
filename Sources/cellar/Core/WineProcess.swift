@@ -114,6 +114,16 @@ struct WineProcess {
 
         let elapsed = Date().timeIntervalSince(startTime)
 
+        // Prevent spurious callbacks after process exit (matches GuidedInstaller pattern)
+        stdoutPipe.fileHandleForReading.readabilityHandler = nil
+        stderrPipe.fileHandleForReading.readabilityHandler = nil
+
+        // Close pipe write ends to unblock readDataToEndOfFile — Wine child processes
+        // (winedevice, services.exe) inherit these descriptors and keep them open indefinitely,
+        // causing readDataToEndOfFile to block forever even after the game exits.
+        try? stdoutPipe.fileHandleForWriting.close()
+        try? stderrPipe.fileHandleForWriting.close()
+
         // Drain remaining data after exit (Pitfall 4: readabilityHandler EOF bug)
         let remainingStdout = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
         if !remainingStdout.isEmpty {
@@ -128,10 +138,6 @@ struct WineProcess {
                 stderrCapture.append(str)
             }
         }
-
-        // Prevent spurious callbacks after process exit (matches GuidedInstaller pattern)
-        stdoutPipe.fileHandleForReading.readabilityHandler = nil
-        stderrPipe.fileHandleForReading.readabilityHandler = nil
 
         // Close log file handle
         logHandle?.closeFile()

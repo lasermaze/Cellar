@@ -1331,12 +1331,16 @@ final class AgentTools {
         process.waitUntilExit()
         killWork.cancel()
 
+        // Close pipe write ends to unblock readDataToEndOfFile — Wine child processes
+        // inherit these descriptors and keep them open indefinitely.
+        stderrPipe.fileHandleForReading.readabilityHandler = nil
+        try? stderrPipe.fileHandleForWriting.close()
+
         // Drain remaining stderr
         let remainingData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
         if !remainingData.isEmpty, let str = String(data: remainingData, encoding: .utf8) {
             stderrCapture.append(str)
         }
-        stderrPipe.fileHandleForReading.readabilityHandler = nil
 
         // Kill wineserver to clean up (in case timeout didn't fire)
         try? wineProcess.killWineserver()
