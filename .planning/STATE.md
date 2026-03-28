@@ -137,6 +137,7 @@ None.
 
 - Phase 03.1 inserted after Phase 03: Expand AI repair system to support DLL replacements and advanced fixes beyond env vars (URGENT)
 - Phase 6 added: Implement agentic launch architecture with AI tool-use loop
+- Phase 7 added: Agentic v2: research-diagnose-adapt loop with web search, diagnostic traces, and success database
 
 ### Blockers/Concerns
 
