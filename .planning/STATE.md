@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-25)
 ## Current Position
 
 Phase: 07-agentic-v2-research-diagnose-adapt-loop-with-web-search-diagnostic-traces-and-success-database (Phase 7)
-Plan: 3 of 5 complete (07-03 complete)
+Plan: 4 of 5 complete (07-04 complete)
 Status: Phase 07 In Progress
-Last activity: 2026-03-28 — Plan 07-03 complete: trace_launch DLL load analysis, verify_dll_override config verification, check_file_access path debugging, enhanced inspect_game with PE imports/bottle type/data files.
+Last activity: 2026-03-28 — Plan 07-04 complete: SuccessDatabase with Codable schema, file-backed CRUD, fuzzy symptom matching, and query_successdb/save_success agent tools.
 
-Progress: [██████████] Phase 01-06 complete; Phase 07 in progress (3/5)
+Progress: [██████████] Phase 01-06 complete; Phase 07 in progress (4/5)
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Progress: [██████████] Phase 01-06 complete; Phase 07 in pro
 | Phase 07 P01 | 2min | 2 tasks | 7 files |
 | Phase 07 P02 | 3min | 2 tasks | 1 files |
 | Phase 07 P03 | 7min | 2 tasks | 1 files |
+| Phase 07 P04 | 7min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -133,6 +134,9 @@ Recent decisions affecting current work:
 - [Phase 06-implement-agentic-launch-architecture-with-ai-tool-use-loop]: Agent loop is Anthropic-only — OpenAI returns .unavailable; recipeFallbackLaunch() is the no-key path
 - [Phase 07]: CompanionFile as standalone struct for DLL config file co-placement reusability
 - [Phase 07]: DLLPlacementTarget.autoDetect checks filesystem for syswow64 presence rather than bottle metadata
+- [Phase 07-04]: SuccessRecord uses ISO8601 string for verifiedAt — simpler JSON serialization than Date
+- [Phase 07-04]: save_success also saves backward-compatible user recipe via RecipeEngine
+- [Phase 07-04]: Symptom fuzzy matching uses keyword overlap with 0.3 threshold, skips words under 3 chars
 - [Phase 07-02]: write_game_file uses URL.standardized for path traversal protection
 - [Phase 07-02]: place_dll auto-detect only triggers for isSystemDLL entries; non-system DLLs default to gameDir
 - [Phase 07-03]: traceLaunch is non-private so verifyDllOverride can call it internally for closed-loop verification
@@ -159,4 +163,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-28
-Stopped at: Completed 07-03-PLAN.md — Diagnostic tools: trace_launch DLL load analysis, verify_dll_override config verification, check_file_access path debugging, enhanced inspect_game with PE imports/bottle type/data files.
+Stopped at: Completed 07-04-PLAN.md — SuccessDatabase with Codable schema, file-backed CRUD, fuzzy symptom matching, query_successdb and save_success agent tools.
