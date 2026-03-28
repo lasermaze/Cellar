@@ -40,7 +40,10 @@
   2. When a 5xx or network error occurs, the agent retries up to 3 times with exponential backoff before surfacing the error; 4xx errors (except 429) abort immediately with a clear message
   3. At the end of an agent session, total token usage and estimated cost are printed; a configurable budget ceiling halts the session with a warning at 80% and stops at 100%
   4. When the API returns an empty end_turn response (no tool calls, no text), the agent sends a continuation prompt instead of silently aborting
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 08-01-PLAN.md — Data layer: usage decoding, extended AgentLoopResult, CellarConfig, model ID fix
+- [ ] 08-02-PLAN.md — Loop logic: truncation recovery, retry with backoff, budget tracking, empty end_turn, cost display
 
 ### Phase 9: Engine Detection and Pre-configuration
 **Goal**: The agent detects a game's engine and graphics API from files and PE imports, and pre-configures Wine settings before the first launch to eliminate renderer-selection and first-run dialogs for known engines
@@ -81,7 +84,7 @@ Phases execute in numeric order: 8 → 9 → 10 → 11
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 1–7. v1.0 phases | v1.0 | All complete | Complete | 2026-03-28 |
-| 8. Loop Resilience | v1.1 | 0/? | Not started | - |
+| 8. Loop Resilience | v1.1 | 0/2 | Planned | - |
 | 9. Engine Detection and Pre-configuration | v1.1 | 0/? | Not started | - |
 | 10. Dialog Detection | v1.1 | 0/? | Not started | - |
 | 11. Smarter Research | v1.1 | 0/? | Not started | - |
