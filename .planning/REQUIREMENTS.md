@@ -3,9 +3,9 @@
 **Defined:** 2026-03-25
 **Core Value:** Any user can go from "I have these old game files" to "the game launches and works" without manually configuring Wine.
 
-## v1 Requirements
+## v1.0 Requirements (Validated)
 
-Requirements for initial release. Each maps to roadmap phases.
+Shipped and confirmed in v1.0. See MILESTONES.md for details.
 
 ### Setup & Dependencies
 
@@ -15,16 +15,9 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **SETUP-04**: Cellar guides user through installing Wine (Gcenx tap) if missing
 - [x] **SETUP-05**: Cellar detects whether GPTK is installed on the system
 
-### Game Library
-
-- [ ] **GAME-01**: User can add a game by providing a directory path (`cellar add /path`)
-- [ ] **GAME-02**: User can remove a game and optionally clean up its bottle (`cellar remove`)
-
 ### Bottle Management
 
 - [x] **BOTTLE-01**: Cellar creates an isolated WINEPREFIX per game automatically on first launch
-- [ ] **BOTTLE-02**: User can reset a game's bottle to a clean state (`cellar reset`)
-- [ ] **BOTTLE-03**: User can open winecfg for a game's bottle (`cellar config`)
 
 ### Recipe System
 
@@ -40,13 +33,39 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **LAUNCH-03**: After launch, Cellar asks user if the game reached the menu (validation prompt)
 - [x] **LAUNCH-04**: AI interprets Wine crash logs and provides human-readable diagnosis
 
-### Community
+### Agentic Architecture (v1.0)
 
-- [ ] **COMM-01**: User can export a working recipe as a shareable JSON file
+- [x] **AGENT-01** through **AGENT-12**: 18-tool Research-Diagnose-Adapt agent loop with web search, diagnostic traces, DLL management, success database
 
-### Interface
+## v1.1 Requirements
 
-- [ ] **CLI-01**: CLI commands: `add`, `launch`, `remove`, `reset`, `config`, `log`, `status`
+Requirements for v1.1 Agentic Independence. Each maps to roadmap phases.
+
+### Loop Resilience
+
+- [ ] **LOOP-01**: Agent recovers from max_tokens truncation — detects incomplete tool_use blocks and retries with higher max_tokens instead of sending broken continuation
+- [ ] **LOOP-02**: Agent retries on transient API errors — 3-attempt exponential backoff on 5xx and network errors; 4xx (except 429) are fatal
+- [ ] **LOOP-03**: Agent tracks token usage per session and prints total cost at end — configurable budget ceiling with 80% warning and halt at 100%
+- [ ] **LOOP-04**: Agent handles empty end_turn responses by sending continuation prompt instead of aborting
+
+### Engine Detection
+
+- [ ] **ENGN-01**: Agent detects game engine type from file patterns (GSC/DMCR, Unreal 1, Build, id Tech 2/3, Unity, UE4/5, Westwood, Blizzard) with confidence levels
+- [ ] **ENGN-02**: Agent uses PE import table as secondary engine signal (ddraw.dll = DirectDraw, d3d9.dll = DX9, etc.)
+- [ ] **ENGN-03**: Agent pre-configures game settings before first launch based on detected engine — writes INI files and registry entries to skip renderer selection dialogs
+- [ ] **ENGN-04**: Agent constructs engine-aware web search queries using engine type, graphics API, and symptoms instead of just game name
+
+### Dialog Detection
+
+- [ ] **DIAG-01**: trace_launch includes +msgbox in WINEDEBUG and parses MessageBoxW output into structured dialog info (title, message, type)
+- [ ] **DIAG-02**: Agent queries macOS window list (CGWindowListCopyWindowInfo) to detect window sizes and titles of Wine processes
+- [ ] **DIAG-03**: Agent uses hybrid signal (Wine traces + window list) to determine if game is stuck on a dialog vs running normally — with graceful degradation if Screen Recording permission is denied
+
+### Research Quality
+
+- [ ] **RSRCH-01**: Agent extracts actionable fixes from web pages — exact env vars, registry paths, DLL names, winetricks verbs, INI changes (not general descriptions)
+- [ ] **RSRCH-02**: Agent queries success database by engine type and graphics API tags to find similar-game solutions for new games
+- [ ] **RSRCH-03**: fetch_page uses SwiftSoup for structured HTML parsing instead of string stripping — extracts content from known sources (WineHQ, PCGamingWiki, forums)
 
 ## v2 Requirements
 
@@ -58,18 +77,35 @@ Deferred to future release. Tracked but not in current roadmap.
 
 ### Game Library
 
+- **GAME-01**: User can add a game by providing a directory path (`cellar add /path`)
+- **GAME-02**: User can remove a game and optionally clean up its bottle (`cellar remove`)
 - **GAME-03**: AI-powered game identification from EXE metadata and file hashes
 - **GAME-04**: List games with metadata (`cellar list` with status, last played)
+
+### Bottle Management
+
+- **BOTTLE-02**: User can reset a game's bottle to a clean state (`cellar reset`)
+- **BOTTLE-03**: User can open winecfg for a game's bottle (`cellar config`)
+
+### CLI
+
+- **CLI-01**: CLI commands: `add`, `launch`, `remove`, `reset`, `config`, `log`, `status`
 
 ### Recipe System
 
 - **RECIPE-05**: Confidence scoring on recipes (track reliability across launches)
-- **RECIPE-06**: cnc-ddraw integration for DirectDraw games
 
 ### Community
 
+- **COMM-01**: User can export a working recipe as a shareable JSON file
 - **COMM-02**: Debug bundle export (logs + config + system info in one command)
 - **COMM-03**: Submit recipe via PR workflow guidance
+
+### Advanced Detection
+
+- **ADV-01**: Vision-based dialog detection via screenshot analysis and vision model
+- **ADV-02**: Multi-session agent memory — persist reasoning across sessions
+- **ADV-03**: ProtonDB integration for community compatibility reports
 
 ### Setup
 
@@ -91,6 +127,12 @@ Deferred to future release. Tracked but not in current roadmap.
 | DX11/DX12 game support (v1) | Wedge is old DX8/DX9 games; GPTK detect for future |
 | Native GUI (SwiftUI) | CLI-first for simplicity; TUI in v2 |
 | Automatic game downloads | Legal issues — user provides their own files |
+| Automated dialog button clicking | Requires Accessibility API, fragile, dangerous |
+| Virtual desktop mode | Does not work on macOS winemac.drv |
+| Wine version switching | Gcenx provides one build; not viable repair |
+| Mass winetricks pre-install | Breaks bottles, masks deps, wastes time |
+| Parallel multi-config testing | Wine processes share winemac; causes corruption |
+| Screenshot-based success detection | Expensive, requires permissions, high false positives |
 
 ## Traceability
 
@@ -112,18 +154,27 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RECIPE-03 | Phase 2 | Complete |
 | LAUNCH-04 | Phase 2 | Complete |
 | RECIPE-04 | Phase 3 | Complete |
-| GAME-01 | Phase 4 | Pending |
-| GAME-02 | Phase 4 | Pending |
-| BOTTLE-02 | Phase 4 | Pending |
-| BOTTLE-03 | Phase 4 | Pending |
-| CLI-01 | Phase 4 | Pending |
-| COMM-01 | Phase 5 | Pending |
+| AGENT-01–12 | Phase 6-7 | Complete |
+| LOOP-01 | TBD | Pending |
+| LOOP-02 | TBD | Pending |
+| LOOP-03 | TBD | Pending |
+| LOOP-04 | TBD | Pending |
+| ENGN-01 | TBD | Pending |
+| ENGN-02 | TBD | Pending |
+| ENGN-03 | TBD | Pending |
+| ENGN-04 | TBD | Pending |
+| DIAG-01 | TBD | Pending |
+| DIAG-02 | TBD | Pending |
+| DIAG-03 | TBD | Pending |
+| RSRCH-01 | TBD | Pending |
+| RSRCH-02 | TBD | Pending |
+| RSRCH-03 | TBD | Pending |
 
 **Coverage:**
-- v1 requirements: 20 total
-- Mapped to phases: 20
-- Unmapped: 0
+- v1.1 requirements: 14 total
+- Mapped to phases: 0
+- Unmapped: 14 ⚠️
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-25 after roadmap revision to vertical slices*
+*Last updated: 2026-03-28 after v1.1 requirement definition*
