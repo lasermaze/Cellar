@@ -27,7 +27,7 @@
 - [ ] **Phase 8: Loop Resilience** — Fix max_tokens truncation bug, retry on transient errors, budget tracking with ceiling
 - [ ] **Phase 9: Engine Detection and Pre-configuration** — Detect game engine from file patterns and PE imports; pre-configure games before first launch to skip known dialogs
 - [x] **Phase 10: Dialog Detection** — Wine trace:msgbox parsing and macOS window list monitoring to detect stuck-on-dialog state (completed 2026-03-29)
-- [ ] **Phase 11: Smarter Research** — Actionable fix extraction from web pages, engine-aware search queries, cross-game success matching
+- [x] **Phase 11: Smarter Research** — Actionable fix extraction from web pages, engine-aware search queries, cross-game success matching (completed 2026-03-29)
 
 ## Phase Details
 
@@ -77,7 +77,7 @@ Plans:
   1. fetch_page returns an extracted_fixes field containing specific env vars, registry paths, DLL names, winetricks verbs, and INI changes found on the page — not just raw text; raw text_content is still included as fallback
   2. When query_successdb is called with engine type and graphics API tags, it returns solutions from similar games (not just exact game matches) ranked by signal overlap
   3. fetch_page uses SwiftSoup CSS-selector extraction for known sources (WineHQ AppDB, PCGamingWiki, forums) — code blocks, tables, and list items are parsed structurally rather than stripped as plain text
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 Plans:
 - [ ] 11-01-PLAN.md — SwiftSoup dependency + PageParser protocol, three parser implementations (WineHQ, PCGamingWiki, Generic), ExtractedFixes models, regex extraction
 - [ ] 11-02-PLAN.md — Rewrite fetchPage() with SwiftSoup + PageParser, add queryBySimilarity() and similar_games to querySuccessdb()
@@ -94,4 +94,4 @@ Phases execute in numeric order: 8 → 9 → 10 → 11
 | 8. Loop Resilience | v1.1 | 0/2 | Planned | - |
 | 9. Engine Detection and Pre-configuration | v1.1 | 0/? | Not started | - |
 | 10. Dialog Detection | 2/2 | Complete    | 2026-03-29 | - |
-| 11. Smarter Research | 2/3 | In Progress|  | - |
+| 11. Smarter Research | 3/3 | Complete   | 2026-03-29 | - |
