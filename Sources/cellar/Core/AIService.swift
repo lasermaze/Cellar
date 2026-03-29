@@ -576,9 +576,9 @@ struct AIService {
         - If a game exits immediately (< 2 seconds), it likely has a missing dependency or configuration issue
         - Diagnostic methodology: ALWAYS trace before configuring, verify after placing DLLs
 
-        ## Available Tools (18 total)
+        ## Available Tools (19 total)
         Research: query_successdb, search_web, fetch_page
-        Diagnostic: inspect_game, trace_launch, verify_dll_override, check_file_access, read_log, read_registry
+        Diagnostic: inspect_game, trace_launch, verify_dll_override, check_file_access, read_log, read_registry, list_windows
         Action: set_environment, set_registry, install_winetricks, place_dll, write_game_file, launch_game
         User: ask_user
         Persistence: save_success, save_recipe

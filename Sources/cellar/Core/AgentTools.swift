@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 // MARK: - Research Cache
 
@@ -476,6 +477,17 @@ final class AgentTools {
                 ]),
                 "required": .array([.string("url")])
             ])
+        ),
+
+        // 19. list_windows — no required params
+        ToolDefinition(
+            name: "list_windows",
+            description: "Query the macOS window list for Wine processes. Returns window sizes, owner process names, and titles (titles require Screen Recording permission). Use after launch_game to check if the game is showing a dialog (small window) or running normally (large window). If Screen Recording permission is denied, returns bounds and owner only with instructions to grant permission.",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([:]),
+                "required": .array([])
+            ])
         )
     ]
 
@@ -502,6 +514,7 @@ final class AgentTools {
         case "verify_dll_override": return verifyDllOverride(input: input)
         case "search_web":        return searchWeb(input: input)
         case "fetch_page":        return fetchPage(input: input)
+        case "list_windows":      return listWindows(input: input)
         default:
             return jsonResult(["error": "Unknown tool: \(toolName)"])
         }
@@ -2050,6 +2063,74 @@ final class AgentTools {
             "length": cleaned.count,
             "truncated": truncated
         ])
+    }
+
+    // MARK: 19. list_windows
+
+    /// Query macOS window list for Wine processes using CoreGraphics.
+    private func listWindows(input: JSONValue) -> String {
+        guard let windowList = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements],
+            kCGNullWindowID
+        ) as? [[String: Any]] else {
+            return jsonResult(["error": "Failed to query window list", "windows": [] as [Any], "count": 0])
+        }
+
+        let wineNames: Set<String> = ["wine", "wine64", "wineserver",
+            "wine-preloader", "wine64-preloader", "start.exe"]
+
+        let myPID = ProcessInfo.processInfo.processIdentifier
+        var wineWindows: [[String: Any]] = []
+        var hasScreenRecordingPermission = false
+
+        // Check all windows for Screen Recording permission indicator
+        for window in windowList {
+            if let pid = window[kCGWindowOwnerPID as String] as? Int32,
+               pid != myPID,
+               window[kCGWindowName as String] as? String != nil {
+                hasScreenRecordingPermission = true
+                break
+            }
+        }
+
+        // Filter to Wine processes
+        for window in windowList {
+            guard let ownerName = window[kCGWindowOwnerName as String] as? String else { continue }
+
+            let isWine = wineNames.contains(ownerName.lowercased()) ||
+                         ownerName.lowercased().contains("wine")
+            guard isWine else { continue }
+
+            var entry: [String: Any] = ["owner": ownerName]
+
+            // Bounds are always available (no permission needed)
+            if let bounds = window[kCGWindowBounds as String] as? [String: Any] {
+                let w = (bounds["Width"] as? CGFloat) ?? (bounds["Width"] as? Double).map { CGFloat($0) } ?? 0
+                let h = (bounds["Height"] as? CGFloat) ?? (bounds["Height"] as? Double).map { CGFloat($0) } ?? 0
+                entry["width"] = Int(w)
+                entry["height"] = Int(h)
+                entry["likely_dialog"] = (w < 640 && h < 480)
+            }
+
+            // Window name requires Screen Recording permission
+            if let name = window[kCGWindowName as String] as? String {
+                entry["title"] = name
+            }
+
+            wineWindows.append(entry)
+        }
+
+        var result: [String: Any] = [
+            "windows": wineWindows,
+            "screen_recording_permission": hasScreenRecordingPermission,
+            "count": wineWindows.count
+        ]
+
+        if wineWindows.isEmpty && !hasScreenRecordingPermission {
+            result["note"] = "No Wine windows found. If a Wine game is running, Screen Recording permission may be needed for full window detection. Grant permission to Terminal/your app in System Settings > Privacy & Security > Screen Recording."
+        }
+
+        return jsonResult(result)
     }
 }
 
