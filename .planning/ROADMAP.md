@@ -106,7 +106,7 @@ Phases execute in numeric order: 8 → 9 → 10 → 11
   3. Users can add games (by installer path) and delete games (with optional bottle cleanup) from the browser
   4. Users can directly launch games with working recipes — Wine output streams to browser via SSE
   5. Users can launch games with AI agent — iteration count, tool calls, reasoning, and cost stream in real-time via SSE
-**Plans:** 4 plans
+**Plans:** 1/4 plans executed
 
 Plans:
 - [ ] 12-01-PLAN.md — Foundation: Vapor + Leaf deps, ServeCommand, WebApp, GameService actor, LaunchService, base.leaf

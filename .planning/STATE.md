@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Agentic Independence
-status: unknown
-last_updated: "2026-03-29T16:13:02.687Z"
+status: in-progress
+last_updated: "2026-03-29T23:25:20Z"
 progress:
-  total_phases: 11
+  total_phases: 12
   completed_phases: 11
-  total_plans: 31
-  completed_plans: 31
+  total_plans: 35
+  completed_plans: 32
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** Any user can go from "I have these old game files" to "the game launches and works" without manually configuring Wine.
-**Current focus:** Phase 11 in progress — smarter research with SwiftSoup HTML parsing and structured fix extraction.
+**Current focus:** Phase 12 in progress — web interface for game management with CRUD, live agent logs, and direct launch.
 
 ## Current Position
 
-Phase: 11 of 11 (Smarter Research)
-Plan: 3 of 3 complete
-Status: Phase 11 complete. All plans delivered (PageParser, tool integration, system prompt).
-Last activity: 2026-03-29 — Completed 11-02 (fetchPage SwiftSoup rewrite + querySuccessdb similar_games).
+Phase: 12 of 12 (Web Interface)
+Plan: 1 of 4 complete
+Status: Plan 12-02 complete (AgentEvent streaming callback). Plans 12-03 and 12-04 remaining.
+Last activity: 2026-03-29 — Completed 12-02 (AgentEvent enum + onOutput callback on AgentLoop).
 
-Progress: [████████████████████] v1.1 100% (Phase 11: 3/3 plans complete)
+Progress: [████████████████░░░░] Phase 12: 1/4 plans complete
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: [████████████████████] v1.1 10
 | Phase 11 | 11-01 | 4 min |
 | Phase 11 | 11-03 | 1 min |
 | Phase 11 | 11-02 | 2 min |
+| Phase 12 | 12-02 | 5 min |
 
 ## Accumulated Context
 
@@ -91,6 +92,13 @@ Progress: [████████████████████] v1.1 10
 - [Phase 11-02]: selectParser is a free function, not namespaced as PageParserDispatch
 - [Phase 11-02]: fetchPage fallback to regex stripping on SwiftSoup parse failure preserves resilience
 - [Phase 11-02]: Result key renamed from 'content' to 'text_content' per CONTEXT.md spec
+- [Phase 12-02]: emit() always prints AND calls callback -- CLI behavior preserved unconditionally
+- [Phase 12-02]: AgentEvent.completed wraps AgentLoopResult, emitted via makeResult helper for all exit paths
+- [Phase 12-02]: toolResult case includes truncated output (200 chars) for web UI preview
+
+### Roadmap Evolution
+
+- Phase 12 added: Web interface for game management with CRUD operations, live agent logs, and direct launch
 
 ### Pending Todos
 
@@ -105,4 +113,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-29
-Stopped at: Completed 11-02-PLAN.md — fetchPage SwiftSoup rewrite + querySuccessdb similar_games. Phase 11 fully complete (all 3 plans).
+Stopped at: Completed 12-02-PLAN.md — AgentEvent enum + onOutput callback on AgentLoop for web streaming.
