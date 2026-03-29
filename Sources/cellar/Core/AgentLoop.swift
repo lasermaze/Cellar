@@ -3,7 +3,7 @@ import Foundation
 // MARK: - AgentLoopResult
 
 /// Why the agent loop stopped.
-enum AgentStopReason {
+enum AgentStopReason: Sendable {
     case completed
     case budgetExhausted
     case maxIterations
@@ -11,7 +11,7 @@ enum AgentStopReason {
 }
 
 /// Result returned when the agent loop terminates.
-struct AgentLoopResult {
+struct AgentLoopResult: Sendable {
     /// Concatenated text from all assistant text blocks across the run.
     let finalText: String
     /// Number of API calls made (tool-use iterations).
@@ -26,6 +26,21 @@ struct AgentLoopResult {
     let totalOutputTokens: Int
     /// Estimated cost in USD based on token usage.
     let estimatedCostUSD: Double
+}
+
+// MARK: - AgentEvent
+
+/// Events emitted during agent loop execution for external consumers (web UI, logging).
+enum AgentEvent: Sendable {
+    case iteration(number: Int, total: Int)
+    case text(String)
+    case toolCall(name: String)
+    case toolResult(name: String, truncated: String)
+    case cost(inputTokens: Int, outputTokens: Int, usd: Double)
+    case budgetWarning(percentage: Int)
+    case status(String)
+    case error(String)
+    case completed(AgentLoopResult)
 }
 
 // MARK: - AgentLoop
@@ -51,6 +66,7 @@ struct AgentLoop {
     let maxIterations: Int
     let maxTokens: Int
     let budgetCeiling: Double
+    let onOutput: (@Sendable (AgentEvent) -> Void)?
 
     // MARK: Init
 
@@ -61,7 +77,8 @@ struct AgentLoop {
         model: String = "claude-opus-4-6",
         maxIterations: Int = 20,
         maxTokens: Int = 4096,
-        budgetCeiling: Double = 5.00
+        budgetCeiling: Double = 5.00,
+        onOutput: (@Sendable (AgentEvent) -> Void)? = nil
     ) {
         self.apiKey = apiKey
         self.tools = tools
@@ -70,6 +87,34 @@ struct AgentLoop {
         self.maxIterations = maxIterations
         self.maxTokens = maxTokens
         self.budgetCeiling = budgetCeiling
+        self.onOutput = onOutput
+    }
+
+    // MARK: Emit
+
+    /// Emit a structured event AND preserve CLI print output.
+    private func emit(_ event: AgentEvent) {
+        onOutput?(event)
+        switch event {
+        case .iteration(let n, let total):
+            print("[Agent iteration \(n)/\(total)]")
+        case .text(let text):
+            print("Agent: \(text)")
+        case .toolCall(let name):
+            print("-> \(name)")
+        case .toolResult:
+            break // not printed in CLI
+        case .cost:
+            break // printed separately at session end
+        case .budgetWarning(let pct):
+            print("[Budget: \(pct)% used]")
+        case .status(let msg):
+            print(msg)
+        case .error(let msg):
+            print(msg)
+        case .completed:
+            break
+        }
     }
 
     // MARK: Run
@@ -109,7 +154,7 @@ struct AgentLoop {
         }
 
         func makeResult(text: String, iterations: Int, completed: Bool, stopReason: AgentStopReason) -> AgentLoopResult {
-            AgentLoopResult(
+            let result = AgentLoopResult(
                 finalText: text,
                 iterationsUsed: iterations,
                 completed: completed,
@@ -118,6 +163,9 @@ struct AgentLoop {
                 totalOutputTokens: totalOutputTokens,
                 estimatedCostUSD: estimatedCost()
             )
+            emit(.cost(inputTokens: totalInputTokens, outputTokens: totalOutputTokens, usd: estimatedCost()))
+            emit(.completed(result))
+            return result
         }
 
         // Step 1: Append initial user message
@@ -128,15 +176,15 @@ struct AgentLoop {
             iterationCount += 1
 
             // Step 2a: Call Anthropic API with retry
-            print("[Agent iteration \(iterationCount)/\(maxIterations)]")
+            emit(.iteration(number: iterationCount, total: maxIterations))
             let response: AnthropicToolResponse
             do {
                 response = try callAnthropicWithRetry(messages: messages, maxTokens: currentMaxTokens)
             } catch let error as AgentLoopError {
                 if case .apiUnavailable = error {
-                    print("API unavailable after 3 attempts. Your game state is unchanged.")
+                    emit(.error("API unavailable after 3 attempts. Your game state is unchanged."))
                 } else {
-                    print("Agent API error (iteration \(iterationCount)): \(error.localizedDescription)")
+                    emit(.error("Agent API error (iteration \(iterationCount)): \(error.localizedDescription)"))
                 }
                 return makeResult(
                     text: allText.joined(separator: "\n") + "\n\(error.localizedDescription)",
@@ -145,7 +193,7 @@ struct AgentLoop {
                     stopReason: .apiError(error.localizedDescription)
                 )
             } catch {
-                print("Agent API error (iteration \(iterationCount)): \(error.localizedDescription)")
+                emit(.error("Agent API error (iteration \(iterationCount)): \(error.localizedDescription)"))
                 return makeResult(
                     text: allText.joined(separator: "\n") + "\n\(error.localizedDescription)",
                     iterations: iterationCount,
@@ -165,7 +213,8 @@ struct AgentLoop {
             let budgetFraction = budgetCeiling > 0 ? currentCost / budgetCeiling : 0
 
             if budgetFraction >= 0.5 && !hasAlertedAt50 {
-                print("[Budget: 50% used ($\(String(format: "%.2f", currentCost)) / $\(String(format: "%.2f", budgetCeiling)))]")
+                emit(.budgetWarning(percentage: 50))
+                emit(.cost(inputTokens: totalInputTokens, outputTokens: totalOutputTokens, usd: currentCost))
                 hasAlertedAt50 = true
             }
 
@@ -195,7 +244,7 @@ struct AgentLoop {
             // Step 2d: Print and collect text blocks
             for block in response.content {
                 if case .text(let text) = block, !text.isEmpty {
-                    print("Agent: \(text)")
+                    emit(.text(text))
                     allText.append(text)
                 }
             }
@@ -214,14 +263,14 @@ struct AgentLoop {
                 if hasContent && !agentCanStop && consecutiveContinuations < 3 {
                     // Agent tried to stop but task isn't done yet
                     consecutiveContinuations += 1
-                    print("[Agent tried to stop, but task is not complete (\(consecutiveContinuations)/3). Continuing...]")
+                    emit(.status("[Agent tried to stop, but task is not complete (\(consecutiveContinuations)/3). Continuing...]"))
                     messages.append(AnthropicToolRequest.Message(role: "assistant", content: .blocks(response.content)))
                     messages.append(AnthropicToolRequest.Message(role: "user", content: .text("You cannot stop yet — the game has not been confirmed working by the user, or you haven't saved a success record after confirmation. Continue diagnosing and fixing. Use your tools to investigate and apply a fix, then launch_game again.")))
                 } else if hasContent {
                     return makeResult(text: allText.joined(separator: "\n"), iterations: iterationCount, completed: true, stopReason: .completed)
                 } else {
                     // Empty end_turn — send continuation prompt
-                    print("[Agent: empty response, sending continuation...]")
+                    emit(.status("[Agent: empty response, sending continuation...]"))
                     messages.append(AnthropicToolRequest.Message(role: "assistant", content: .blocks(response.content)))
                     messages.append(AnthropicToolRequest.Message(role: "user", content: .text("Please continue. What would you like to do next?")))
                 }
@@ -242,8 +291,9 @@ struct AgentLoop {
                 var resultBlocks: [ToolContentBlock] = []
                 for block in response.content {
                     if case .toolUse(let id, let name, let input) = block {
-                        print("-> \(name)")
+                        emit(.toolCall(name: name))
                         let result = toolExecutor(name, input)
+                        emit(.toolResult(name: name, truncated: String(result.prefix(200))))
                         resultBlocks.append(.toolResult(toolUseId: id, content: result, isError: false))
                     }
                 }
@@ -271,13 +321,13 @@ struct AgentLoop {
                     let projectedCost = Double(totalInputTokens) * inputPricePerToken + Double(projectedOutputTokens) * outputPricePerToken
                     if budgetCeiling > 0 && projectedCost / budgetCeiling >= 0.8 {
                         // Budget override: use continuation prompt instead of escalating
-                        print("[Agent: max_tokens hit, but escalation would exceed budget. Using continuation...]")
+                        emit(.status("[Agent: max_tokens hit, but escalation would exceed budget. Using continuation...]"))
                         messages.append(AnthropicToolRequest.Message(role: "assistant", content: .blocks(response.content)))
                         messages.append(AnthropicToolRequest.Message(role: "user", content: .text("Your response was truncated. Continue.")))
                     } else {
                         // Safe to escalate — do NOT append truncated response to messages
                         let newMax = min(currentMaxTokens * 2, maxTokensCeiling)
-                        print("[Agent: max_tokens hit with incomplete tool_use, retrying with \(newMax)...]")
+                        emit(.status("[Agent: max_tokens hit with incomplete tool_use, retrying with \(newMax)...]"))
                         currentMaxTokens = newMax
                         // Do NOT increment iteration count — this is a retry, not a new step
                         iterationCount -= 1
@@ -285,12 +335,12 @@ struct AgentLoop {
                     }
                 } else if hasIncompleteToolUse {
                     // At ceiling and still truncated — fall back to continuation
-                    print("[Agent: max_tokens hit at ceiling (\(maxTokensCeiling)), using continuation...]")
+                    emit(.status("[Agent: max_tokens hit at ceiling (\(maxTokensCeiling)), using continuation...]"))
                     messages.append(AnthropicToolRequest.Message(role: "assistant", content: .blocks(response.content)))
                     messages.append(AnthropicToolRequest.Message(role: "user", content: .text("Your response was truncated. Continue.")))
                 } else {
                     // Text-only truncation — safe to append and continue
-                    print("[Agent: response truncated, continuing...]")
+                    emit(.status("[Agent: response truncated, continuing...]"))
                     messages.append(AnthropicToolRequest.Message(role: "assistant", content: .blocks(response.content)))
                     messages.append(AnthropicToolRequest.Message(role: "user", content: .text("Your response was truncated. Continue.")))
                     // Reset max_tokens after text-only truncation
@@ -301,7 +351,7 @@ struct AgentLoop {
 
             default:
                 // Truly unexpected stop reason — return what we have
-                print("[Agent: unexpected stop_reason '\(response.stopReason)']")
+                emit(.error("[Agent: unexpected stop_reason '\(response.stopReason)']"))
                 return makeResult(
                     text: allText.joined(separator: "\n"),
                     iterations: iterationCount,
@@ -336,13 +386,13 @@ struct AgentLoop {
                     }
                 }
                 if attempt < 3 {
-                    print("API error, retrying (\(attempt + 1)/3)...")
+                    emit(.status("API error, retrying (\(attempt + 1)/3)..."))
                     Thread.sleep(forTimeInterval: backoffSeconds[attempt - 1])
                 }
             } catch {
                 // Network errors (URLError etc) — retriable
                 if attempt < 3 {
-                    print("API error, retrying (\(attempt + 1)/3)...")
+                    emit(.status("API error, retrying (\(attempt + 1)/3)..."))
                     Thread.sleep(forTimeInterval: backoffSeconds[attempt - 1])
                 }
             }
