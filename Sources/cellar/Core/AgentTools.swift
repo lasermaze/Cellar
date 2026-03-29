@@ -288,7 +288,7 @@ final class AgentTools {
         // 12. trace_launch — optional debug_channels, timeout_seconds
         ToolDefinition(
             name: "trace_launch",
-            description: "Run a short diagnostic Wine launch with debug channels enabled. The game is killed after timeout_seconds. Returns structured DLL load analysis (which DLLs loaded, from where, native vs builtin) and any errors detected. Use this BEFORE configuring — trace first, then fix. Does NOT count toward the launch limit.",
+            description: "Run a short diagnostic Wine launch with debug channels enabled. The game is killed after timeout_seconds. Returns structured DLL load analysis (which DLLs loaded, from where, native vs builtin), any dialog/msgbox text detected, and errors. Use this BEFORE configuring — trace first, then fix. Does NOT count toward the launch limit.",
             inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
@@ -1239,6 +1239,9 @@ final class AgentTools {
         }
         let loadedDLLs = loadedDLLEntries.values.sorted { ($0["name"] ?? "") < ($1["name"] ?? "") }
 
+        // Parse +msgbox lines from stderr for dialog detection
+        let parsedDialogs = AgentTools.parseMsgboxDialogs(from: stderrLines)
+
         let stderrTail = String(result.stderr.suffix(4000))
 
         var resultDict: [String: Any] = [
@@ -1248,6 +1251,7 @@ final class AgentTools {
             "stderr_tail": stderrTail,
             "detected_errors": errorDicts,
             "loaded_dlls": loadedDLLs,
+            "dialogs": parsedDialogs,
             "log_file": logFile.path,
             "launch_number": thisLaunchNumber,
             "diagnostic": isDiagnostic
@@ -1312,6 +1316,33 @@ final class AgentTools {
         }
     }
 
+    // MARK: - Msgbox Dialog Parsing
+
+    /// Parse Wine trace:msgbox lines from stderr to extract dialog message text.
+    /// Returns array of dicts with "message" and "source" keys.
+    /// Wine only traces the message body (not caption or button type).
+    static func parseMsgboxDialogs(from stderrLines: [String]) -> [[String: String]] {
+        var dialogs: [[String: String]] = []
+        for line in stderrLines {
+            guard line.contains("trace:msgbox:MSGBOX_OnInit") else { continue }
+            // Extract text between L" and the final "
+            if let lQuoteRange = line.range(of: #"L""#),
+               let lastQuote = line.lastIndex(of: "\""),
+               lastQuote > lQuoteRange.upperBound {
+                var rawText = String(line[lQuoteRange.upperBound..<lastQuote])
+                // Unescape Wine debugstr_w sequences (order matters: backslash last)
+                rawText = rawText.replacingOccurrences(of: "\\n", with: "\n")
+                rawText = rawText.replacingOccurrences(of: "\\t", with: "\t")
+                rawText = rawText.replacingOccurrences(of: "\\\\", with: "\\")
+                dialogs.append([
+                    "message": rawText,
+                    "source": "trace:msgbox"
+                ])
+            }
+        }
+        return dialogs
+    }
+
     // MARK: - Diagnostic Trace Tools (Phase 07-03)
 
     /// Thread-safe stderr capture for trace_launch (mirrors WineProcess.StderrCapture pattern).
@@ -1332,7 +1363,7 @@ final class AgentTools {
         if let channels = input["debug_channels"]?.asArray {
             debugChannels = channels.compactMap { $0.asString }
         } else {
-            debugChannels = ["+loaddll"]
+            debugChannels = ["+loaddll", "+msgbox"]
         }
         let timeoutSeconds: Int
         if let ts = input["timeout_seconds"]?.asNumber {
@@ -1437,11 +1468,15 @@ final class AgentTools {
 
         let loadedDLLs = dllEntries.values.sorted { ($0["name"] ?? "") < ($1["name"] ?? "") }
 
+        // Parse +msgbox lines for dialog detection
+        let parsedDialogs = AgentTools.parseMsgboxDialogs(from: lines)
+
         // Extract Wine error lines (err: prefix)
         let errors = lines.filter { $0.contains("err:") }.prefix(50).map { String($0) }
 
         return jsonResult([
             "loaded_dlls": loadedDLLs,
+            "dialogs": parsedDialogs,
             "errors": Array(errors),
             "timeout_applied": true,
             "raw_line_count": lines.count
