@@ -22,9 +22,7 @@ enum WebApp {
         app.http.server.configuration.port = port
         app.http.server.configuration.hostname = "127.0.0.1"
 
-        // Placeholder root route — controllers added in Plans 03 and 04
-        app.get { req async throws -> View in
-            try await req.view.render("base", ["title": "Cellar"])
-        }
+        // Game management routes
+        try GameController.register(app)
     }
 }
