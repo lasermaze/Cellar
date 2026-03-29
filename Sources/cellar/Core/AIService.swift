@@ -499,7 +499,8 @@ struct AIService {
         executablePath: String,
         wineURL: URL,
         bottleURL: URL,
-        wineProcess: WineProcess
+        wineProcess: WineProcess,
+        onOutput: (@Sendable (AgentEvent) -> Void)? = nil
     ) -> AIResult<String> {
         let provider = detectProvider()
         guard case .anthropic(let apiKey) = provider else {
@@ -710,7 +711,8 @@ struct AIService {
             model: "claude-sonnet-4-6",
             maxIterations: 50,
             maxTokens: 16384,
-            budgetCeiling: config.budgetCeiling
+            budgetCeiling: config.budgetCeiling,
+            onOutput: onOutput
         )
 
         let initialMessage = "Launch the game '\(entry.name)' (ID: \(gameId)). The executable is at: \(executablePath). Follow the Research-Diagnose-Adapt workflow: start by querying the success database, then inspect the game. Move quickly to a real launch_game call — research and at most one trace_launch before your first real launch."

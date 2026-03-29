@@ -1,0 +1,313 @@
+@preconcurrency import Vapor
+import Foundation
+import NIOCore
+
+/// Actor-based single launch guard -- Wine on macOS doesn't handle parallel processes well
+private actor LaunchGuard {
+    static let shared = LaunchGuard()
+    private var activeLaunch: String? = nil
+
+    func tryAcquire(gameId: String) throws -> Bool {
+        if let active = activeLaunch {
+            throw Abort(.conflict, reason: "Game '\(active)' is currently launching")
+        }
+        activeLaunch = gameId
+        return true
+    }
+
+    func release() {
+        activeLaunch = nil
+    }
+}
+
+enum LaunchController {
+
+    static func register(_ app: Application) throws {
+        // GET /games/:gameId/launch -- launch log page
+        app.get("games", ":gameId", "launch") { req async throws -> View in
+            guard let gameId = req.parameters.get("gameId") else {
+                throw Abort(.badRequest)
+            }
+            guard let game = try await GameService.shared.findGame(id: gameId) else {
+                throw Abort(.notFound)
+            }
+            let useAgent = (req.query[String.self, at: "agent"] ?? "false") == "true"
+            return try await req.view.render("launch-log", LaunchLogContext(
+                gameId: game.id,
+                gameName: game.name,
+                useAgent: useAgent,
+                streamURL: "/games/\(game.id)/launch/stream?agent=\(useAgent)"
+            ))
+        }
+
+        // GET /games/:gameId/launch/stream -- SSE stream
+        app.get("games", ":gameId", "launch", "stream") { req async throws -> Response in
+            guard let gameId = req.parameters.get("gameId") else {
+                throw Abort(.badRequest)
+            }
+
+            // Enforce single active launch
+            _ = try await LaunchGuard.shared.tryAcquire(gameId: gameId)
+
+            let useAgent = (req.query[String.self, at: "agent"] ?? "false") == "true"
+
+            let body = Response.Body(stream: { writer in
+                Task.detached {
+                    defer {
+                        Task { await LaunchGuard.shared.release() }
+                    }
+
+                    do {
+                        try await runLaunch(
+                            gameId: gameId,
+                            useAgent: useAgent,
+                            writer: writer
+                        )
+                    } catch {
+                        sendSSE(writer: writer, event: "error",
+                                data: "<div class='error'>Error: \(error.localizedDescription)</div>")
+                    }
+
+                    // Signal completion
+                    sendSSE(writer: writer, event: "complete",
+                            data: "<div>Launch finished.</div>")
+                    _ = writer.write(.end)
+                }
+            })
+
+            let response = Response(status: .ok, body: body)
+            response.headers.replaceOrAdd(name: .contentType, value: "text/event-stream")
+            response.headers.replaceOrAdd(name: .cacheControl, value: "no-cache")
+            response.headers.replaceOrAdd(name: .connection, value: "keep-alive")
+            return response
+        }
+    }
+
+    // MARK: - Launch Logic
+
+    private static func runLaunch(gameId: String, useAgent: Bool, writer: BodyStreamWriter) async throws {
+        guard let game = try await GameService.shared.findGame(id: gameId) else {
+            throw Abort(.notFound)
+        }
+        guard let wineURL = LaunchService.resolveWine() else {
+            sendSSE(writer: writer, event: "error",
+                    data: "<div class='error'>Wine is not installed</div>")
+            return
+        }
+
+        let bottleURL = CellarPaths.bottleDir(for: gameId)
+        guard let executablePath = game.executablePath else {
+            sendSSE(writer: writer, event: "error",
+                    data: "<div class='error'>No executable path configured for this game</div>")
+            return
+        }
+
+        sendSSE(writer: writer, event: "status",
+                data: "<div>Preparing to launch \(escapeHTML(game.name))...</div>")
+
+        if useAgent {
+            try await runAgentLaunch(
+                gameId: gameId, game: game, executablePath: executablePath,
+                wineURL: wineURL, bottleURL: bottleURL, writer: writer
+            )
+        } else {
+            try await runDirectLaunch(
+                gameId: gameId, game: game, executablePath: executablePath,
+                wineURL: wineURL, bottleURL: bottleURL, writer: writer
+            )
+        }
+    }
+
+    private static func runDirectLaunch(
+        gameId: String, game: GameEntry, executablePath: String,
+        wineURL: URL, bottleURL: URL, writer: BodyStreamWriter
+    ) async throws {
+        sendSSE(writer: writer, event: "status",
+                data: "<div>Direct launch -- applying recipe...</div>")
+
+        let wineProcess = WineProcess(wineBinary: wineURL, winePrefix: bottleURL)
+        let engine = RecipeEngine()
+
+        // Load and apply bundled recipe
+        if let recipe = try? RecipeEngine.findBundledRecipe(for: gameId) {
+            do {
+                _ = try engine.apply(recipe: recipe, wineProcess: wineProcess)
+                sendSSE(writer: writer, event: "log",
+                        data: "<div>Recipe applied: \(escapeHTML(recipe.name))</div>")
+            } catch {
+                sendSSE(writer: writer, event: "log",
+                        data: "<div class='warning'>Recipe apply error: \(escapeHTML(error.localizedDescription))</div>")
+            }
+        }
+
+        // Check for user recipe
+        let userRecipeURL = CellarPaths.userRecipeFile(for: gameId)
+        if FileManager.default.fileExists(atPath: userRecipeURL.path),
+           let data = try? Data(contentsOf: userRecipeURL),
+           let recipe = try? JSONDecoder().decode(Recipe.self, from: data) {
+            do {
+                _ = try engine.apply(recipe: recipe, wineProcess: wineProcess)
+                sendSSE(writer: writer, event: "log",
+                        data: "<div>User recipe applied</div>")
+            } catch {
+                sendSSE(writer: writer, event: "log",
+                        data: "<div class='warning'>User recipe apply error: \(escapeHTML(error.localizedDescription))</div>")
+            }
+        }
+
+        sendSSE(writer: writer, event: "status",
+                data: "<div>Launching game...</div>")
+
+        // Run Wine process on a detached thread (WineProcess uses synchronous Process APIs)
+        let result = await withCheckedContinuation { (continuation: CheckedContinuation<WineResult, Never>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    let logFile = CellarPaths.logFile(for: gameId, timestamp: Date())
+                    try FileManager.default.createDirectory(
+                        at: logFile.deletingLastPathComponent(),
+                        withIntermediateDirectories: true
+                    )
+                    let wineResult = try wineProcess.run(
+                        binary: executablePath,
+                        arguments: [],
+                        environment: [:],
+                        logFile: logFile
+                    )
+                    continuation.resume(returning: wineResult)
+                } catch {
+                    continuation.resume(returning: WineResult(
+                        exitCode: -1,
+                        stderr: "Launch error: \(error.localizedDescription)",
+                        elapsed: 0,
+                        logPath: nil,
+                        timedOut: false
+                    ))
+                }
+            }
+        }
+
+        // Stream the result
+        let statusText: String
+        if result.timedOut {
+            statusText = "Game timed out (stale output)"
+        } else if result.exitCode == 0 {
+            statusText = "Game exited normally"
+        } else {
+            statusText = "Game exited with code \(result.exitCode)"
+        }
+        sendSSE(writer: writer, event: "status",
+                data: "<div>\(statusText)</div>")
+
+        if !result.stderr.isEmpty {
+            let escaped = escapeHTML(result.stderr)
+            for line in escaped.components(separatedBy: "\n").prefix(100) {
+                sendSSE(writer: writer, event: "log",
+                        data: "<div class='log-line'>\(line)</div>")
+            }
+        }
+    }
+
+    private static func runAgentLaunch(
+        gameId: String, game: GameEntry, executablePath: String,
+        wineURL: URL, bottleURL: URL, writer: BodyStreamWriter
+    ) async throws {
+        sendSSE(writer: writer, event: "status",
+                data: "<div>Starting AI agent...</div>")
+
+        // Capture writer for the callback closure
+        let sseWriter = writer
+
+        let wineProcess = WineProcess(wineBinary: wineURL, winePrefix: bottleURL)
+
+        // Run on a detached dispatch queue to avoid NIO event loop deadlock.
+        // AgentLoop uses DispatchSemaphore internally -- MUST NOT run on NIO.
+        let result = await withCheckedContinuation { (continuation: CheckedContinuation<AIResult<String>, Never>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                let onOutput: @Sendable (AgentEvent) -> Void = { event in
+                    switch event {
+                    case .iteration(let n, let total):
+                        sendSSE(writer: sseWriter, event: "iteration",
+                                data: "<div class='iteration'>Iteration \(n)/\(total)</div>")
+                    case .text(let text):
+                        sendSSE(writer: sseWriter, event: "log",
+                                data: "<div class='agent-text'>\(escapeHTML(text))</div>")
+                    case .toolCall(let name):
+                        sendSSE(writer: sseWriter, event: "tool",
+                                data: "<div class='tool-call'>Tool: \(escapeHTML(name))</div>")
+                    case .toolResult(let name, let truncated):
+                        sendSSE(writer: sseWriter, event: "log",
+                                data: "<div class='tool-result'>\(escapeHTML(name)): \(escapeHTML(truncated))</div>")
+                    case .cost(_, _, let usd):
+                        sendSSE(writer: sseWriter, event: "cost",
+                                data: "<div class='cost'>Cost: $\(String(format: "%.4f", usd))</div>")
+                    case .budgetWarning(let pct):
+                        sendSSE(writer: sseWriter, event: "status",
+                                data: "<div class='warning'>Budget warning: \(pct)% used</div>")
+                    case .status(let msg):
+                        sendSSE(writer: sseWriter, event: "status",
+                                data: "<div>\(escapeHTML(msg))</div>")
+                    case .error(let msg):
+                        sendSSE(writer: sseWriter, event: "error",
+                                data: "<div class='error'>\(escapeHTML(msg))</div>")
+                    case .completed(let loopResult):
+                        sendSSE(writer: sseWriter, event: "status",
+                                data: "<div>Agent completed: \(loopResult.iterationsUsed) iterations, $\(String(format: "%.4f", loopResult.estimatedCostUSD))</div>")
+                    }
+                }
+
+                let aiResult = AIService.runAgentLoop(
+                    gameId: gameId,
+                    entry: game,
+                    executablePath: executablePath,
+                    wineURL: wineURL,
+                    bottleURL: bottleURL,
+                    wineProcess: wineProcess,
+                    onOutput: onOutput
+                )
+                continuation.resume(returning: aiResult)
+            }
+        }
+
+        switch result {
+        case .success(let summary):
+            sendSSE(writer: writer, event: "status",
+                    data: "<div class='success'>Agent finished: \(escapeHTML(summary))</div>")
+        case .failed(let message):
+            sendSSE(writer: writer, event: "error",
+                    data: "<div class='error'>Agent failed: \(escapeHTML(message))</div>")
+        case .unavailable:
+            sendSSE(writer: writer, event: "error",
+                    data: "<div class='error'>AI provider unavailable</div>")
+        }
+    }
+
+    // MARK: - SSE Helpers
+
+    @discardableResult
+    private static func sendSSE(writer: BodyStreamWriter, event: String, data: String) -> EventLoopFuture<Void> {
+        // SSE format: event: <name>\ndata: <data>\n\n
+        // Multi-line data must have each line prefixed with "data: "
+        let dataLines = data.components(separatedBy: "\n")
+            .map { "data: \($0)" }
+            .joined(separator: "\n")
+        let message = "event: \(event)\n\(dataLines)\n\n"
+        var buffer = ByteBufferAllocator().buffer(capacity: message.utf8.count)
+        buffer.writeString(message)
+        return writer.write(.buffer(buffer))
+    }
+
+    private static func escapeHTML(_ text: String) -> String {
+        text.replacingOccurrences(of: "&", with: "&amp;")
+            .replacingOccurrences(of: "<", with: "&lt;")
+            .replacingOccurrences(of: ">", with: "&gt;")
+    }
+
+    // MARK: - View Models
+
+    struct LaunchLogContext: Content {
+        let gameId: String
+        let gameName: String
+        let useAgent: Bool
+        let streamURL: String
+    }
+}

@@ -24,5 +24,8 @@ enum WebApp {
 
         // Game management routes
         try GameController.register(app)
+
+        // Launch routes (SSE streaming)
+        try LaunchController.register(app)
     }
 }
