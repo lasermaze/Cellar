@@ -26,7 +26,7 @@
 
 - [ ] **Phase 8: Loop Resilience** — Fix max_tokens truncation bug, retry on transient errors, budget tracking with ceiling
 - [ ] **Phase 9: Engine Detection and Pre-configuration** — Detect game engine from file patterns and PE imports; pre-configure games before first launch to skip known dialogs
-- [ ] **Phase 10: Dialog Detection** — Wine trace:msgbox parsing and macOS window list monitoring to detect stuck-on-dialog state
+- [x] **Phase 10: Dialog Detection** — Wine trace:msgbox parsing and macOS window list monitoring to detect stuck-on-dialog state (completed 2026-03-29)
 - [ ] **Phase 11: Smarter Research** — Actionable fix extraction from web pages, engine-aware search queries, cross-game success matching
 
 ## Phase Details
@@ -89,5 +89,5 @@ Phases execute in numeric order: 8 → 9 → 10 → 11
 | 1–7. v1.0 phases | v1.0 | All complete | Complete | 2026-03-28 |
 | 8. Loop Resilience | v1.1 | 0/2 | Planned | - |
 | 9. Engine Detection and Pre-configuration | v1.1 | 0/? | Not started | - |
-| 10. Dialog Detection | 1/2 | In Progress|  | - |
+| 10. Dialog Detection | 2/2 | Complete   | 2026-03-29 | - |
 | 11. Smarter Research | v1.1 | 0/? | Not started | - |
