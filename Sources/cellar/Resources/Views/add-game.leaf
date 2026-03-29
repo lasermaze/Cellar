@@ -1,0 +1,19 @@
+#extend("base"):
+  #export("content"):
+    <section>
+      <h2>Add Game</h2>
+      <form hx-post="/games" hx-target="body">
+        <label>
+          Installer Path
+          <input type="text" name="installPath"
+                 placeholder="/path/to/game/setup.exe"
+                 required>
+        </label>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="submit">Add Game</button>
+          <a href="/" role="button" class="secondary outline">Cancel</a>
+        </div>
+      </form>
+    </section>
+  #endexport
+#endextend

@@ -1,0 +1,24 @@
+#extend("base"):
+  #export("content"):
+    <section>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Game Library</h2>
+        <a href="/games/add" role="button" class="outline">+ Add Game</a>
+      </div>
+
+      <div id="game-list">
+        #if(count(games) > 0):
+          <div class="grid">
+            #for(game in games):
+              #extend("game-card")
+            #endfor
+          </div>
+        #else:
+          <article>
+            <p>No games added yet. Click "Add Game" to get started.</p>
+          </article>
+        #endif
+      </div>
+    </section>
+  #endexport
+#endextend

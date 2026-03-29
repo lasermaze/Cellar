@@ -1,0 +1,11 @@
+#if(count(games) > 0):
+  <div class="grid">
+    #for(game in games):
+      #extend("game-card")
+    #endfor
+  </div>
+#else:
+  <article>
+    <p>No games added yet. Click "Add Game" to get started.</p>
+  </article>
+#endif
