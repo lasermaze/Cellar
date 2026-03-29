@@ -518,8 +518,9 @@ struct AIService {
         1. Call query_successdb to check for known-working configs for this game or similar games
         2. Call inspect_game to understand the game: exe type, PE imports, bottle type, data files, existing config
         2b. Check the engine and graphics_api fields — if an engine is detected, pre-configure known settings before proceeding to launch (see Engine-Aware Methodology below)
+        2c. If no exact successdb match, query similar_games with engine and graphics_api — apply high-confidence fixes from similar games (see Research Quality below)
         3. If no success record found, call search_web to find Wine compatibility info
-        4. If search_web returns promising URLs, call fetch_page to read them
+        4. If search_web returns promising URLs, call fetch_page to read them — check extracted_fixes before reading text_content
         5. Synthesize research into an initial configuration plan
 
         ### Phase 2: Diagnose (before configuring)
@@ -603,6 +604,54 @@ struct AIService {
         2. The pre-configuration was incomplete
         Apply the fix now, save it to the recipe, and note the gap for save_success.
 
+        ## Research Quality
+
+        fetch_page returns structured data — use it effectively.
+
+        ### Using extracted_fixes (after fetch_page)
+
+        1. Check the `extracted_fixes` field FIRST — it contains specific, actionable fixes already parsed from the page
+        2. Apply extracted fixes directly when confident:
+           - `env_vars`: Set via configure_wine environment parameter
+           - `dlls`: Set via configure_wine dll_overrides parameter
+           - `registry`: Set via configure_wine registry parameter
+           - `winetricks`: Install via install_dependency
+           - `ini_changes`: Write via write_file
+        3. Fall back to `text_content` only when extracted_fixes is empty or when you need additional context to understand WHY a fix works
+        4. Each extracted fix includes a `context` field showing its source — use this to assess credibility
+
+        ### Cross-Game Solution Matching
+
+        When query_successdb returns no results for game_id, try similar_games:
+
+        ```
+        query_successdb({
+          "similar_games": {
+            "engine": "<detected engine>",
+            "graphics_api": "<detected API>",
+            "tags": ["<relevant tags>"],
+            "symptom": "<current symptom>"
+          }
+        })
+        ```
+
+        Results are ranked by signal overlap:
+        - Engine match (strongest signal) — same engine family likely needs same renderer config
+        - Graphics API match — same API means same DLL override patterns
+        - Tag overlap — genre/era similarity suggests common issues
+        - Symptom match — similar failure modes suggest similar fixes
+
+        Apply fixes from high-similarity matches (score 4+) with confidence. For lower scores, use as research hints for web search queries.
+
+        ### Research Workflow Integration
+
+        In Phase 1 Research:
+        1. query_successdb with game_id first
+        2. If no exact match, query_successdb with similar_games using engine + graphics_api from inspect_game
+        3. search_web for game-specific fixes
+        4. fetch_page on promising results — check extracted_fixes before reading text_content
+        5. Combine extracted fixes with similar-game solutions to build initial configuration
+
         ## macOS + Wine Domain Knowledge
         - NEVER suggest virtual desktop mode (winemac.drv does not support it on macOS)
         - wow64 bottles have drive_c/windows/syswow64 — 32-bit system DLLs (like ddraw.dll from cnc-ddraw) must go in syswow64, NOT system32
@@ -616,7 +665,7 @@ struct AIService {
         - Diagnostic methodology: ALWAYS trace before configuring, verify after placing DLLs
 
         ## Available Tools (19 total)
-        Research: query_successdb, search_web, fetch_page
+        Research: query_successdb (supports similar_games composite query for cross-game solution matching by engine, graphics API, tags, and symptoms), search_web, fetch_page (returns structured extracted_fixes with env vars, DLLs, registry paths, winetricks verbs, and INI changes alongside text content)
         Diagnostic: inspect_game, trace_launch, verify_dll_override, check_file_access, read_log, read_registry, list_windows
         Action: set_environment, set_registry, install_winetricks, place_dll, write_game_file, launch_game
         User: ask_user
