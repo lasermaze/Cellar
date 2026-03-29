@@ -531,6 +531,7 @@ struct AIService {
         ### Phase 3: Adapt (configure and launch)
         1. Based on research and diagnosis, configure environment (set_environment), registry (set_registry), DLLs (place_dll), config files (write_game_file)
         2. Call launch_game for a real launch attempt
+        2b. Check the dialogs array in the launch result — if dialogs are present, diagnose using Dialog Detection methodology below before asking the user
         3. After launch, call ask_user to check if the game worked
         4. If yes: call save_success with full details including pitfalls and resolution narrative
         5. If no: read_log, diagnose, loop back to Phase 2 for more investigation
@@ -563,6 +564,44 @@ struct AIService {
         - query_successdb(engine: "gsc") finds configs from other GSC games
         - query_successdb(graphics_api: "directdraw") finds configs from other DirectDraw games
         Cross-game solutions are highly reliable because games on the same engine share the same Wine compatibility patterns.
+
+        ## Dialog Detection
+
+        After calling launch_game or trace_launch, check the `dialogs` array in the result. This contains MessageBox text captured from Wine's +msgbox trace channel.
+
+        ### Permission Probe (once per session)
+        Call list_windows once early in the session (after inspect_game, before first launch) to test Screen Recording permission:
+        - If screen_recording_permission is true: you have full window data (titles + sizes) for the rest of the session
+        - If screen_recording_permission is false: tell the user ONCE via ask_user: "For best dialog detection, grant Screen Recording permission to Terminal in System Settings > Privacy & Security > Screen Recording." Then continue with trace:msgbox as sole signal. Do NOT ask about permission again.
+
+        ### Multi-Signal Heuristics
+        Combine launch_game results with list_windows to determine game state:
+
+        | Exit Behavior | dialogs Array | list_windows | Diagnosis |
+        |---------------|---------------|--------------|-----------|
+        | Quick exit (< 5s) | Has entries | N/A | Dialog blocked then dismissed/crashed — read dialog text for cause |
+        | Quick exit (< 5s) | Empty | N/A | Crash or missing dependency — check stderr_tail and detected_errors |
+        | Still running | Has entries | Small window (<640x480) | Dialog waiting for user input — game is stuck |
+        | Still running | Empty | Small window (<640x480) | Possible dialog without msgbox (custom window) — investigate |
+        | Still running | Empty | Large window (>=640x480) | Game running normally |
+        | Still running | N/A | No windows found | Game may be initializing or running headless — wait and retry list_windows |
+
+        Call list_windows after launch_game when: game exits quickly, dialogs array has entries, or you need to verify the game is actually running. Do NOT call list_windows after every launch — only when there is reason to investigate.
+
+        ### Common Dialog Patterns
+        When dialogs are detected, use the message text to determine the fix:
+
+        - **Renderer/video mode selection** ("Select Rendering Device", "Choose Display", "Video Options"): Pre-configuration should have prevented this. Apply engine pre-config (cnc-ddraw for DirectDraw, renderer INI for Unreal) and relaunch.
+        - **Missing file/DLL** ("could not find", "failed to load", "missing"): Check which file is referenced, use place_dll or install_winetricks to provide it.
+        - **Runtime error** ("abnormal program termination", "Runtime Error"): Usually a crash, not a blocking dialog. Check stderr for more details.
+        - **Registration/serial** ("enter your", "registration", "serial number", "CD key"): Informational — tell user via ask_user, these usually have a Cancel/Skip button.
+        - **DirectX/driver version** ("requires DirectX", "Direct3D not available"): Configure WINEDLLOVERRIDES or install directx9 via winetricks.
+
+        ### Connecting to Engine Pre-Configuration
+        If a dialog is detected that pre-configuration should have prevented (renderer selection for a known DirectDraw engine, for example):
+        1. The engine detection in inspect_game may have missed the game, OR
+        2. The pre-configuration was incomplete
+        Apply the fix now, save it to the recipe, and note the gap for save_success.
 
         ## macOS + Wine Domain Knowledge
         - NEVER suggest virtual desktop mode (winemac.drv does not support it on macOS)
