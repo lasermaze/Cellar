@@ -73,8 +73,8 @@ Requirements for v1.2 Web Interface. Maps to Phase 12.
 
 ### Web Interface
 
-- [ ] **WEB-01**: User can view game library as a card grid in the browser at localhost:8080, showing game name, status, and last played date
-- [ ] **WEB-02**: User can add a game (providing installer path) and delete a game (with optional bottle cleanup) through the web interface
+- [x] **WEB-01**: User can view game library as a card grid in the browser at localhost:8080, showing game name, status, and last played date
+- [x] **WEB-02**: User can add a game (providing installer path) and delete a game (with optional bottle cleanup) through the web interface
 - [ ] **WEB-03**: User can directly launch a game that has a working recipe or success record, with Wine output streamed to the browser via SSE
 - [x] **WEB-04**: User can launch a game with the AI agent, with real-time agent loop events (iterations, tool calls, reasoning, cost) streamed to the browser via SSE
 - [x] **WEB-05**: `cellar serve` subcommand starts a Vapor web server on localhost:8080, sharing all existing business logic without duplication

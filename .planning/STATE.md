@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Agentic Independence
 status: in-progress
-last_updated: "2026-03-29T23:32:00Z"
+last_updated: "2026-03-29T23:37:00Z"
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 35
-  completed_plans: 33
+  completed_plans: 34
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-28)
 ## Current Position
 
 Phase: 12 of 12 (Web Interface)
-Plan: 2 of 4 complete
-Status: Plans 12-01 and 12-02 complete. Plans 12-03 and 12-04 remaining.
-Last activity: 2026-03-29 — Completed 12-01 (Vapor foundation + GameService + LaunchService).
+Plan: 3 of 4 complete
+Status: Plans 12-01, 12-02, and 12-03 complete. Plan 12-04 remaining.
+Last activity: 2026-03-29 — Completed 12-03 (GameController CRUD + Leaf templates for game library UI).
 
-Progress: [██████████████████░░] Phase 12: 2/4 plans complete
+Progress: [███████████████████░] Phase 12: 3/4 plans complete
 
 ## Performance Metrics
 
@@ -61,6 +61,7 @@ Progress: [██████████████████░░] Phase 1
 | Phase 11 | 11-02 | 2 min |
 | Phase 12 | 12-01 | 12 min |
 | Phase 12 | 12-02 | 5 min |
+| Phase 12 | 12-03 | 2 min |
 
 ## Accumulated Context
 
@@ -100,6 +101,9 @@ Progress: [██████████████████░░] Phase 1
 - [Phase 12-02]: emit() always prints AND calls callback -- CLI behavior preserved unconditionally
 - [Phase 12-02]: AgentEvent.completed wraps AgentLoopResult, emitted via makeResult helper for all exit paths
 - [Phase 12-02]: toolResult case includes truncated output (200 chars) for web UI preview
+- [Phase 12-03]: GameViewData.status derived from lastResult.reachedMenu rather than raw status field
+- [Phase 12-03]: Form field named installPath (matching GameEntry) not installerPath from plan
+- [Phase 12-03]: Extracted loadGameViewData helper to avoid duplicating game-to-viewmodel mapping across routes
 
 ### Roadmap Evolution
 
@@ -118,4 +122,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-29
-Stopped at: Completed 12-01-PLAN.md — Vapor foundation, ServeCommand, WebApp, GameService actor, LaunchService.
+Stopped at: Completed 12-03-PLAN.md — GameController CRUD routes + Leaf templates for game library UI.
