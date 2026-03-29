@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+@preconcurrency import SwiftSoup
 
 // MARK: - Research Cache
 
@@ -343,7 +344,7 @@ final class AgentTools {
         // 15. query_successdb — optional query params
         ToolDefinition(
             name: "query_successdb",
-            description: "Query the local success database for known-working game configurations. Query by game_id (exact), tags (overlap), engine (substring), graphics_api (substring), or symptom (fuzzy keyword match against pitfalls). Call this BEFORE web research — local knowledge is faster and more reliable.",
+            description: "Query the local success database for known-working game configurations. Query by game_id (exact), tags (overlap), engine (substring), graphics_api (substring), symptom (fuzzy keyword match against pitfalls), or similar_games (composite multi-signal similarity search). Call this BEFORE web research — local knowledge is faster and more reliable.",
             inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
@@ -367,6 +368,16 @@ final class AgentTools {
                     "symptom": .object([
                         "type": .string("string"),
                         "description": .string("Symptom description for fuzzy matching against known pitfalls (e.g. 'black screen on launch')")
+                    ]),
+                    "similar_games": .object([
+                        "type": .string("object"),
+                        "description": .string("Find games with similar characteristics. Returns cross-game matches ranked by signal overlap (engine weight 3, graphics_api weight 2, tags weight 1 each, symptom weight 1). Requires at least engine or graphics_api."),
+                        "properties": .object([
+                            "engine": .object(["type": .string("string"), "description": .string("Engine to match (e.g. 'unreal')")]),
+                            "graphics_api": .object(["type": .string("string"), "description": .string("Graphics API to match (e.g. 'directdraw')")]),
+                            "tags": .object(["type": .string("array"), "description": .string("Tags for overlap scoring"), "items": .object(["type": .string("string")])]),
+                            "symptom": .object(["type": .string("string"), "description": .string("Symptom for pitfall matching")])
+                        ])
                     ])
                 ]),
                 "required": .array([])
@@ -466,7 +477,7 @@ final class AgentTools {
         // 18. fetch_page — required url
         ToolDefinition(
             name: "fetch_page",
-            description: "Fetch a specific URL and extract readable text content. Use after search_web to read a promising result page. Returns up to 8000 characters of cleaned text. Good for WineHQ AppDB pages, PCGamingWiki articles, and forum threads.",
+            description: "Fetch a URL and extract structured content using SwiftSoup HTML parsing. Returns text_content (up to 8000 chars) plus extracted_fixes containing Wine-specific fix data (env vars, DLL overrides, registry entries, winetricks verbs, INI changes) when detected. Use after search_web to read promising result pages. Specialized parsers for WineHQ AppDB and PCGamingWiki; generic parser for other sites.",
             inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
@@ -1726,7 +1737,24 @@ final class AgentTools {
             return jsonResult(["query_type": "symptom", "matches": dicts])
         }
 
-        return jsonResult(["error": "No query parameters provided. Specify game_id, tags, engine, graphics_api, or symptom."])
+        if let similarGames = input["similar_games"]?.asObject {
+            let engine = similarGames["engine"]?.asString
+            let graphicsApi = similarGames["graphics_api"]?.asString
+            let tags = similarGames["tags"]?.asArray?.compactMap { $0.asString } ?? []
+            let symptom = similarGames["symptom"]?.asString
+
+            let results = SuccessDatabase.queryBySimilarity(
+                engine: engine, graphicsApi: graphicsApi, tags: tags, symptom: symptom
+            )
+            let dicts: [[String: Any]] = results.map { (record, score) in
+                var dict = successRecordToDict(record)
+                dict["similarity_score"] = score
+                return dict
+            }
+            return jsonResult(["query_type": "similar_games", "matches": dicts])
+        }
+
+        return jsonResult(["error": "No query parameters provided. Specify game_id, tags, engine, graphics_api, symptom, or similar_games."])
     }
 
     // MARK: 16. save_success
@@ -2031,38 +2059,59 @@ final class AgentTools {
             return jsonResult(["error": "Fetch failed: \(errorMsg)", "url": urlStr])
         }
 
-        // Strip scripts and styles first
-        var cleaned = rawHTML
-            .replacingOccurrences(of: #"<script[^>]*>[\s\S]*?</script>"#, with: "", options: .regularExpression)
-            .replacingOccurrences(of: #"<style[^>]*>[\s\S]*?</style>"#, with: "", options: .regularExpression)
+        // Parse with SwiftSoup + PageParser for structured extraction
+        do {
+            let doc = try SwiftSoup.parse(rawHTML)
+            let parser = selectParser(for: pageURL)
+            let parsed = try parser.parse(document: doc, url: pageURL)
 
-        // Strip remaining HTML tags
-        cleaned = cleaned.replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
+            // Truncate textContent to 8000 chars
+            let truncated = parsed.textContent.count > 8000
+            let textContent = truncated ? String(parsed.textContent.prefix(8000)) : parsed.textContent
 
-        // Decode basic HTML entities
-        cleaned = cleaned
-            .replacingOccurrences(of: "&amp;", with: "&")
-            .replacingOccurrences(of: "&lt;", with: "<")
-            .replacingOccurrences(of: "&gt;", with: ">")
-            .replacingOccurrences(of: "&quot;", with: "\"")
-            .replacingOccurrences(of: "&#39;", with: "'")
+            // Build result with both text_content and extracted_fixes
+            var result: [String: Any] = [
+                "url": urlStr,
+                "text_content": textContent,
+                "length": textContent.count,
+                "truncated": truncated,
+            ]
 
-        // Collapse multiple whitespace/newlines into single spaces
-        cleaned = cleaned.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+            // Add extracted_fixes as serialized dict
+            if !parsed.extractedFixes.isEmpty {
+                let fixesData = try JSONEncoder().encode(parsed.extractedFixes)
+                if let fixesDict = try JSONSerialization.jsonObject(with: fixesData) as? [String: Any] {
+                    result["extracted_fixes"] = fixesDict
+                }
+            }
 
-        // Truncate to 8000 characters
-        let truncated = cleaned.count > 8000
-        if truncated {
-            cleaned = String(cleaned.prefix(8000))
+            return jsonResult(result)
+        } catch {
+            // Fallback: regex stripping if SwiftSoup parsing fails
+            var cleaned = rawHTML
+                .replacingOccurrences(of: #"<script[^>]*>[\s\S]*?</script>"#, with: "", options: .regularExpression)
+                .replacingOccurrences(of: #"<style[^>]*>[\s\S]*?</style>"#, with: "", options: .regularExpression)
+            cleaned = cleaned.replacingOccurrences(of: "<[^>]+>", with: " ", options: .regularExpression)
+            cleaned = cleaned
+                .replacingOccurrences(of: "&amp;", with: "&")
+                .replacingOccurrences(of: "&lt;", with: "<")
+                .replacingOccurrences(of: "&gt;", with: ">")
+                .replacingOccurrences(of: "&quot;", with: "\"")
+                .replacingOccurrences(of: "&#39;", with: "'")
+            cleaned = cleaned.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let truncated = cleaned.count > 8000
+            if truncated {
+                cleaned = String(cleaned.prefix(8000))
+            }
+            return jsonResult([
+                "url": urlStr,
+                "text_content": cleaned,
+                "length": cleaned.count,
+                "truncated": truncated,
+                "parse_error": error.localizedDescription
+            ])
         }
-
-        return jsonResult([
-            "url": urlStr,
-            "content": cleaned,
-            "length": cleaned.count,
-            "truncated": truncated
-        ])
     }
 
     // MARK: 19. list_windows

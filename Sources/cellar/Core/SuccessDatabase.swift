@@ -166,4 +166,56 @@ struct SuccessDatabase {
         .filter { $0.1 > 0.3 }
         .sorted { $0.1 > $1.1 }
     }
+
+    /// Query by multi-signal similarity. Returns records ranked by overlap score.
+    /// Requires at least engine OR graphicsApi match for a result to be included.
+    static func queryBySimilarity(
+        engine: String?,
+        graphicsApi: String?,
+        tags: [String],
+        symptom: String?
+    ) -> [(record: SuccessRecord, score: Int)] {
+        let allRecords = loadAll()
+
+        let scored: [(record: SuccessRecord, score: Int)] = allRecords.compactMap { record in
+            var score = 0
+
+            // Engine match (strongest signal, weight 3)
+            if let engine = engine, let recordEngine = record.engine,
+               recordEngine.lowercased().contains(engine.lowercased()) {
+                score += 3
+            }
+
+            // Graphics API match (strong signal, weight 2)
+            if let api = graphicsApi, let recordApi = record.graphicsApi,
+               recordApi.lowercased().contains(api.lowercased()) {
+                score += 2
+            }
+
+            // Require at least engine OR graphics API match
+            guard score > 0 else { return nil }
+
+            // Tag overlap (weight 1 each)
+            let lowerTags = Set(tags.map { $0.lowercased() })
+            let recordTags = Set(record.tags.map { $0.lowercased() })
+            score += lowerTags.intersection(recordTags).count
+
+            // Symptom match (weight 1)
+            if let symptom = symptom {
+                let queryWords = Set(symptom.lowercased().split(separator: " ")
+                    .map(String.init).filter { $0.count > 2 })
+                for pitfall in record.pitfalls {
+                    let pitfallWords = Set(pitfall.symptom.lowercased().split(separator: " ")
+                        .map(String.init).filter { $0.count > 2 })
+                    if !queryWords.intersection(pitfallWords).isEmpty {
+                        score += 1
+                        break
+                    }
+                }
+            }
+
+            return (record: record, score: score)
+        }
+        return Array(scored.sorted { $0.score > $1.score }.prefix(5))
+    }
 }
