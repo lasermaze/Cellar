@@ -115,11 +115,12 @@ struct DependencyCheckerTests {
 
     // MARK: DependencyStatus.allRequired computed property
 
-    @Test("allRequired is true when both homebrew and wine are non-nil")
+    @Test("allRequired is true when homebrew, wine, and winetricks are all present")
     func allRequiredTrue() {
         let sut = DependencyChecker(existingPaths: [
             "/opt/homebrew/bin/brew",
             "/opt/homebrew/bin/wine64",
+            "/opt/homebrew/bin/winetricks",
         ])
         let status = sut.checkAll()
         #expect(status.allRequired == true)

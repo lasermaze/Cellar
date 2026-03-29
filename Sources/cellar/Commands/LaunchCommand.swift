@@ -75,7 +75,16 @@ struct LaunchCommand: ParsableCommand {
             )
 
         case .failed(let msg):
-            print("Agent error: \(msg)")
+            print("\n--- Agent stopped ---")
+            if msg.contains("[STOP:budget]") {
+                print("Reason: \(msg.replacingOccurrences(of: "[STOP:budget] ", with: ""))")
+            } else if msg.contains("[STOP:iterations]") {
+                print("Reason: \(msg.replacingOccurrences(of: "[STOP:iterations] ", with: ""))")
+            } else if msg.contains("[STOP:api_error]") {
+                print("Reason: \(msg.replacingOccurrences(of: "[STOP:api_error] ", with: ""))")
+            } else {
+                print("Reason: \(msg)")
+            }
             print("Falling back to recipe-only launch...")
             try recipeFallbackLaunch(
                 entry: &entry,

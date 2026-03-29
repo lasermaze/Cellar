@@ -9,7 +9,7 @@ struct CellarConfig: Codable {
         case budgetCeiling = "budget"
     }
 
-    static let defaultBudgetCeiling: Double = 5.00
+    static let defaultBudgetCeiling: Double = 15.00
 
     /// Load configuration with priority: env var > config file > default.
     static func load() -> CellarConfig {

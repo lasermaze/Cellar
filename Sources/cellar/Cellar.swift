@@ -8,4 +8,11 @@ struct Cellar: ParsableCommand {
         subcommands: [StatusCommand.self, AddCommand.self, LaunchCommand.self, LogCommand.self],
         defaultSubcommand: StatusCommand.self
     )
+
+    static func main() throws {
+        CellarPaths.refuseRoot()
+        CellarPaths.checkOwnership()
+        var command = try Self.parseAsRoot()
+        try command.run()
+    }
 }

@@ -2,6 +2,14 @@ import Foundation
 
 // MARK: - AgentLoopResult
 
+/// Why the agent loop stopped.
+enum AgentStopReason {
+    case completed
+    case budgetExhausted
+    case maxIterations
+    case apiError(String)
+}
+
 /// Result returned when the agent loop terminates.
 struct AgentLoopResult {
     /// Concatenated text from all assistant text blocks across the run.
@@ -10,6 +18,8 @@ struct AgentLoopResult {
     let iterationsUsed: Int
     /// True if loop ended because the model returned "end_turn". False if max iterations reached or error occurred.
     let completed: Bool
+    /// Why the loop stopped.
+    let stopReason: AgentStopReason
     /// Total input tokens consumed across all iterations.
     let totalInputTokens: Int
     /// Total output tokens consumed across all iterations.
@@ -72,7 +82,8 @@ struct AgentLoop {
     /// - Returns: AgentLoopResult with finalText, iterationsUsed, and completed flag.
     func run(
         initialMessage: String,
-        toolExecutor: (String, JSONValue) -> String
+        toolExecutor: (String, JSONValue) -> String,
+        canStop: (() -> Bool)? = nil
     ) -> AgentLoopResult {
         var messages: [AnthropicToolRequest.Message] = []
         var iterationCount = 0
@@ -87,20 +98,22 @@ struct AgentLoop {
         var hasWarnedAt80 = false
         var hasSentBudgetHalt = false
         var hasSentBudgetWarningMessage = false
+        var consecutiveContinuations = 0
 
-        // Pricing constants (Opus 4.6: $5/$25 per MTok)
-        let inputPricePerToken  = 5.0 / 1_000_000.0
-        let outputPricePerToken = 25.0 / 1_000_000.0
+        // Pricing constants (Sonnet 4.6: $3/$15 per MTok)
+        let inputPricePerToken  = 3.0 / 1_000_000.0
+        let outputPricePerToken = 15.0 / 1_000_000.0
 
         func estimatedCost() -> Double {
             Double(totalInputTokens) * inputPricePerToken + Double(totalOutputTokens) * outputPricePerToken
         }
 
-        func makeResult(text: String, iterations: Int, completed: Bool) -> AgentLoopResult {
+        func makeResult(text: String, iterations: Int, completed: Bool, stopReason: AgentStopReason) -> AgentLoopResult {
             AgentLoopResult(
                 finalText: text,
                 iterationsUsed: iterations,
                 completed: completed,
+                stopReason: stopReason,
                 totalInputTokens: totalInputTokens,
                 totalOutputTokens: totalOutputTokens,
                 estimatedCostUSD: estimatedCost()
@@ -128,14 +141,16 @@ struct AgentLoop {
                 return makeResult(
                     text: allText.joined(separator: "\n") + "\n\(error.localizedDescription)",
                     iterations: iterationCount,
-                    completed: false
+                    completed: false,
+                    stopReason: .apiError(error.localizedDescription)
                 )
             } catch {
                 print("Agent API error (iteration \(iterationCount)): \(error.localizedDescription)")
                 return makeResult(
                     text: allText.joined(separator: "\n") + "\n\(error.localizedDescription)",
                     iterations: iterationCount,
-                    completed: false
+                    completed: false,
+                    stopReason: .apiError(error.localizedDescription)
                 )
             }
 
@@ -170,7 +185,7 @@ struct AgentLoop {
                         if case .text(let t) = block, !t.isEmpty { allText.append(t) }
                     }
                 }
-                return makeResult(text: allText.joined(separator: "\n"), iterations: iterationCount, completed: false)
+                return makeResult(text: allText.joined(separator: "\n"), iterations: iterationCount, completed: false, stopReason: .budgetExhausted)
             }
 
             if budgetFraction >= 0.8 && !hasWarnedAt80 {
@@ -193,8 +208,17 @@ struct AgentLoop {
                     if case .toolUse = $0 { return true }
                     return false
                 }
-                if hasContent {
-                    return makeResult(text: allText.joined(separator: "\n"), iterations: iterationCount, completed: true)
+
+                let agentCanStop = canStop?() ?? true  // nil callback = always allow (backward compat)
+
+                if hasContent && !agentCanStop && consecutiveContinuations < 3 {
+                    // Agent tried to stop but task isn't done yet
+                    consecutiveContinuations += 1
+                    print("[Agent tried to stop, but task is not complete (\(consecutiveContinuations)/3). Continuing...]")
+                    messages.append(AnthropicToolRequest.Message(role: "assistant", content: .blocks(response.content)))
+                    messages.append(AnthropicToolRequest.Message(role: "user", content: .text("You cannot stop yet — the game has not been confirmed working by the user, or you haven't saved a success record after confirmation. Continue diagnosing and fixing. Use your tools to investigate and apply a fix, then launch_game again.")))
+                } else if hasContent {
+                    return makeResult(text: allText.joined(separator: "\n"), iterations: iterationCount, completed: true, stopReason: .completed)
                 } else {
                     // Empty end_turn — send continuation prompt
                     print("[Agent: empty response, sending continuation...]")
@@ -203,6 +227,9 @@ struct AgentLoop {
                 }
 
             case "tool_use":
+                // Agent is doing work — reset stuck-loop counter
+                consecutiveContinuations = 0
+
                 // Reset max_tokens after successful non-truncated response
                 if currentMaxTokens > maxTokens {
                     currentMaxTokens = maxTokens
@@ -278,13 +305,14 @@ struct AgentLoop {
                 return makeResult(
                     text: allText.joined(separator: "\n"),
                     iterations: iterationCount,
-                    completed: false
+                    completed: false,
+                    stopReason: .apiError("unexpected stop_reason '\(response.stopReason)'")
                 )
             }
         }
 
         // Max iterations reached
-        return makeResult(text: allText.joined(separator: "\n"), iterations: iterationCount, completed: false)
+        return makeResult(text: allText.joined(separator: "\n"), iterations: iterationCount, completed: false, stopReason: .maxIterations)
     }
 
     // MARK: - Private Retry

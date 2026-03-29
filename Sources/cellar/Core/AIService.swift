@@ -524,18 +524,20 @@ struct AIService {
         5. Synthesize research into an initial configuration plan
 
         ### Phase 2: Diagnose (before configuring)
-        1. Call trace_launch to see which DLLs Wine actually loads — this is cheap (3-5 seconds)
+        **HARD RULE: Phase 2 must complete within 2 iterations.** Call trace_launch at most ONCE, then move to Phase 3. If you have research results from Phase 1, skip Phase 2 entirely and go straight to Phase 3. trace_launch kills the game after a few seconds — it cannot show you the full picture.
+        1. Call trace_launch ONCE to see which DLLs Wine actually loads
         2. Call check_file_access if the game uses relative paths or data files
         3. After placing DLLs or setting overrides, call verify_dll_override to confirm they took effect
-        4. Budget: up to 3 diagnostic traces before first real launch, 2 between failed real launches
 
         ### Phase 3: Adapt (configure and launch)
         1. Based on research and diagnosis, configure environment (set_environment), registry (set_registry), DLLs (place_dll), config files (write_game_file)
         2. Call launch_game for a real launch attempt
         2b. Check the dialogs array in the launch result — if dialogs are present, diagnose using Dialog Detection methodology below before asking the user
-        3. After launch, call ask_user to check if the game worked
-        4. If yes: call save_success with full details including pitfalls and resolution narrative
-        5. If no: read_log, diagnose, loop back to Phase 2 for more investigation
+        3. **User feedback:** If the game ran for more than 10 seconds, launch_game automatically asks the user how it went. The result will contain a `user_feedback` field with their answer. Use this directly — do NOT call ask_user to re-ask.
+        4. If user says it worked (even partially): call save_success with full details including pitfalls and resolution narrative
+        5. If user reports a specific issue (e.g. "no keyboard", "black screen"): use that feedback to guide your next fix, then loop back to Phase 2
+        6. If game exited in under 10 seconds with no user interaction: likely a crash, proceed to diagnose without asking
+        7. Wine ALWAYS produces stderr output and non-zero exit codes even when games work perfectly. Never assume failure from stderr or exit_code alone.
 
         ## Engine-Aware Methodology
 
@@ -546,7 +548,7 @@ struct AIService {
 
         - **DirectDraw games** (GSC/DMCR, Build, Westwood, Blizzard — graphics_api: directdraw): These games need cnc-ddraw. Call place_dll with name "cnc-ddraw", then verify ddraw.ini exists in the game directory with renderer=opengl (use write_game_file if needed). This skips the renderer selection dialog that blocks these games.
         - **id Tech 2/3 games** (graphics_api: opengl): These use OpenGL natively and usually work well under Wine. If you see rendering issues, set MESA_GL_VERSION_OVERRIDE=4.5 via set_environment.
-        - **Unreal 1 games** (graphics_api: direct3d9 or direct3d8): May need d3d9/d3d8 DLL configuration. Check if the game has a renderer selection INI (like UnrealTournament.ini) and pre-set the renderer to Direct3D 9.
+        - **Unreal 1 games** (graphics_api: direct3d9 or direct3d8): May need d3d9/d3d8 DLL configuration. Check if the game has a renderer selection INI (like UnrealTournament.ini) and pre-set the renderer. CRITICAL: Unreal 1 INI files (DeusEx.ini, UnrealTournament.ini, etc.) are generated from Default.ini and contain dozens of essential engine entries (GameEngine, Input, ViewportManager, DefaultGame, Canvas, etc.). NEVER rewrite these from scratch — always use read_game_file first, then modify only the specific keys you need while preserving all existing content.
         - **Unity games**: Look for screen resolution dialog on first launch. If detected via trace_launch, write a registry key or prefs file to skip it.
         - **UE4/5 games**: Modern engine, usually needs fewer Wine tweaks. Check for D3D11 requirements.
 
@@ -664,12 +666,19 @@ struct AIService {
         - If a game exits immediately (< 2 seconds), it likely has a missing dependency or configuration issue
         - Diagnostic methodology: ALWAYS trace before configuring, verify after placing DLLs
 
-        ## Available Tools (19 total)
+        ## Available Tools (20 total)
         Research: query_successdb (supports similar_games composite query for cross-game solution matching by engine, graphics API, tags, and symptoms), search_web, fetch_page (returns structured extracted_fixes with env vars, DLLs, registry paths, winetricks verbs, and INI changes alongside text content)
-        Diagnostic: inspect_game, trace_launch, verify_dll_override, check_file_access, read_log, read_registry, list_windows
+        Diagnostic: inspect_game, trace_launch, verify_dll_override, check_file_access, read_log, read_registry, list_windows, read_game_file
         Action: set_environment, set_registry, install_winetricks, place_dll, write_game_file, launch_game
         User: ask_user
         Persistence: save_success, save_recipe
+
+        ## CRITICAL: Read Before Write
+        NEVER call write_game_file on an existing config file (.ini, .cfg, .conf, .xml) without first calling read_game_file to see its current contents. Game config files contain dozens of essential entries — writing a partial file will break the game. Always:
+        1. read_game_file to get current contents
+        2. Modify only the specific keys/sections you need
+        3. write_game_file with the COMPLETE modified content (all original sections preserved)
+        A .cellar-backup is created automatically, but prevention is better than recovery.
 
         ## Constraints
         - Maximum 8 real launch attempts — be strategic, use diagnostics first
@@ -698,17 +707,18 @@ struct AIService {
             apiKey: apiKey,
             tools: AgentTools.toolDefinitions,
             systemPrompt: systemPrompt,
-            model: "claude-opus-4-6",
-            maxIterations: 20,
+            model: "claude-sonnet-4-6",
+            maxIterations: 50,
             maxTokens: 16384,
             budgetCeiling: config.budgetCeiling
         )
 
-        let initialMessage = "Launch the game '\(entry.name)' (ID: \(gameId)). The executable is at: \(executablePath). Follow the Research-Diagnose-Adapt workflow: start by querying the success database, then inspect the game."
+        let initialMessage = "Launch the game '\(entry.name)' (ID: \(gameId)). The executable is at: \(executablePath). Follow the Research-Diagnose-Adapt workflow: start by querying the success database, then inspect the game. Move quickly to a real launch_game call — research and at most one trace_launch before your first real launch."
 
         let result = agentLoop.run(
             initialMessage: initialMessage,
-            toolExecutor: { name, input in tools.execute(toolName: name, input: input) }
+            toolExecutor: { name, input in tools.execute(toolName: name, input: input) },
+            canStop: { tools.isTaskComplete }
         )
 
         // Always print cost summary
@@ -718,7 +728,18 @@ struct AIService {
         if result.completed {
             return .success(result.finalText)
         } else {
-            return .failed(result.finalText.isEmpty ? "Agent loop did not complete (used \(result.iterationsUsed) iterations)" : result.finalText)
+            let reason: String
+            switch result.stopReason {
+            case .budgetExhausted:
+                reason = "[STOP:budget] The AI agent ran out of its $\(String(format: "%.2f", result.estimatedCostUSD)) spending budget before finishing."
+            case .maxIterations:
+                reason = "[STOP:iterations] The AI agent used all \(result.iterationsUsed) iterations without finishing."
+            case .apiError(let detail):
+                reason = "[STOP:api_error] The AI agent couldn't reach the API: \(detail)"
+            case .completed:
+                reason = "[STOP:unknown]"
+            }
+            return .failed(reason)
         }
     }
 

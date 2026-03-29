@@ -222,6 +222,14 @@ struct WineProcess {
         process.environment = env
 
         try process.run()
-        process.waitUntilExit()
+        // Wait with timeout — wineserver -k can hang if children won't die
+        let done = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            process.waitUntilExit()
+            done.signal()
+        }
+        if done.wait(timeout: .now() + 5.0) == .timedOut {
+            process.terminate()
+        }
     }
 }

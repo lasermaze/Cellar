@@ -52,6 +52,17 @@ final class AgentTools {
     var installedDeps: Set<String> = []
     /// Log file from the most recent launch_game call.
     var lastLogFile: URL? = nil
+    /// Tracks whether the agent's task is complete.
+    enum TaskState { case working, userConfirmedOk, savedAfterConfirm, exhausted }
+    var taskState: TaskState = .working
+
+    /// Whether the agent is allowed to stop via end_turn.
+    var isTaskComplete: Bool {
+        switch taskState {
+        case .savedAfterConfirm, .exhausted: return true
+        case .working, .userConfirmedOk: return false
+        }
+    }
 
     // MARK: - Init
 
@@ -268,7 +279,7 @@ final class AgentTools {
         // 11. write_game_file — required relative_path, content
         ToolDefinition(
             name: "write_game_file",
-            description: "Write a config or data file into the game directory. Use for files like ddraw.ini, mode.dat, or custom config files the game needs. Paths are relative to the game executable's directory. Windows backslash paths are auto-converted.",
+            description: "Write a config or data file into the game directory. Use for files like ddraw.ini, mode.dat, or custom config files the game needs. Paths are relative to the game executable's directory. Windows backslash paths are auto-converted. WARNING: This OVERWRITES the entire file. If modifying an existing config file (e.g. .ini), use check_file_access to verify it exists first, then read it via inspect_game or read_log context. Never write a partial version of an existing config — include ALL original sections/keys plus your changes. A backup is created automatically (.cellar-backup).",
             inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
@@ -282,6 +293,22 @@ final class AgentTools {
                     ])
                 ]),
                 "required": .array([.string("relative_path"), .string("content")])
+            ])
+        ),
+
+        // 11b. read_game_file — required relative_path
+        ToolDefinition(
+            name: "read_game_file",
+            description: "Read a file from the game directory. Use this BEFORE write_game_file to see the current contents of config files (.ini, .cfg, etc.) so you can make targeted edits without losing existing settings. Returns the file contents (up to 16000 chars). Paths are relative to the game executable's directory.",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "relative_path": .object([
+                        "type": .string("string"),
+                        "description": .string("File path relative to the game executable directory (e.g. 'DeusEx.ini' or 'data/config.cfg')")
+                    ])
+                ]),
+                "required": .array([.string("relative_path")])
             ])
         ),
 
@@ -518,6 +545,7 @@ final class AgentTools {
         case "launch_game":       return launchGame(input: input)
         case "save_recipe":       return saveRecipe(input: input)
         case "write_game_file":   return writeGameFile(input: input)
+        case "read_game_file":    return readGameFile(input: input)
         case "query_successdb":   return querySuccessdb(input: input)
         case "save_success":      return saveSuccess(input: input)
         case "trace_launch":      return traceLaunch(input: input)
@@ -1152,6 +1180,7 @@ final class AgentTools {
         // Enforce max launch limit (diagnostic launches are free)
         if !isDiagnostic {
             if launchCount >= maxLaunches {
+                taskState = .exhausted
                 return jsonResult([
                     "error": "Maximum launches (\(maxLaunches)) reached for this session. Save a recipe if you found a working configuration.",
                     "launch_number": launchCount
@@ -1268,6 +1297,9 @@ final class AgentTools {
 
         let stderrTail = String(result.stderr.suffix(4000))
 
+        // Determine if game likely ran successfully (ran long enough to reach menu)
+        let likelyRanSuccessfully = result.elapsed > 10.0 && !result.timedOut
+
         var resultDict: [String: Any] = [
             "exit_code": Int(result.exitCode),
             "elapsed_seconds": result.elapsed,
@@ -1282,6 +1314,31 @@ final class AgentTools {
         ]
         if !preflightWarnings.isEmpty {
             resultDict["preflight_warnings"] = preflightWarnings
+        }
+        if likelyRanSuccessfully {
+            // Auto-prompt user directly — don't leave this to the agent
+            print("\n--- Game ran for \(Int(result.elapsed)) seconds ---")
+            print("Did the game work? (yes / no / describe any issues): ", terminator: "")
+            fflush(stdout)
+            let feedback = readLine() ?? ""
+            resultDict["user_feedback"] = feedback
+            resultDict["user_was_asked"] = true
+            resultDict["IMPORTANT"] = "The user was already asked about the game and responded: '\(feedback)'. Use their feedback to decide next steps. Do NOT call ask_user to re-ask the same question."
+
+            // Track task state based on user feedback
+            let lower = feedback.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            let positive = ["yes", "y", "works", "perfect", "good", "great", "fine", "ok", "okay"]
+            if positive.contains(lower) || lower.hasPrefix("yes") {
+                taskState = .userConfirmedOk
+            } else if !lower.isEmpty {
+                taskState = .working  // Reset even if previously confirmed (regression)
+            }
+        } else if !isDiagnostic && !result.timedOut && result.elapsed < 10.0 {
+            // Fast crash — task is definitely not complete
+            resultDict["IMPORTANT"] = "Game crashed in \(String(format: "%.1f", result.elapsed))s. This is NOT a success. Diagnose the crash using read_log and detected_errors, then fix and relaunch."
+            if taskState == .userConfirmedOk {
+                taskState = .working  // Regression
+            }
         }
 
         return jsonResult(resultDict)
@@ -1441,25 +1498,37 @@ final class AgentTools {
         let killWork = DispatchWorkItem { [weak self] in
             process.terminate()
             try? self?.wineProcess.killWineserver()
+            // Force SIGKILL after 2 more seconds if process is still alive
+            DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) {
+                if process.isRunning {
+                    kill(process.processIdentifier, SIGKILL)
+                }
+            }
         }
         DispatchQueue.global().asyncAfter(deadline: .now() + Double(timeoutSeconds), execute: killWork)
 
-        process.waitUntilExit()
+        // Wait for exit with a hard timeout — don't hang if Wine children keep the process alive
+        let waitDone = DispatchSemaphore(value: 0)
+        DispatchQueue.global().async {
+            process.waitUntilExit()
+            waitDone.signal()
+        }
+        let maxWait = Double(timeoutSeconds) + 5.0
+        if waitDone.wait(timeout: .now() + maxWait) == .timedOut {
+            kill(process.processIdentifier, SIGKILL)
+            try? wineProcess.killWineserver()
+        }
         killWork.cancel()
 
-        // Close pipe write ends to unblock readDataToEndOfFile — Wine child processes
-        // inherit these descriptors and keep them open indefinitely.
-        stderrPipe.fileHandleForReading.readabilityHandler = nil
-        try? stderrPipe.fileHandleForWriting.close()
-
-        // Drain remaining stderr
-        let remainingData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
-        if !remainingData.isEmpty, let str = String(data: remainingData, encoding: .utf8) {
-            stderrCapture.append(str)
-        }
-
-        // Kill wineserver to clean up (in case timeout didn't fire)
+        // Kill wineserver to release all Wine children holding pipe descriptors
         try? wineProcess.killWineserver()
+
+        // Close pipes immediately — readabilityHandler already captured data in real-time.
+        // Do NOT call readDataToEndOfFile — Wine child processes hold pipe descriptors
+        // open indefinitely, causing hangs.
+        stderrPipe.fileHandleForReading.readabilityHandler = nil
+        try? stderrPipe.fileHandleForReading.close()
+        try? stderrPipe.fileHandleForWriting.close()
 
         let stderr = stderrCapture.value
 
@@ -1678,15 +1747,77 @@ final class AgentTools {
             return jsonResult(["error": "Failed to create directories: \(error.localizedDescription)"])
         }
 
+        // Back up existing file before overwriting
+        let fm = FileManager.default
+        var backedUp = false
+        var backupPath = ""
+        if fm.fileExists(atPath: targetURL.path) {
+            let backupURL = targetURL.appendingPathExtension("cellar-backup")
+            try? fm.removeItem(at: backupURL)  // Remove stale backup
+            do {
+                try fm.copyItem(at: targetURL, to: backupURL)
+                backedUp = true
+                backupPath = backupURL.path
+            } catch {
+                // Non-fatal — warn but continue
+                print("[write_game_file] Warning: could not back up \(targetURL.lastPathComponent): \(error.localizedDescription)")
+            }
+        }
+
         // Write file atomically
         do {
             try content.write(to: targetURL, atomically: true, encoding: .utf8)
-            return jsonResult([
+            var result: [String: Any] = [
                 "status": "ok",
                 "written_to": targetURL.path
-            ])
+            ]
+            if backedUp {
+                result["backup"] = backupPath
+                result["note"] = "Original file backed up to \(targetURL.lastPathComponent).cellar-backup. If the game breaks, the backup can be restored."
+            }
+            return jsonResult(result)
         } catch {
             return jsonResult(["error": "Failed to write file: \(error.localizedDescription)"])
+        }
+    }
+
+    // MARK: 11b. read_game_file
+
+    private func readGameFile(input: JSONValue) -> String {
+        guard let relativePath = input["relative_path"]?.asString, !relativePath.isEmpty else {
+            return jsonResult(["error": "relative_path is required"])
+        }
+
+        let gameDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
+        let normalizedPath = relativePath.replacingOccurrences(of: "\\", with: "/")
+        let targetURL = gameDir.appendingPathComponent(normalizedPath).standardized
+
+        // Security check
+        let gameDirPath = gameDir.standardized.path
+        guard targetURL.path.hasPrefix(gameDirPath) else {
+            return jsonResult(["error": "Path traversal denied: resolved path is outside the game directory"])
+        }
+
+        guard FileManager.default.fileExists(atPath: targetURL.path) else {
+            return jsonResult(["error": "File not found: \(relativePath)"])
+        }
+
+        do {
+            let content = try String(contentsOf: targetURL, encoding: .utf8)
+            let truncated = content.count > 16000
+            let output = truncated ? String(content.prefix(16000)) : content
+            var result: [String: Any] = [
+                "status": "ok",
+                "path": relativePath,
+                "content": output
+            ]
+            if truncated {
+                result["truncated"] = true
+                result["total_length"] = content.count
+            }
+            return jsonResult(result)
+        } catch {
+            return jsonResult(["error": "Failed to read file: \(error.localizedDescription)"])
         }
     }
 
@@ -1841,6 +1972,9 @@ final class AgentTools {
 
         do {
             try SuccessDatabase.save(record)
+            if taskState == .userConfirmedOk {
+                taskState = .savedAfterConfirm
+            }
             let savedPath = CellarPaths.successdbFile(for: gameId).path
 
             // Backward compatibility: also save as user recipe

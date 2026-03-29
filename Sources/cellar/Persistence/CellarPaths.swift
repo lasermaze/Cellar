@@ -4,6 +4,42 @@ struct CellarPaths {
     static let base: URL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent(".cellar")
 
+    /// Abort if running as root — prevents creating root-owned files under ~/.cellar and ~/.cache
+    static func refuseRoot() {
+        if ProcessInfo.processInfo.userName == "root" || getuid() == 0 {
+            print("Error: Do not run cellar with sudo. It creates root-owned files that break Wine and winetricks.")
+            print("If you already did, run:  sudo chown -R $(whoami):staff ~/.cellar ~/.cache/winetricks .build 2>/dev/null")
+            _Exit(1)
+        }
+    }
+
+    /// Check key directories for root-owned files and warn with a fix command
+    static func checkOwnership() {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let dirsToCheck = [
+            base.path,
+            "\(home)/.cache/winetricks"
+        ]
+        let currentUser = ProcessInfo.processInfo.userName
+        var badPaths: [String] = []
+
+        for dir in dirsToCheck {
+            guard FileManager.default.fileExists(atPath: dir) else { continue }
+            var stat = stat()
+            if lstat(dir, &stat) == 0 && stat.st_uid == 0 {
+                badPaths.append(dir)
+            }
+        }
+
+        guard !badPaths.isEmpty else { return }
+        print("Warning: These directories are owned by root (likely from a previous sudo run):")
+        for path in badPaths {
+            print("  \(path)")
+        }
+        print("Fix with:  sudo chown -R \(currentUser):staff \(badPaths.joined(separator: " "))")
+        print("")
+    }
+
     static let gamesJSON: URL = base.appendingPathComponent("games.json")
 
     static let bottlesDir: URL = base.appendingPathComponent("bottles")
