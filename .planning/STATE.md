@@ -7,8 +7,8 @@ last_updated: "2026-03-29T00:51:25.469Z"
 progress:
   total_phases: 10
   completed_phases: 10
-  total_plans: 28
-  completed_plans: 28
+  total_plans: 31
+  completed_plans: 29
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** Any user can go from "I have these old game files" to "the game launches and works" without manually configuring Wine.
-**Current focus:** Phase 10 complete — dialog detection delivered. Phase 11 next.
+**Current focus:** Phase 11 in progress — smarter research with SwiftSoup HTML parsing and structured fix extraction.
 
 ## Current Position
 
-Phase: 10 of 11 (Dialog Detection) -- COMPLETE
-Plan: 2 of 2 complete
-Status: Phase 10 complete. All dialog detection plans delivered (msgbox parsing + list_windows + system prompt heuristics).
-Last activity: 2026-03-29 — Completed 10-02 (Dialog detection methodology in agent system prompt).
+Phase: 11 of 11 (Smarter Research)
+Plan: 1 of 3 complete
+Status: Phase 11 in progress. Plan 01 delivered (PageParser module with SwiftSoup, 3 parsers, regex extraction).
+Last activity: 2026-03-29 — Completed 11-01 (PageParser with SwiftSoup HTML parsing and Wine fix extraction).
 
-Progress: [██████████████] v1.1 ~80% (Phase 10 complete, Phase 11 next)
+Progress: [███████████████] v1.1 ~87% (Phase 11: 1/3 plans complete)
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Progress: [██████████████] v1.1 ~80% (Phase 10 compl
 | Phase 9 | 09-02 | 1 min |
 | Phase 10 | 10-01 | 4 min |
 | Phase 10 | 10-02 | 1 min |
+| Phase 11 | 11-01 | 4 min |
 
 ## Accumulated Context
 
@@ -80,6 +81,9 @@ Progress: [██████████████] v1.1 ~80% (Phase 10 compl
 - [Phase 10-01]: Tool count now 19 (added list_windows to Diagnostic tools)
 - [Phase 10-02]: Dialog Detection section placed between Engine-Aware Methodology and macOS + Wine Domain Knowledge for optimal prompt ordering
 - [Phase 10-02]: Phase 3 Adapt workflow gets step 2b for dialog checking, mirroring Phase 1 Research step 2b pattern
+- [Phase 11-01]: SwiftSoup 2.13.x (from: 2.13.0) not 2.8.7 from earlier roadmap — same API, important bugfixes
+- [Phase 11-01]: Winetricks verb extraction uses stop-word filtering to avoid matching common English words
+- [Phase 11-01]: @preconcurrency import SwiftSoup for Swift 6 strict concurrency compatibility
 
 ### Pending Todos
 
@@ -94,4 +98,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-29
-Stopped at: Completed 10-02-PLAN.md — Phase 10 complete. Dialog detection methodology added to agent system prompt.
+Stopped at: Completed 11-01-PLAN.md — PageParser module with SwiftSoup, 3 parsers, regex Wine fix extraction.
