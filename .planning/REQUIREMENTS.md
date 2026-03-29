@@ -67,6 +67,18 @@ Requirements for v1.1 Agentic Independence. Each maps to roadmap phases.
 - [x] **RSRCH-02**: Agent queries success database by engine type and graphics API tags to find similar-game solutions for new games
 - [x] **RSRCH-03**: fetch_page uses SwiftSoup for structured HTML parsing instead of string stripping — extracts content from known sources (WineHQ, PCGamingWiki, forums)
 
+## v1.2 Requirements
+
+Requirements for v1.2 Web Interface. Maps to Phase 12.
+
+### Web Interface
+
+- [ ] **WEB-01**: User can view game library as a card grid in the browser at localhost:8080, showing game name, status, and last played date
+- [ ] **WEB-02**: User can add a game (providing installer path) and delete a game (with optional bottle cleanup) through the web interface
+- [ ] **WEB-03**: User can directly launch a game that has a working recipe or success record, with Wine output streamed to the browser via SSE
+- [ ] **WEB-04**: User can launch a game with the AI agent, with real-time agent loop events (iterations, tool calls, reasoning, cost) streamed to the browser via SSE
+- [ ] **WEB-05**: `cellar serve` subcommand starts a Vapor web server on localhost:8080, sharing all existing business logic without duplication
+
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -170,11 +182,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RSRCH-02 | Phase 11 | Complete |
 | RSRCH-03 | Phase 11 | Complete |
 
+| WEB-01 | Phase 12 | Planned |
+| WEB-02 | Phase 12 | Planned |
+| WEB-03 | Phase 12 | Planned |
+| WEB-04 | Phase 12 | Planned |
+| WEB-05 | Phase 12 | Planned |
+
 **Coverage:**
-- v1.1 requirements: 14 total
-- Mapped to phases: 14
-- Unmapped: 0 ✓
+- v1.1 requirements: 14 total (all complete)
+- v1.2 requirements: 5 total
+- Mapped to phases: 19
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-28 after v1.1 roadmap creation*
+*Last updated: 2026-03-29 after v1.2 Phase 12 planning*

@@ -95,3 +95,21 @@ Phases execute in numeric order: 8 → 9 → 10 → 11
 | 9. Engine Detection and Pre-configuration | v1.1 | 0/? | Not started | - |
 | 10. Dialog Detection | 2/2 | Complete    | 2026-03-29 | - |
 | 11. Smarter Research | 3/3 | Complete    | 2026-03-29 | - |
+
+### Phase 12: Web Interface for Game Management
+**Goal**: Users can manage their game library, add/delete games, launch games (directly or with AI agent), and watch real-time agent logs — all from a browser-based web UI served on localhost:8080 via Vapor + HTMX
+**Depends on**: Phase 11
+**Requirements**: WEB-01, WEB-02, WEB-03, WEB-04, WEB-05
+**Success Criteria** (what must be TRUE):
+  1. `cellar serve` starts a Vapor web server on localhost:8080 that shares all existing business logic
+  2. Users see a card-based game library showing game name, status, and last played date
+  3. Users can add games (by installer path) and delete games (with optional bottle cleanup) from the browser
+  4. Users can directly launch games with working recipes — Wine output streams to browser via SSE
+  5. Users can launch games with AI agent — iteration count, tool calls, reasoning, and cost stream in real-time via SSE
+**Plans:** 4 plans
+
+Plans:
+- [ ] 12-01-PLAN.md — Foundation: Vapor + Leaf deps, ServeCommand, WebApp, GameService actor, LaunchService, base.leaf
+- [ ] 12-02-PLAN.md — AgentLoop streaming: AgentEvent enum, onOutput callback, replace print() calls
+- [ ] 12-03-PLAN.md — Game library CRUD: GameController routes, index/card/add templates, HTMX partials
+- [ ] 12-04-PLAN.md — Launch & SSE: LaunchController, direct + agent launch, SSE streaming, launch-log template
