@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Agentic Independence
-status: unknown
-last_updated: "2026-03-29T00:00:20.804Z"
+status: in-progress
+last_updated: "2026-03-29T00:27:30Z"
 progress:
-  total_phases: 9
+  total_phases: 11
   completed_phases: 9
-  total_plans: 26
-  completed_plans: 26
+  total_plans: 28
+  completed_plans: 27
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** Any user can go from "I have these old game files" to "the game launches and works" without manually configuring Wine.
-**Current focus:** Phase 9 complete, ready for Phase 10
+**Current focus:** Phase 10 in progress — dialog detection
 
 ## Current Position
 
-Phase: 9 of 11 (Engine Detection and Pre-configuration) -- COMPLETE
-Plan: 2 of 2 complete
-Status: Phase 09 complete, ready for Phase 10
-Last activity: 2026-03-28 — Completed 09-02 (Engine-aware system prompt with pre-configuration, search enrichment, success DB cross-referencing).
+Phase: 10 of 11 (Dialog Detection)
+Plan: 1 of 2 complete
+Status: Phase 10 in progress, Plan 01 complete (msgbox parsing + list_windows), Plan 02 next (system prompt)
+Last activity: 2026-03-29 — Completed 10-01 (Msgbox parsing in launch_game/trace_launch, list_windows CoreGraphics tool).
 
-Progress: [████████████] v1.1 ~55% (Phase 9 complete, 2/2 plans done)
+Progress: [█████████████] v1.1 ~60% (Phase 10 plan 1/2 done)
 
 ## Performance Metrics
 
@@ -54,6 +54,7 @@ Progress: [████████████] v1.1 ~55% (Phase 9 complete, 2/
 | Phase 8 | 08-02 | 2 min |
 | Phase 9 | 09-01 | 6 min |
 | Phase 9 | 09-02 | 1 min |
+| Phase 10 | 10-01 | 4 min |
 
 ## Accumulated Context
 
@@ -72,6 +73,10 @@ Progress: [████████████] v1.1 ~55% (Phase 9 complete, 2/
 - [Phase 09-01]: swift-testing added as package dependency for CLI test support (Command Line Tools lacks built-in frameworks)
 - [Phase 09-02]: Engine-Aware Methodology placed between Three-Phase Workflow and Domain Knowledge for optimal prompt ordering
 - [Phase 09-02]: Step 2b added to Phase 1 Research for explicit engine detection checkpoint in workflow
+- [Phase 10-01]: parseMsgboxDialogs is static on AgentTools for direct unit testing
+- [Phase 10-01]: list_windows uses broad Wine process matching (exact names + contains 'wine') for Gcenx variant coverage
+- [Phase 10-01]: Screen Recording permission detected via kCGWindowName presence on non-self windows
+- [Phase 10-01]: Tool count now 19 (added list_windows to Diagnostic tools)
 
 ### Pending Todos
 
@@ -85,5 +90,5 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-28
-Stopped at: Completed 09-02-PLAN.md — Phase 9 complete. Engine-aware system prompt with pre-configuration guidance. Phase 10 next.
+Last session: 2026-03-29
+Stopped at: Completed 10-01-PLAN.md — Msgbox parsing + list_windows tool. Plan 10-02 next (system prompt dialog detection heuristics).

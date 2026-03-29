@@ -57,8 +57,8 @@ Requirements for v1.1 Agentic Independence. Each maps to roadmap phases.
 
 ### Dialog Detection
 
-- [ ] **DIAG-01**: trace_launch includes +msgbox in WINEDEBUG and parses MessageBoxW output into structured dialog info (title, message, type)
-- [ ] **DIAG-02**: Agent queries macOS window list (CGWindowListCopyWindowInfo) to detect window sizes and titles of Wine processes
+- [x] **DIAG-01**: trace_launch includes +msgbox in WINEDEBUG and parses MessageBoxW output into structured dialog info (title, message, type)
+- [x] **DIAG-02**: Agent queries macOS window list (CGWindowListCopyWindowInfo) to detect window sizes and titles of Wine processes
 - [ ] **DIAG-03**: Agent uses hybrid signal (Wine traces + window list) to determine if game is stuck on a dialog vs running normally — with graceful degradation if Screen Recording permission is denied
 
 ### Research Quality
@@ -163,8 +163,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | ENGN-02 | Phase 9 | Complete |
 | ENGN-03 | Phase 9 | Complete |
 | ENGN-04 | Phase 9 | Complete |
-| DIAG-01 | Phase 10 | Pending |
-| DIAG-02 | Phase 10 | Pending |
+| DIAG-01 | Phase 10 | Complete |
+| DIAG-02 | Phase 10 | Complete |
 | DIAG-03 | Phase 10 | Pending |
 | RSRCH-01 | Phase 11 | Pending |
 | RSRCH-02 | Phase 11 | Pending |
