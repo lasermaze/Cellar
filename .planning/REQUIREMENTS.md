@@ -63,8 +63,8 @@ Requirements for v1.1 Agentic Independence. Each maps to roadmap phases.
 
 ### Research Quality
 
-- [ ] **RSRCH-01**: Agent extracts actionable fixes from web pages — exact env vars, registry paths, DLL names, winetricks verbs, INI changes (not general descriptions)
-- [ ] **RSRCH-02**: Agent queries success database by engine type and graphics API tags to find similar-game solutions for new games
+- [x] **RSRCH-01**: Agent extracts actionable fixes from web pages — exact env vars, registry paths, DLL names, winetricks verbs, INI changes (not general descriptions)
+- [x] **RSRCH-02**: Agent queries success database by engine type and graphics API tags to find similar-game solutions for new games
 - [x] **RSRCH-03**: fetch_page uses SwiftSoup for structured HTML parsing instead of string stripping — extracts content from known sources (WineHQ, PCGamingWiki, forums)
 
 ## v2 Requirements
@@ -166,8 +166,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DIAG-01 | Phase 10 | Complete |
 | DIAG-02 | Phase 10 | Complete |
 | DIAG-03 | Phase 10 | Complete |
-| RSRCH-01 | Phase 11 | Pending |
-| RSRCH-02 | Phase 11 | Pending |
+| RSRCH-01 | Phase 11 | Complete |
+| RSRCH-02 | Phase 11 | Complete |
 | RSRCH-03 | Phase 11 | Complete |
 
 **Coverage:**
