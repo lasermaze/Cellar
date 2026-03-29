@@ -1,5 +1,6 @@
 import ArgumentParser
 @preconcurrency import Vapor
+import Foundation
 
 struct ServeCommand: ParsableCommand {
     static let configuration = CommandConfiguration(
@@ -12,29 +13,34 @@ struct ServeCommand: ParsableCommand {
 
     mutating func run() throws {
         // Prevent Vapor from hijacking CommandLine.arguments
-        let env = Environment(name: "development", arguments: ["vapor"])
-
-        // Bridge async Application.make into synchronous ParsableCommand.run()
         let portValue = port
-        let semaphore = DispatchSemaphore(value: 0)
-        nonisolated(unsafe) var appError: (any Error)?
 
-        Thread {
-            Task {
-                do {
-                    let app = try await Application.make(env)
-                    try WebApp.configure(app, port: portValue)
-                    try await app.execute()
-                    try await app.asyncShutdown()
-                } catch {
-                    appError = error
+        // Use a dedicated run loop thread for the async Vapor server
+        nonisolated(unsafe) var serverError: (any Error)?
+        let done = DispatchSemaphore(value: 0)
+
+        let thread = Thread {
+            let eventLoop = DispatchQueue(label: "cellar.serve")
+            eventLoop.async {
+                Task {
+                    do {
+                        let env = Environment(name: "development", arguments: ["vapor"])
+                        let app = try await Application.make(env)
+                        try WebApp.configure(app, port: portValue)
+                        try await app.execute()
+                        try await app.asyncShutdown()
+                    } catch {
+                        serverError = error
+                    }
+                    done.signal()
                 }
-                semaphore.signal()
             }
-        }.start()
+            RunLoop.current.run()
+        }
+        thread.start()
 
-        semaphore.wait()
-        if let error = appError {
+        done.wait()
+        if let error = serverError {
             throw error
         }
     }
