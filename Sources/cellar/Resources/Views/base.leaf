@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>#(title) - Cellar</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/htmx-ext-sse@2.2.4"></script>
+</head>
+<body>
+    <header class="container">
+        <nav>
+            <ul><li><strong>Cellar</strong></li></ul>
+            <ul><li><a href="/">Games</a></li></ul>
+        </nav>
+    </header>
+    <main class="container">
+        #import("content")
+    </main>
+</body>
+</html>
