@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Agentic Independence
 status: in-progress
-last_updated: "2026-03-29T23:25:20Z"
+last_updated: "2026-03-29T23:32:00Z"
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 35
-  completed_plans: 32
+  completed_plans: 33
 ---
 
 # Project State
@@ -23,11 +23,11 @@ See: .planning/PROJECT.md (updated 2026-03-28)
 ## Current Position
 
 Phase: 12 of 12 (Web Interface)
-Plan: 1 of 4 complete
-Status: Plan 12-02 complete (AgentEvent streaming callback). Plans 12-03 and 12-04 remaining.
-Last activity: 2026-03-29 — Completed 12-02 (AgentEvent enum + onOutput callback on AgentLoop).
+Plan: 2 of 4 complete
+Status: Plans 12-01 and 12-02 complete. Plans 12-03 and 12-04 remaining.
+Last activity: 2026-03-29 — Completed 12-01 (Vapor foundation + GameService + LaunchService).
 
-Progress: [████████████████░░░░] Phase 12: 1/4 plans complete
+Progress: [██████████████████░░] Phase 12: 2/4 plans complete
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: [████████████████░░░░] Phase 1
 | Phase 11 | 11-01 | 4 min |
 | Phase 11 | 11-03 | 1 min |
 | Phase 11 | 11-02 | 2 min |
+| Phase 12 | 12-01 | 12 min |
 | Phase 12 | 12-02 | 5 min |
 
 ## Accumulated Context
@@ -92,6 +93,10 @@ Progress: [████████████████░░░░] Phase 1
 - [Phase 11-02]: selectParser is a free function, not namespaced as PageParserDispatch
 - [Phase 11-02]: fetchPage fallback to regex stripping on SwiftSoup parse failure preserves resilience
 - [Phase 11-02]: Result key renamed from 'content' to 'text_content' per CONTEXT.md spec
+- [Phase 12-01]: @preconcurrency import Vapor/Leaf for Swift 6 strict concurrency compatibility
+- [Phase 12-01]: DispatchQueue+Task+Semaphore bridge for async Vapor in sync ParsableCommand context
+- [Phase 12-01]: ArgumentParser.Option disambiguation to avoid ConsoleKit Option conflict
+- [Phase 12-01]: SPM .copy(Resources) with Bundle.module.resourcePath for Leaf views resolution
 - [Phase 12-02]: emit() always prints AND calls callback -- CLI behavior preserved unconditionally
 - [Phase 12-02]: AgentEvent.completed wraps AgentLoopResult, emitted via makeResult helper for all exit paths
 - [Phase 12-02]: toolResult case includes truncated output (200 chars) for web UI preview
@@ -113,4 +118,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-29
-Stopped at: Completed 12-02-PLAN.md — AgentEvent enum + onOutput callback on AgentLoop for web streaming.
+Stopped at: Completed 12-01-PLAN.md — Vapor foundation, ServeCommand, WebApp, GameService actor, LaunchService.
