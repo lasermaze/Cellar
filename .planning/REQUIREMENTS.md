@@ -82,7 +82,7 @@ Requirements for v1.2 Collective Agent Memory. Each maps to roadmap phases.
 ### Authentication
 
 - [x] **AUTH-01**: Agent authenticates to GitHub API using GitHub App credentials (RS256 JWT + installation token) shipped with CLI
-- [ ] **AUTH-02**: Agent token refreshes automatically before expiry (1-hour lifetime, refresh at 55 minutes)
+- [x] **AUTH-02**: Agent token refreshes automatically before expiry (1-hour lifetime, refresh at 55 minutes)
 
 ### Schema
 
@@ -220,7 +220,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WEB-04 | Phase 12 | Complete |
 | WEB-05 | Phase 12 | Complete |
 | AUTH-01 | Phase 13 | Complete |
-| AUTH-02 | Phase 13 | Pending |
+| AUTH-02 | Phase 13 | Complete |
 | SCHM-01 | Phase 14 | Pending |
 | SCHM-02 | Phase 14 | Pending |
 | SCHM-03 | Phase 14 | Pending |
