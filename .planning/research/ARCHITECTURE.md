@@ -1,300 +1,383 @@
-# Architecture Research: Cellar v1.1 Agentic Independence
+# Architecture Research: Cellar v1.2 Collective Agent Memory
 
-**Domain:** macOS CLI+TUI Wine game launcher — v1.1 feature integration
-**Researched:** 2026-03-28
-**Confidence:** HIGH (based on direct codebase inspection)
-
----
-
-## Standard Architecture
-
-### System Overview
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                        CLI Commands Layer                         │
-│  AddCommand  LaunchCommand  StatusCommand  LogCommand             │
-└──────────────────────────┬───────────────────────────────────────┘
-                           │
-┌──────────────────────────┴───────────────────────────────────────┐
-│                     AIService (static entry point)               │
-│  runAgentLoop() ─── detects provider ─── builds system prompt    │
-└──────────────────────────┬───────────────────────────────────────┘
-                           │
-         ┌─────────────────┴──────────────────┐
-         │                                    │
-┌────────┴────────┐               ┌───────────┴──────────┐
-│   AgentLoop     │               │     AgentTools       │
-│  state machine  │  toolExecutor │  18 tool impls       │
-│  HTTP↔Anthropic │◄─────────────│  accumulates state   │
-│  max_tokens     │               │  per session         │
-└─────────────────┘               └───────────┬──────────┘
-                                              │
-          ┌───────────────────────────────────┼───────────────┐
-          │                                   │               │
-┌─────────┴──────┐  ┌──────────────┐  ┌──────┴──────┐  ┌────┴──────┐
-│  WineProcess   │  │ RecipeEngine │  │SuccessDB    │  │CellarPaths│
-│  synchronous   │  │ bundled+user │  │ JSON CRUD   │  │ path mgmt │
-│  Wine launch   │  │ recipes      │  │ query/save  │  │           │
-└────────────────┘  └──────────────┘  └─────────────┘  └───────────┘
-          │
-┌─────────┴───────────────────────────────────────┐
-│              Supporting subsystems               │
-│  BottleManager  DLLDownloader  WineActionExecutor│
-│  KnownDLLRegistry  WinetricksRunner              │
-└─────────────────────────────────────────────────┘
-```
-
-### Component Responsibilities
-
-| Component | Responsibility | v1.1 Change |
-|-----------|----------------|-------------|
-| `AgentLoop` | Anthropic API send/execute/return cycle, max_tokens handling | Modify: budget-aware escalation, iteration counting changes |
-| `AgentTools` | All 18 tool implementations, mutable session state | Modify: add engine detection, add dialog-state queries, modify search tools |
-| `AIService.runAgentLoop()` | System prompt construction, AgentTools wiring, session entry | Modify: pre-configuration phase before loop, smarter system prompt |
-| `WineProcess` | Synchronous Wine process execution, stderr capture, timeout | Already correct for v1.1 — WD fix already shipped |
-| `SuccessDatabase` | JSON CRUD for success records, query methods | Already correct for v1.1 — schema and queries ship in v1.0 |
-| `KnownDLLRegistry` | Static DLL metadata + companion file specs | Modify: add engine classification hints |
-| `CGWindowListCopyWindowInfo` | macOS window list (new) | New: `WindowMonitor` module |
-| Engine detection | Detect game engine from EXE metadata, files, registry | New: `GameEngineDetector` module or extend `inspect_game` |
-| Proactive config | Pre-set renderer/settings before agent starts | New: pre-configuration phase in `AIService.runAgentLoop()` |
+**Domain:** macOS CLI Wine game launcher — Git-backed collective memory integration
+**Researched:** 2026-03-29
+**Confidence:** HIGH (GitHub API flows verified against official docs; integration points from direct codebase inspection)
 
 ---
 
-## Integration Points — Each v1.1 Feature
+## Context: What This File Is
 
-### 1. Dialog Detection via CGWindowListCopyWindowInfo
+This file covers the **v1.2 integration architecture only** — specifically how Git-backed collective memory and GitHub App authentication integrate with the existing Cellar codebase. The existing architecture (Swift 6 CLI, AgentLoop, AgentTools, AIService, SuccessDatabase, Vapor web server) is documented in prior research files and the current ARCHITECTURE.md. Do not re-litigate those decisions here.
 
-**Question:** New tool? Background monitor during launch?
+The two core technical questions for v1.2:
+1. How does collective memory (Git-backed shared knowledge base) integrate with the agent loop?
+2. How does GitHub App bot token authentication work for agent-initiated pushes?
 
-**Answer:** Background monitor spawned by `launch_game` tool, not a standalone tool.
+---
 
-The reason: `CGWindowListCopyWindowInfo` must be called during an active Wine process run. The `launch_game` tool in `AgentTools` already wraps the `WineProcess.run()` call synchronously. The window list monitor fits as a background observation pass that runs concurrently with the Wine process and writes its findings to the `WineResult`.
+## System Overview
 
-**Integration:**
-
-`WineProcess.run()` already has a polling loop:
 ```
-while process.isRunning {
-    Thread.sleep(forTimeInterval: 2.0)
-    // stale output timeout check
+┌──────────────────────────────────────────────────────────────────────┐
+│                          CLI / Web Commands                           │
+│   LaunchCommand   LaunchController (SSE)   MemoryController (NEW)    │
+└──────────────────────────────┬───────────────────────────────────────┘
+                               │
+┌──────────────────────────────┴───────────────────────────────────────┐
+│               AIService.runAgentLoop()  (MODIFY)                      │
+│   query collective memory BEFORE first API call                       │
+│   push to collective memory AFTER user confirms success               │
+└───────┬─────────────────────────────────────────────┬────────────────┘
+        │                                             │
+┌───────┴──────────┐                    ┌────────────┴────────────────┐
+│    AgentLoop     │                    │   CollectiveMemoryClient     │
+│  (UNCHANGED)     │                    │   (NEW — Core/)              │
+│  API state mach. │                    │   query / push operations    │
+└──────────────────┘                    └────────────┬────────────────┘
+                                                     │
+                                        ┌────────────┴────────────────┐
+                                        │   GitHubAppAuth              │
+                                        │   (NEW — Core/)              │
+                                        │   JWT sign → install token   │
+                                        └────────────┬────────────────┘
+                                                     │
+                                        ┌────────────┴────────────────┐
+                                        │   GitHub REST API            │
+                                        │   PUT /repos/.../contents/.. │
+                                        │   GET /repos/.../contents/.. │
+                                        └─────────────────────────────┘
+
+Local persistence (existing, UNCHANGED):
+  ~/.cellar/games.json
+  ~/.cellar/recipes/<gameId>.json
+  ~/.cellar/successdb/<gameId>.json
+
+Remote collective memory (NEW):
+  GitHub repo: cellar-community/memory
+  path: entries/<gameId>.json
+  path: entries/<gameId>/<sha>.json  (versioned — optional)
+```
+
+---
+
+## New Components
+
+### Component 1: `CollectiveMemoryClient` (NEW)
+
+**File:** `Sources/cellar/Core/CollectiveMemoryClient.swift`
+
+**Responsibility:** All read/write operations against the remote collective memory Git repo. Wraps the GitHub Contents API. Has no awareness of the agent loop — it is a pure data access layer.
+
+**Operations:**
+- `query(gameId:) -> CollectiveMemoryEntry?` — GET the entry for a game; returns nil if not found or network unavailable
+- `push(entry:) -> Bool` — PUT an updated entry; returns false on auth failure or network error; never throws (caller handles gracefully)
+- `queryAll() -> [CollectiveMemoryEntry]` — list all entries (for web UI); uses GET on the directory listing endpoint
+
+**Key design decisions:**
+- Synchronous with DispatchSemaphore — matches the existing `AgentLoop` and `AIService` HTTP pattern; no async/await
+- Read operations never require auth — public repo, GET is unauthenticated
+- Write operations require a GitHub App installation token (via `GitHubAppAuth`)
+- Network failure on read is a soft failure: agent proceeds without collective memory context
+- Network failure on write is also a soft failure: agent logs it and doesn't block the session
+
+**What it does NOT own:**
+- Authentication (delegated to `GitHubAppAuth`)
+- Entry schema construction (delegated to caller — `AIService`)
+- Caching beyond the session (reads are always live; no local cache of remote entries)
+
+---
+
+### Component 2: `GitHubAppAuth` (NEW)
+
+**File:** `Sources/cellar/Core/GitHubAppAuth.swift`
+
+**Responsibility:** GitHub App authentication flow. Generates RS256 JWTs from the stored private key, exchanges them for installation access tokens, and provides a valid `Bearer` token for REST API calls.
+
+**Operations:**
+- `installationToken() throws -> String` — returns a valid installation access token; re-generates JWT and exchanges if token is expired or not yet obtained
+
+**Auth flow (two-step, verified against GitHub docs):**
+```
+1. Read private key PEM from ~/.cellar/.env (GITHUB_APP_PRIVATE_KEY) or file path
+2. Build JWT claims:
+     iat = now - 60s  (clock-drift protection)
+     exp = now + 300s (5 minutes, well under 10 minute limit)
+     iss = app_id
+3. Sign JWT with RS256 using SecKeyCreateSignature(.rsaSignatureMessagePKCS1v15SHA256)
+4. POST /app/installations/{installation_id}/access_tokens with JWT in Authorization: Bearer
+5. Cache returned token (expires_at - 5 minute buffer) for the session
+```
+
+**No new SPM dependency needed.** RS256 JWT signing uses Apple's `Security` framework (`SecKeyCreateSignature`), which is already available on macOS 14+. PEM private key loading strips the `-----BEGIN RSA PRIVATE KEY-----` headers, base64-decodes to DER, and imports via `SecKeyCreateWithData`. This is approximately 60-80 lines of Swift and requires no external library.
+
+**Configuration (stored in `~/.cellar/.env`):**
+```
+GITHUB_APP_ID=123456
+GITHUB_APP_PRIVATE_KEY_PATH=~/.cellar/github-app.pem
+GITHUB_APP_INSTALLATION_ID=789012
+GITHUB_MEMORY_REPO=cellar-community/memory
+```
+
+**Token lifetime:** Installation access tokens expire after 1 hour. `GitHubAppAuth` caches the token with a 5-minute safety buffer and re-authenticates transparently when stale.
+
+---
+
+### Component 3: `CollectiveMemoryEntry` schema (NEW)
+
+**File:** `Sources/cellar/Models/CollectiveMemoryEntry.swift`
+
+**What it stores per game:**
+```swift
+struct CollectiveMemoryEntry: Codable {
+    let schemaVersion: Int           // 1
+    let gameId: String
+    let gameName: String
+    let updatedAt: String            // ISO8601
+    let confirmations: Int           // number of agents that confirmed this works
+    let workingConfig: WorkingConfig // env vars, DLL overrides, registry, winetricks
+    let reasoningChain: String       // agent's narrative of how it solved the game
+    let environmentContext: EnvContext // wine version, macOS version, arch at solve time
+    let tags: [String]               // engine, graphics api, source (gog, steam)
+}
+
+struct WorkingConfig: Codable {
+    let environment: [String: String]
+    let dllOverrides: [String: String]
+    let winetricksVerbs: [String]
+    let registryEntries: [RegistryRecord]
+    let notes: String?
+}
+
+struct EnvContext: Codable {
+    let wineVersion: String?
+    let macosVersion: String
+    let arch: String              // "arm64", "x86_64"
+    let cellarVersion: String
 }
 ```
 
-The window monitor runs inside this loop: every 2-second tick, call `CGWindowListCopyWindowInfo` to snapshot visible windows. Classify windows by title/size heuristics:
-- Title contains "Error", "Warning", "Missing", known dialog phrases → dialog window
-- Size is < 400x200 → likely a dialog, not gameplay
-- Size matches game resolution (e.g., 1024x768) → gameplay window
+**Relationship to `SuccessRecord`:** `CollectiveMemoryEntry` is derived from `SuccessRecord` but is leaner — it omits file-by-file install details that are machine-specific (paths, SHA hashes) and retains only the transferable configuration (env vars, DLL modes, winetricks verbs, registry). The `reasoningChain` field is new: it is the agent's final `finalText` from `AgentLoopResult`, truncated to ~2000 chars.
 
-The `WineResult` struct gains optional fields:
-```swift
-var dialogsDetected: [WindowSnapshot]   // title + size at detection time
-var gameWindowDetected: Bool            // large window == game reached menu
+**Storage location in Git repo:**
+```
+entries/
+  cossacks-european-wars.json   ← one file per game, content is CollectiveMemoryEntry
+  civilization-3.json
+  ...
 ```
 
-The `launch_game` tool result JSON already returned to the agent gains `dialog_detected: true/false` and `dialog_title: "..."` fields.
-
-**New type needed:** `WindowMonitor` — a simple struct with one `poll() -> WindowSnapshot?` method. Lives in `Core/WindowMonitor.swift`. No state between calls. Uses `CoreGraphics` import.
-
-**Why not a standalone `check_windows` tool:** The agent cannot call a tool while a game is running — `launch_game` is synchronous and blocks the tool executor until the process exits. The window state must be captured during the launch.
-
-**Hybrid signal:** Wine `+msgbox` trace is already enabled in `WineProcess.run()` (`WINEDEBUG` override). The `launch_game` tool already parses `trace:msgbox` from stderr (in `WineErrorParser` or inline). Combine: if `+msgbox` fires AND a small window appears → high-confidence dialog stuck state.
-
-**Confidence:** HIGH — `CGWindowListCopyWindowInfo` is a stable CoreGraphics API (part of macOS since 10.5). Requires no special entitlements for CLI tools (unlike screenshot capture).
+Single file per game (not versioned per-solve). Confirmations increment in-place. This keeps the read path simple (one GET per game), avoids merge conflicts across machines (last-write-wins is acceptable for a best-effort knowledge base), and keeps the repo small.
 
 ---
 
-### 2. Engine Detection
+### Component 4: `MemoryController` (NEW for web UI)
 
-**Question:** New module? Extension of `inspect_game` tool?
+**File:** `Sources/cellar/Web/Controllers/MemoryController.swift`
 
-**Answer:** New `GameEngineDetector` struct called from `inspect_game` tool implementation.
+**Responsibility:** Vapor routes for the web interface's collective memory view.
 
-**Rationale:** `inspect_game` is already the "understand the game before acting" tool. Adding engine detection there is the right place — the agent calls `inspect_game` first in every session and uses the result to plan its approach. Creating a separate `detect_engine` tool would add an agent tool invocation with no benefit.
+**Routes:**
+- `GET /memory` — renders Leaf template showing all collective memory entries (name, confirmations, wine version, last updated)
+- `GET /memory/:gameId` — renders detail view for a single game's entry (working config, reasoning chain, environment context)
 
-**Integration:**
+**Integration:** Calls `CollectiveMemoryClient.queryAll()` for the list view. Registered in `WebApp.configure()`.
 
-`AgentTools.inspectGame()` currently returns `pe_imports`, `bottle_type`, `data_files`, `notable_imports`. Add:
+---
+
+## Modified Components
+
+### `AIService.runAgentLoop()` (MODIFY)
+
+**Current flow:**
+1. Detect provider
+2. Build system prompt
+3. Create `AgentTools`
+4. Create `AgentLoop`
+5. Call `agentLoop.run()`
+
+**v1.2 flow — two additions:**
+
+**Before the loop (step 2.5 — query):**
 ```swift
-"engine": engineDetector.detect(
-    exePath: executablePath,
-    gameDir: gameDir,
-    peImports: peImports,
-    bottleURL: bottleURL
-)
+// 2.5: Query collective memory (best-effort, never blocks)
+let memoryEntry = CollectiveMemoryClient.query(gameId: gameId)
+let memoryContext = memoryEntry.map { entry in
+    """
+    Collective memory has a working config for this game (\(entry.confirmations) confirmation(s)):
+    - Wine env: \(entry.workingConfig.environment)
+    - DLL overrides: \(entry.workingConfig.dllOverrides)
+    - Winetricks: \(entry.workingConfig.winetricksVerbs)
+    - Reasoning: \(entry.reasoningChain.prefix(500))
+    - Solved with Wine \(entry.environmentContext.wineVersion ?? "unknown") on macOS \(entry.environmentContext.macosVersion)
+    Before applying this config, reason about whether it fits your local environment.
+    """
+} ?? "No collective memory entry found for this game."
 ```
 
-Where `engine` is a structured result:
-```json
-{
-  "name": "GSC DMCR",
-  "confidence": "high",
-  "signals": ["mdraw.dll in pe_imports", "MINMM.dll in pe_imports"],
-  "known_config": "Use cnc-ddraw in syswow64. mdraw.dll is a custom ddraw wrapper."
+This context is injected into the initial user message (not the system prompt), so the agent sees it as part of the task description for this specific game.
+
+**After the loop (step 6 — push on success):**
+```swift
+// 6: Push to collective memory if agent confirmed success
+if result.stopReason == .completed, let successRecord = SuccessDatabase.load(gameId: gameId) {
+    let entry = CollectiveMemoryEntry.from(
+        successRecord: successRecord,
+        reasoningChain: result.finalText,
+        existingEntry: memoryEntry  // to increment confirmations
+    )
+    let pushed = CollectiveMemoryClient.push(entry: entry)
+    if !pushed { emit(.status("[Collective memory push skipped — auth not configured or network error]")) }
 }
 ```
 
-**New type needed:** `GameEngineDetector` in `Core/GameEngineDetector.swift`. Implements pattern matching against:
-- PE imports (presence of engine-specific DLLs: `mdraw.dll`, `binkw32.dll`, `Miles Sound System`, `Unreal`, `id Software`)
-- File patterns in game directory (`.pak`, `.upk`, `.vpk`, `.gob`, `engine.ini`)
-- Registry keys in the bottle (app registration paths)
-- EXE name patterns (`UT2004.exe`, `quake.exe`, `doom.exe`)
-
-**Known engine signatures to ship in v1.1:**
-- GSC DMCR (Cossacks) — `mdraw.dll`, `MINMM.dll`
-- id Software (Quake/Doom) — `opengl32.dll` import, `.wad` files
-- Unreal Engine 2 — `Engine.dll`, `.upk` files, `UnrealEngine2.exe` pattern
-- Valve Source — `.vpk` files, `tier0.dll` import
-- Sierra SCI — `RESOURCE.MAP`, `RESOURCE.000`
-
-The engine detection result feeds into the system prompt enrichment for the session (see "Proactive Pre-configuration" below).
-
-**Confidence:** HIGH — PE import parsing already exists in `inspectGame()` via `objdump -p`. Engine detection is an extension of existing pattern matching.
+**What does NOT change:** `AgentLoop`, `AgentTools`, `BottleManager`, `SuccessDatabase` — none of these are modified. The collective memory integration is entirely in the `AIService` orchestration layer, which already owns the "before" and "after" the loop.
 
 ---
 
-### 3. Proactive Pre-configuration
+### `CellarPaths` (MINOR MODIFY)
 
-**Question:** Before agent loop starts? As an agent tool?
-
-**Answer:** Before the agent loop starts, in `AIService.runAgentLoop()`, as a pre-configuration phase.
-
-**Rationale:** The agent loop is designed for the LLM to drive decisions. But certain pre-configuration (renderer selection, resolution, disabling problematic intro videos) is mechanical: if engine X is detected, write file Y with content Z. Handing this to the LLM costs tokens and iterations for something we can deterministically apply before the first API call.
-
-**Integration:**
-
-`AIService.runAgentLoop()` currently:
-1. Detects provider
-2. Builds system prompt
-3. Creates `AgentTools`
-4. Creates `AgentLoop`
-5. Calls `agentLoop.run()`
-
-v1.1 inserts a new step between 3 and 4:
+Add path for the GitHub App private key file:
 
 ```swift
-// Step 3.5: Pre-configuration phase
-let preConfig = ProactiveConfigurator(
-    gameId: gameId,
-    entry: entry,
-    executablePath: executablePath,
-    bottleURL: bottleURL,
-    wineProcess: wineProcess
-)
-let preConfigResult = preConfig.apply()
-// preConfigResult.appliedActions: list of what was done (for system prompt injection)
-// preConfigResult.engineDetected: "GSC DMCR" etc (for system prompt)
+static let githubAppKeyFile: URL = base.appendingPathComponent("github-app.pem")
 ```
-
-The pre-configuration result is injected into the initial user message (not the system prompt, to avoid polluting all sessions):
-```
-"Launch game 'Cossacks' (ID: cossacks-european-wars)...
-Pre-configuration applied: engine=GSC DMCR, wrote ddraw.ini with renderer=opengl, placed cnc-ddraw in syswow64."
-```
-
-**New type needed:** `ProactiveConfigurator` in `Core/ProactiveConfigurator.swift`.
-
-Responsibilities:
-- Call `GameEngineDetector.detect()` to identify engine
-- Check `SuccessDatabase` for existing success record (fast path: full replay)
-- If success record exists: apply all known-working config mechanically, report to agent
-- If no record: apply engine-class defaults (e.g., for GSC DMCR, write default `ddraw.ini`)
-
-**What "apply" means:**
-- Write INI/config files the game requires (via `write_game_file` equivalent logic)
-- Set registry keys known to be required for the engine class
-- Place DLLs from `KnownDLLRegistry` if engine signature implies them
-
-**What it does NOT do:**
-- Launch the game (that remains agent-driven)
-- Make assumptions beyond engine-class known patterns
-- Override the agent's subsequent decisions
-
-**Confidence:** HIGH — this is pure Swift logic calling existing subsystems. No new external dependencies.
 
 ---
 
-### 4. max_tokens Handling in AgentLoop
+### `WebApp.configure()` (MINOR MODIFY)
 
-**Question:** How does this change the state machine?
-
-**Current state:** `AgentLoop` already handles `max_tokens` stop reason (line 126-130 in `AgentLoop.swift`). It appends the truncated response and asks the model to continue. This is technically correct.
-
-**What's missing for v1.1:**
-
-The issue isn't the single-response truncation handler — that exists. The issue is **budget-aware escalation** and **loop resilience** when the agent fails to make progress:
-
-1. **Stuck in max_tokens loop:** If the agent keeps getting truncated (e.g., it's trying to produce a very long response), the current code continues indefinitely until `maxIterations` is hit. Need: count consecutive max_tokens events; if >= 3, inject a directive: "Be more concise. Call one tool rather than explaining at length."
-
-2. **Budget-aware escalation:** The agent currently has no visibility into how many iterations remain. Near the limit, it should be told to wrap up. Inject a countdown message when `remainingIterations <= 3`.
-
-3. **Failure loop detection:** If the agent calls `launch_game` and it fails, then calls `launch_game` again with the same `accumulatedEnv` (no changes), it's stuck. Need: detect when the same tool is called twice in a row with identical inputs, and inject: "You already tried that. Diagnose the root cause before retrying."
-
-**Integration:**
-
-All changes live in `AgentLoop.run()` — the state machine method. No new types needed. Add:
-- `consecutiveMaxTokens: Int` counter in the loop
-- `lastToolCall: (name: String, inputHash: String)?` for stuck-loop detection
-- Budget warning message injection when `maxIterations - iterationCount <= 3`
-
-**Confidence:** HIGH — all changes are internal to `AgentLoop.run()`.
-
----
-
-### 5. Smarter Search Strategies
-
-**Question:** System prompt changes? New tools? Modified existing tools?
-
-**Answer:** Both system prompt changes AND modifications to the existing `search_web` tool. No new tools needed.
-
-**Current state:** `search_web` in `AgentTools` uses DuckDuckGo with a generic query and caches results per game. `fetch_page` retrieves and strips HTML.
-
-**v1.1 changes:**
-
-**A. Engine-aware search queries (system prompt change):**
-
-The system prompt currently instructs the agent to call `search_web` with a game name query. v1.1 system prompt should add:
-- After engine detection, include engine name in search queries
-- Symptom-aware query construction: if `+msgbox` fires → search for "dialog" + game + wine
-- Multi-target queries: WineHQ AppDB URL format, PCGamingWiki URL format for structured lookups
-
-This is a system prompt change in `AIService.runAgentLoop()` — add a section:
-
-```
-## Search Strategy
-When calling search_web:
-- Include engine name if known: "[game] [engine] Wine macOS"
-- Include symptom if known: "[game] [error] Wine fix"
-- Try structured sources directly: "site:appdb.winehq.org [game]", "site:pcgamingwiki.com [game]"
-- After failed launches: include specific error message in query
-```
-
-**B. Actionable fix extraction from fetch_page (modify fetch_page tool):**
-
-Currently `fetch_page` returns up to 8000 chars of cleaned HTML text — the LLM must parse it. v1.1 should add a post-processing pass to `fetchPage()` in `AgentTools` that extracts structured fixes:
-
+Register the new `MemoryController` routes:
 ```swift
-struct ExtractedFix {
-    let envVars: [String: String]     // e.g., WINEDLLOVERRIDES=ddraw=n,b
-    let winetricksVerbs: [String]     // e.g., ["d3dx9", "vcrun2015"]
-    let registryKeys: [(key: String, value: String, data: String)]
-    let notes: [String]               // free-text fix notes
+try MemoryController.register(app)
+```
+
+---
+
+### `CellarConfig` (MINOR MODIFY)
+
+Add GitHub App configuration fields (optional — push is skipped if not configured):
+```swift
+struct CellarConfig: Codable {
+    // ... existing fields ...
+    var githubAppId: String?
+    var githubInstallationId: String?
+    var githubMemoryRepo: String?     // "owner/repo"
+    var githubAppKeyPath: String?     // path to .pem file
 }
 ```
 
-The `fetchPage()` tool result gains an `extracted_fixes` key alongside `text_content`. Regex/string scanning for common patterns:
-- `WINEDLLOVERRIDES=...` patterns
-- `winetricks <verb>` mentions
-- Registry key paths with dword values
-- Gold/Platinum/Silver AppDB ratings
+These can also be read from `~/.cellar/.env` — environment vars take precedence (matches existing `AIService.loadEnvironment()` pattern).
 
-This reduces token usage (agent doesn't need to parse 8000 chars of prose) and makes fixes directly actionable.
+---
 
-**C. Success database cross-reference before web search (no new code):**
+### `SettingsController` (MINOR MODIFY)
 
-The system prompt already instructs: call `query_successdb` before `search_web`. v1.1 strengthens this: add symptom-based queries to the search strategy. If a `+msgbox` fires with text "cannot find file", search successdb with `symptom: "cannot find file"` before hitting the web.
+Add collective memory configuration fields to the web settings page: GitHub App ID, installation ID, memory repo, key path. Read-only display of whether collective memory is configured and the last push status.
 
-**Confidence:** HIGH for A and C (system prompt changes). MEDIUM for B (regex extraction is imprecise — may miss edge cases in page formats).
+---
+
+## What Does NOT Change
+
+The following existing components require **zero modification** for v1.2:
+
+| Component | Reason |
+|-----------|--------|
+| `AgentLoop.swift` | Loop knows nothing about collective memory — it just runs iterations |
+| `AgentTools.swift` | No new agent tools for collective memory — read/write is orchestration, not agent decision |
+| `BottleManager.swift` | Bottle management is local |
+| `SuccessDatabase.swift` | Local DB unchanged — collective memory derives from it but doesn't replace it |
+| `RecipeEngine.swift` | Recipe layer unchanged |
+| `GameEntry.swift` | Model unchanged |
+| `LaunchCommand.swift` | Entry point calls `AIService.runAgentLoop()` — no changes needed there |
+| `LaunchController.swift` | Same — SSE streaming of agent events unchanged |
+| `GameController.swift` | Game CRUD routes unchanged |
+
+The agent does NOT get new tools for reading or writing collective memory. The query and push happen in the `AIService` orchestration layer, not in the agent loop. This preserves the agent's role as a problem-solver (using its tools to diagnose and fix) rather than a data curator (managing knowledge base records). The agent's reasoning chain and final success record are captured automatically after the fact.
+
+---
+
+## Data Flow
+
+### Read path — agent query before session starts
+
+```
+cellar launch cossacks-european-wars
+      │
+      ▼
+AIService.runAgentLoop()
+      │
+      ├─► CollectiveMemoryClient.query("cossacks-european-wars")
+      │       │
+      │       ├─► GET https://api.github.com/repos/{owner}/{repo}/contents/entries/cossacks-european-wars.json
+      │       │   (unauthenticated — public repo)
+      │       │
+      │       ├─► response: base64-encoded JSON → decode → CollectiveMemoryEntry
+      │       │
+      │       └─► returns: CollectiveMemoryEntry (or nil if 404 / network error)
+      │
+      ├─► Inject memory context into initial user message
+      │
+      └─► AgentLoop.run()
+              │
+              └─► agent sees: "Collective memory has a working config: ..."
+                  agent reasons: "Does this config fit my Wine 9.0 / macOS 15.2 environment?"
+                  agent applies or adapts config via existing tools
+```
+
+### Write path — push after successful session
+
+```
+AgentLoop.run() returns AgentLoopResult (completed=true)
+      │
+      ▼
+AIService.runAgentLoop() — post-loop phase
+      │
+      ├─► SuccessDatabase.load(gameId)     ← local record written by agent's save_success tool
+      │       └─► SuccessRecord (env vars, DLL overrides, reasoning, etc.)
+      │
+      ├─► CollectiveMemoryEntry.from(successRecord, reasoningChain, existingEntry)
+      │       └─► builds entry; if existingEntry exists, increments confirmations
+      │
+      └─► CollectiveMemoryClient.push(entry)
+              │
+              ├─► GitHubAppAuth.installationToken()
+              │       │
+              │       ├─► load PEM key from ~/.cellar/github-app.pem
+              │       ├─► sign RS256 JWT with Security framework
+              │       ├─► POST /app/installations/{id}/access_tokens
+              │       └─► returns: "ghs_xxxx" installation token (1hr expiry)
+              │
+              ├─► GET current file SHA (needed for update, not for create)
+              │   GET /repos/{owner}/{repo}/contents/entries/{gameId}.json
+              │   → extract .sha from response (or nil if 404 = new file)
+              │
+              └─► PUT /repos/{owner}/{repo}/contents/entries/{gameId}.json
+                  body: {
+                    message: "cellar: update config for cossacks-european-wars",
+                    content: base64(JSON.encode(entry)),
+                    sha: existing_sha_or_nil,
+                    branch: "main"
+                  }
+                  headers: Authorization: Bearer {installationToken}
+```
+
+### Web UI read path
+
+```
+Browser → GET /memory
+      │
+      ▼
+MemoryController.index()
+      │
+      ├─► CollectiveMemoryClient.queryAll()
+      │       └─► GET /repos/{owner}/{repo}/contents/entries/
+      │           → list of file metadata objects
+      │           → parallel GET for each entry file
+      │           → decode each CollectiveMemoryEntry
+      │
+      └─► render memory/index.leaf with entries list
+```
 
 ---
 
@@ -302,202 +385,79 @@ The system prompt already instructs: call `query_successdb` before `search_web`.
 
 ```
 Sources/cellar/
-├── Commands/           # CLI entry points (unchanged)
-│   ├── AddCommand.swift
-│   ├── LaunchCommand.swift
-│   └── ...
-├── Core/               # Business logic (primary change area)
-│   ├── AgentLoop.swift         # MODIFY: budget awareness, stuck-loop detection
-│   ├── AgentTools.swift        # MODIFY: fetch_page extraction, search hints, dialog results
-│   ├── AIService.swift         # MODIFY: pre-config phase, smarter system prompt
-│   ├── BottleManager.swift     # unchanged
-│   ├── GameEngineDetector.swift     # NEW: engine signature detection
-│   ├── ProactiveConfigurator.swift  # NEW: pre-config phase runner
-│   ├── WindowMonitor.swift          # NEW: CGWindowListCopyWindowInfo wrapper
-│   ├── WineProcess.swift       # MINOR MODIFY: pass WindowMonitor results to WineResult
-│   ├── SuccessDatabase.swift   # unchanged
-│   └── ...
-├── Models/             # Data types (minor additions)
-│   ├── GameEntry.swift         # unchanged
-│   ├── WineResult.swift        # MODIFY: add dialogsDetected, gameWindowDetected
-│   └── ...
-└── Persistence/        # unchanged
+├── Commands/                        # UNCHANGED
+├── Core/
+│   ├── AgentLoop.swift              # UNCHANGED
+│   ├── AgentTools.swift             # UNCHANGED
+│   ├── AIService.swift              # MODIFY: query before loop, push after loop
+│   ├── CollectiveMemoryClient.swift # NEW: GitHub Contents API read/write
+│   ├── GitHubAppAuth.swift          # NEW: JWT sign + installation token exchange
+│   ├── BottleManager.swift          # UNCHANGED
+│   ├── GameEngineDetector.swift     # UNCHANGED
+│   ├── ProactiveConfigurator.swift  # UNCHANGED
+│   └── SuccessDatabase.swift        # UNCHANGED
+├── Models/
+│   ├── CollectiveMemoryEntry.swift  # NEW: shared knowledge base entry schema
+│   ├── GameEntry.swift              # UNCHANGED
+│   ├── Recipe.swift                 # UNCHANGED
+│   └── WineResult.swift             # UNCHANGED
+├── Persistence/
+│   ├── CellarConfig.swift           # MODIFY: add GitHub App config fields
+│   ├── CellarPaths.swift            # MODIFY: add github-app.pem path
+│   └── CellarStore.swift            # UNCHANGED
+└── Web/
+    ├── Controllers/
+    │   ├── GameController.swift     # UNCHANGED
+    │   ├── LaunchController.swift   # UNCHANGED
+    │   ├── MemoryController.swift   # NEW: /memory routes
+    │   └── SettingsController.swift # MODIFY: add memory config fields
+    ├── Services/                    # UNCHANGED
+    └── WebApp.swift                 # MODIFY: register MemoryController
 ```
-
-### Structure Rationale
-
-- `GameEngineDetector` is separate from `AgentTools` because engine detection is also used by `ProactiveConfigurator` (before the agent starts). Both need it without a circular dependency through `AgentTools`.
-- `WindowMonitor` is separate from `WineProcess` because it uses CoreGraphics — isolating the import prevents CoreGraphics from touching every file that imports `WineProcess`.
-- `ProactiveConfigurator` is separate from `AIService` because it may also be called by `AddCommand` in a future phase (detect engine during import, not just launch).
 
 ---
 
 ## Architectural Patterns
 
-### Pattern 1: Pre-Launch Phase Runner
+### Pattern 1: Best-Effort Collective Memory Read
 
-**What:** A synchronous "prepare" pass that runs before `AgentLoop.run()`. Detects engine, applies mechanical defaults, injects context into the initial message.
+**What:** Query the remote repo before starting the agent loop. If the query fails (network down, repo not configured), the agent proceeds without collective context — it falls back to the same behavior as before v1.2.
 
-**When to use:** When there is deterministic config that can be applied without LLM judgment. Fast path for known-working games.
+**Why this pattern:** Collective memory is an enhancement, not a requirement. The agent was already capable of solving games independently. A hard dependency on network availability would break every offline session and frustrate users who haven't configured GitHub App auth.
 
-**Trade-offs:** Adds latency before the first API call (typically < 1 second). Risk: pre-config applies wrong defaults and confuses the agent. Mitigate by reporting all pre-config actions in the initial message so the agent can reason about them.
+**Implementation signal:** `CollectiveMemoryClient.query()` returns `CollectiveMemoryEntry?` (never throws). Nil means "not found or unavailable" — the caller injects a different initial message either way.
 
-```swift
-// In AIService.runAgentLoop():
-let preConfig = ProactiveConfigurator(...)
-let result = preConfig.apply()
-let contextNote = result.appliedActions.isEmpty
-    ? ""
-    : "\nPre-configuration applied:\n" + result.appliedActions.joined(separator: "\n")
-let initialMessage = "Launch the game...\(contextNote)"
-```
-
-### Pattern 2: In-Process Window Monitor
-
-**What:** A lightweight background observer that runs inside the `WineProcess.run()` polling loop. Snapshots window state at each tick without spawning a new process.
-
-**When to use:** When observing macOS window state during a blocking synchronous operation.
-
-**Trade-offs:** `CGWindowListCopyWindowInfo` is a synchronous call on the main thread context. In a CLI tool (no runloop), this works fine — the call returns immediately. No async overhead. However, the call requires the process to have screen recording permission on macOS 10.15+ (Catalina) — this is a potential user friction point.
-
-```swift
-// In WineProcess.run() polling loop:
-while process.isRunning {
-    Thread.sleep(forTimeInterval: 2.0)
-    if let snapshot = WindowMonitor.poll() {
-        if snapshot.looksLikeDialog {
-            dialogsDetected.append(snapshot)
-        }
-    }
-    // stale timeout check...
-}
-```
-
-### Pattern 3: Tool Result Enrichment
-
-**What:** Post-processing tool results to extract structured data before returning to the agent. Applied in `fetch_page` and `launch_game`.
-
-**When to use:** When raw tool output (page HTML, Wine stderr) contains information the agent would spend tokens parsing. Extract the signal, reduce noise.
-
-**Trade-offs:** Regex extraction is imprecise. Always include the raw text alongside extracted data so the agent can fall back to reading the full content when extraction misses something.
-
-```swift
-// In fetchPage():
-let rawText = extractVisibleText(from: htmlContent)
-let fixes = ExtractedFix.extract(from: rawText)
-return jsonResult([
-    "text_content": rawText,
-    "extracted_fixes": fixes.asDictionary  // structured, may be empty
-])
-```
+**Trade-off:** Agents could theoretically start sessions independently and produce divergent configs. Acceptable — the confirmation count surfaces which configs are broadly verified vs. single-agent findings.
 
 ---
 
-## Data Flow
+### Pattern 2: Post-Loop Push on Success
 
-### v1.1 Launch Flow
+**What:** Write to collective memory only after the agent loop has completed with `completed = true` AND the user has confirmed success (the `save_success` tool sets `taskState = .savedAfterConfirm` which leads to `stopReason = .completed`). The push happens in `AIService`, not inside the agent loop, not inside any agent tool.
 
-```
-cellar launch <game>
-      │
-      ▼
-LaunchCommand.run()
-      │
-      ▼
-AIService.runAgentLoop()
-      │
-      ├─► ProactiveConfigurator.apply()
-      │       │
-      │       ├─► GameEngineDetector.detect(peImports, files, registry)
-      │       │       └─► returns: engine name, confidence, known_config
-      │       │
-      │       ├─► SuccessDatabase.queryByGameId()
-      │       │       └─► if found: apply known config mechanically
-      │       │
-      │       └─► returns: appliedActions[], engineDetected
-      │
-      ├─► Build system prompt (enriched with engine context)
-      │
-      ├─► Build initial message (includes pre-config summary)
-      │
-      └─► AgentLoop.run()
-              │
-              │   [iteration loop]
-              │
-              ├─► callAnthropic(messages)
-              │       └─► handles: end_turn / tool_use / max_tokens
-              │
-              ├─► tool_use → AgentTools.execute(name, input)
-              │       │
-              │       ├─► inspect_game → GameEngineDetector embedded
-              │       │
-              │       ├─► launch_game → WineProcess.run()
-              │       │       │
-              │       │       └─► WindowMonitor.poll() [inside polling loop]
-              │       │               └─► CGWindowListCopyWindowInfo
-              │       │
-              │       ├─► search_web → DuckDuckGo + cache
-              │       │
-              │       └─► fetch_page → HTTP + ExtractedFix.extract()
-              │
-              └─► budget warning injection (when iterations ≤ 3 remaining)
-```
+**Why this pattern:** The agent should not manage its own knowledge base contributions during an active session. It would distract from the problem-solving task, use up API budget, and require new tools that would introduce authentication complexity into `AgentTools`. Keeping the push in `AIService` as post-processing is clean and doesn't change the agent's tool surface.
 
-### Key Data Flows
-
-1. **Engine detection signal path:** `objdump -p` PE imports → `GameEngineDetector.detect()` → `inspectGame()` result → agent context → search query enrichment
-2. **Dialog detection signal path:** `CGWindowListCopyWindowInfo` → `WindowMonitor.poll()` → `WineResult.dialogsDetected` → `launch_game` tool result JSON → agent reasoning
-3. **Pre-config fast path:** `SuccessDatabase.queryByGameId()` → `ProactiveConfigurator.apply()` → mechanical config applied → agent skips research phase
-4. **max_tokens budget path:** `consecutiveMaxTokens` counter in `AgentLoop` → directive injection → LLM produces concise response
+**Trade-off:** If the user kills the process between `AgentLoop.run()` completing and the push finishing, the push is lost. Acceptable — the local `SuccessDatabase` always has the record; the push is best-effort contribution to the collective.
 
 ---
 
-## Scaling Considerations
+### Pattern 3: Incremental Confirmation (No Merge Conflicts)
 
-This is a single-user CLI tool. Scaling is not a concern. The relevant performance considerations are:
+**What:** When an agent pushes to a game that already has a collective memory entry, it reads the existing entry (getting its `sha` for the update), increments `confirmations`, and writes the new version with the same `sha` (PUT endpoint requires the current `sha` for updates). The new `workingConfig` replaces the old one if the new entry's `confirmations` is higher or if the environment context is more recent.
 
-| Concern | Current | v1.1 Impact | Mitigation |
-|---------|---------|-------------|-----------|
-| Pre-config latency | 0ms (no pre-config) | ~50-200ms (engine detect + successdb query) | Acceptable — before first API call |
-| Window monitor overhead | 0 (none) | ~1ms per 2-second tick | Negligible |
-| fetch_page extraction | Not implemented | ~5ms per page | Acceptable |
-| AgentLoop iteration count | Unchanged | Stuck-loop detection adds <1ms per iteration | Negligible |
+**Why this pattern:** The GitHub Contents API uses a `sha`-based optimistic locking approach for updates — the caller provides the current blob SHA, and if it has changed since the GET (another agent pushed at the same moment), the PUT returns 409 Conflict. This is extremely unlikely in practice (two agents pushing the same game within seconds). On conflict, the implementation retries once with a fresh GET. This avoids the complexity of a separate conflict-resolution service.
+
+**Trade-off:** Last write wins in normal operation. For the use case (sharing game compatibility configs across users), this is entirely appropriate — minor config differences between solving agents are irrelevant compared to the value of having the entry exist at all.
 
 ---
 
-## Anti-Patterns
+### Pattern 4: Agent Reasons Before Applying Collective Memory
 
-### Anti-Pattern 1: CGWindowListCopyWindowInfo as a Separate Agent Tool
+**What:** The agent is explicitly told in the initial message to reason about environment compatibility before applying a remembered config. The config is presented as "this worked for Wine X on macOS Y with these settings" — not as "apply this config now."
 
-**What people might do:** Add a `check_windows` tool to the 18-tool roster so the agent can call it on demand.
+**Why this pattern:** A config that worked on Wine 9.0 / macOS 14 / Intel may not work on Wine 10.0 / macOS 15 / ARM. The agent already has inspect_game, read_registry, and query_successdb tools. It should use them to validate fit, not blindly apply a remembered config. The system prompt should reinforce this.
 
-**Why it's wrong:** The agent cannot call tools while `launch_game` is executing — the tool executor is synchronous and blocks during the Wine process run. A `check_windows` tool would only work between launches (when no windows exist) or would require making `launch_game` async (major refactor). The signal is only useful during a launch.
-
-**Do this instead:** Embed window monitoring inside `WineProcess.run()`'s polling loop and surface the results in `WineResult`. The `launch_game` tool reports dialog state after the process exits.
-
-### Anti-Pattern 2: Proactive Config as Agent Tool Calls
-
-**What people might do:** Let the agent call `inspect_game`, `detect_engine`, then decide to call `write_game_file` and `place_dll` before the first launch. This happens anyway in the Research phase.
-
-**Why it's wrong:** This costs 4-6 agent iterations (inspect → search → verify → configure → re-inspect → launch). For known-working games, these iterations are pure overhead. Pre-configuration eliminates them for the common case.
-
-**Do this instead:** `ProactiveConfigurator` runs the mechanical defaults before the first API call. Report what was applied in the initial message. The agent validates and builds on this rather than rediscovering it.
-
-### Anti-Pattern 3: Engine Detection via LLM
-
-**What people might do:** Ask the LLM to identify the engine from the file list and PE imports.
-
-**Why it's wrong:** LLM-based engine detection costs tokens and an iteration. The engine detection is purely pattern matching on file names — no reasoning required. Pattern matching is deterministic, fast, and free.
-
-**Do this instead:** `GameEngineDetector` is pure Swift — a switch statement on known import patterns and file signatures. LLM only sees the output (structured engine result), not the detection logic.
-
-### Anti-Pattern 4: Replacing `search_web` with Brave/Bing API
-
-**What people might do:** Replace the DuckDuckGo scrape with a paid search API for better results.
-
-**Why it's wrong for v1.1:** The issue isn't search quality — it's search query quality and fix extraction. The same DuckDuckGo results become much more useful when (a) the query includes the engine name and symptom, and (b) the page content is parsed for actionable fixes. Fix the query and extraction first; worry about the search provider later.
-
-**Do this instead:** Keep DuckDuckGo. Improve the system prompt search strategy instructions. Add `ExtractedFix` post-processing to `fetch_page`.
+**Implementation:** The initial message includes environment context from the stored entry (wine version, macOS version, arch). The agent's existing reasoning about environment differences (already part of its system prompt) handles the comparison.
 
 ---
 
@@ -505,23 +465,73 @@ This is a single-user CLI tool. Scaling is not a concern. The relevant performan
 
 ### External Services
 
-| Service | Integration Pattern | v1.1 Notes |
-|---------|---------------------|------------|
-| Anthropic API | Synchronous HTTP via DispatchSemaphore in `AgentLoop` | No change — existing pattern is correct |
-| DuckDuckGo | HTML scrape in `AgentTools.searchWeb()` | No change to mechanism; improve queries via system prompt |
-| GitHub (DLL downloads) | `DLLDownloader` in `WineActionExecutor` | No change |
-| CGWindowListCopyWindowInfo | CoreGraphics framework call | NEW — requires `import CoreGraphics` in `WindowMonitor.swift` |
+| Service | Integration Pattern | Auth | Notes |
+|---------|---------------------|------|-------|
+| GitHub Contents API (read) | Synchronous HTTP GET via DispatchSemaphore (same pattern as `AgentLoop`) | None — public repo | Returns base64-encoded file content |
+| GitHub Contents API (write) | Synchronous HTTP PUT via DispatchSemaphore | GitHub App installation token (Bearer) | Requires `sha` of existing file for updates |
+| GitHub App authentication | POST /app/installations/{id}/access_tokens | RS256 JWT signed with private key | Token valid 1 hour; cache with 5min buffer |
 
 ### Internal Boundaries
 
-| Boundary | Communication | v1.1 Notes |
-|----------|---------------|------------|
-| `AIService` → `ProactiveConfigurator` | Direct call, returns `PreConfigResult` struct | NEW boundary |
-| `ProactiveConfigurator` → `GameEngineDetector` | Direct call, returns `EngineDetectionResult` | NEW boundary |
-| `ProactiveConfigurator` → `SuccessDatabase` | Direct static call | Reuses existing API |
-| `AgentTools.inspectGame()` → `GameEngineDetector` | Direct call | NEW — replaces ad-hoc pattern matching in `inspectGame` |
-| `WineProcess.run()` → `WindowMonitor` | Call inside polling loop | NEW — polling every 2s, returns optional `WindowSnapshot` |
-| `AgentLoop` → budget warning injection | Internal to `AgentLoop.run()` state machine | NEW — no external boundary |
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| `AIService` → `CollectiveMemoryClient` | Direct call, returns optional struct | NEW. Both sides synchronous. |
+| `CollectiveMemoryClient` → `GitHubAppAuth` | Direct call, returns token string or throws | NEW. Called only on write path. |
+| `CollectiveMemoryEntry` ← `SuccessRecord` | Static factory method `CollectiveMemoryEntry.from(successRecord:reasoningChain:existingEntry:)` | NEW. Derives lean entry from rich local record. |
+| `AIService` → `SuccessDatabase` | Existing static call unchanged | Used to load success record for push. |
+| `MemoryController` → `CollectiveMemoryClient` | Direct call from Vapor route handler | NEW. Web UI only. |
+
+---
+
+## Anti-Patterns
+
+### Anti-Pattern 1: Agent Tools for Collective Memory Read/Write
+
+**What people might do:** Add `query_collective_memory` and `push_collective_memory` as agent tools so the agent can decide when to query or contribute.
+
+**Why it's wrong:** The agent should not make authentication calls or manage knowledge base writes during an active problem-solving session. Agent tool invocations consume API budget and iterations. Collective memory is infrastructure supporting the agent, not a tool the agent wields. It also unnecessarily exposes GitHub App credentials to the agent's reasoning context.
+
+**Do this instead:** `AIService.runAgentLoop()` owns the query (before the loop) and the push (after the loop). The agent sees the query result as context in its initial message and never needs to know that a push happened.
+
+---
+
+### Anti-Pattern 2: Git CLI for Collective Memory Operations
+
+**What people might do:** Clone the memory repo to disk, write files, and push using `git` command-line via `Foundation.Process`.
+
+**Why it's wrong:** This requires a local clone of the memory repo (disk space, sync complexity, stale clone management), a git credential helper for authentication (complex on macOS for non-interactive processes), and git CLI availability (not guaranteed). The GitHub Contents API is purpose-built for reading and writing individual files via authenticated HTTP — exactly what's needed here.
+
+**Do this instead:** GitHub Contents API (`GET /repos/.../contents/...` and `PUT /repos/.../contents/...`) handles read and write of single files with SHA-based optimistic locking. No local clone needed.
+
+---
+
+### Anti-Pattern 3: Storing Collective Memory in the Main Cellar Repo
+
+**What people might do:** Store collective memory entries as files committed to the main `cellar` GitHub repository alongside the source code.
+
+**Why it's wrong:** Mixing user-contributed game configs with application source creates merge conflict noise in PRs, makes the repo history hard to read, and requires human review of PRs for content that should be machine-contributed. Community members contributing to the source code should not have to wade through game config auto-commits.
+
+**Do this instead:** A dedicated `cellar-community/memory` repository (separate from the source repo). The GitHub App is installed on that repo only, with `contents: write` permission scoped to it. Source code and community configs remain cleanly separated.
+
+---
+
+### Anti-Pattern 4: Blocking the Agent on Memory Push Failure
+
+**What people might do:** Treat a failed memory push as an error that surfaces to the user ("Collective memory push failed — check your GitHub App credentials").
+
+**Why it's wrong:** The primary value of a session is that the game launched successfully. A failed push to the community knowledge base is a background failure that should be logged but not surfaced as a user-facing error. Users who haven't configured GitHub App auth at all (the majority, at first) should not see scary errors.
+
+**Do this instead:** `CollectiveMemoryClient.push()` returns `Bool` (never throws). `AIService` logs a status event on failure (visible in agent logs, not as a UI error). The game still launched — that's the success.
+
+---
+
+### Anti-Pattern 5: Caching Remote Entries Locally
+
+**What people might do:** Cache queried collective memory entries in `~/.cellar/` to speed up subsequent queries.
+
+**Why it's wrong:** Collective memory entries are expected to be updated by other agents between sessions. A stale local cache is worse than no cache — it tells the current agent that config X works when the community has since discovered it doesn't on newer Wine versions. The value of collective memory is its freshness.
+
+**Do this instead:** Always query live at the start of each session. The query is a single HTTP GET and completes in under 500ms on a normal connection. If the network is unavailable, `CollectiveMemoryClient.query()` returns nil and the agent proceeds without the context — same as pre-v1.2 behavior.
 
 ---
 
@@ -530,45 +540,81 @@ This is a single-user CLI tool. Scaling is not a concern. The relevant performan
 Dependencies determine order. Items at the same level can be built in parallel.
 
 ```
-Level 1 (no dependencies):
-  ├─ GameEngineDetector.swift — pure pattern matching, no dependencies
-  └─ WindowMonitor.swift — CoreGraphics only, no Cellar dependencies
+Level 1 — no Cellar dependencies:
+  ├─ GitHubAppAuth.swift
+  │      Security framework JWT generation + installation token exchange
+  │      Can be unit-tested standalone before anything else
+  │
+  └─ CollectiveMemoryEntry.swift  (model only)
+         Codable struct, no behavior, no dependencies
 
-Level 2 (depends on Level 1):
-  ├─ WineProcess.swift modification — add WindowMonitor call + WineResult fields
-  ├─ AgentTools.inspectGame() modification — embed GameEngineDetector
-  └─ ProactiveConfigurator.swift — depends on GameEngineDetector + SuccessDatabase (existing)
+Level 2 — depends on Level 1:
+  ├─ CollectiveMemoryClient.swift
+  │      Uses GitHubAppAuth for write path
+  │      Uses CollectiveMemoryEntry as return/input type
+  │      Integration tests: real GitHub API with test repo
+  │
+  └─ CellarPaths + CellarConfig modifications
+         Add github-app.pem path, config fields
+         Trivial — can be done in parallel with Level 1
 
-Level 3 (depends on Level 2):
-  ├─ AIService.runAgentLoop() modification — add ProactiveConfigurator phase, richer system prompt
-  ├─ AgentLoop.run() modification — budget awareness, stuck-loop detection, max_tokens counting
-  └─ AgentTools.fetchPage() modification — add ExtractedFix post-processing
+Level 3 — depends on Level 2:
+  ├─ AIService.runAgentLoop() modifications
+  │      Query before loop (uses CollectiveMemoryClient)
+  │      Push after loop (uses CollectiveMemoryClient + SuccessDatabase)
+  │      This is the primary integration point
+  │
+  └─ CollectiveMemoryEntry.from(successRecord:...) factory method
+         Derives entry from SuccessRecord; needs both types
 
-Level 4 (integration, depends on all):
-  └─ System prompt refinements — engine-aware search strategy, dialog-awareness guidance
+Level 4 — depends on Level 3:
+  └─ MemoryController + web UI Leaf templates
+         GET /memory, GET /memory/:gameId
+         Uses CollectiveMemoryClient.queryAll()
+         Register in WebApp.configure()
+
+Level 5 — integration and validation:
+  └─ End-to-end test: solve a game, confirm success, verify push to test repo,
+         launch again, verify agent sees the memory context in initial message
 ```
 
 ### Recommended Delivery Sequence
 
-| Step | What | Why This Order |
-|------|------|----------------|
-| 1 | `WindowMonitor` + `WineResult` changes | Self-contained, no risk to existing flow. Dialog signal works even before agent changes. |
-| 2 | `GameEngineDetector` + embed in `inspectGame` | Unblocks ProactiveConfigurator. `inspect_game` gains engine field with no behavior change. |
-| 3 | `AgentLoop` resilience changes | Isolate loop fixes from feature changes. Easier to verify independently. |
-| 4 | `ProactiveConfigurator` + `AIService` pre-config phase | Depends on GameEngineDetector and SuccessDatabase. High-value: known-game fast path. |
-| 5 | `fetch_page` fix extraction + system prompt search strategy | Lower risk (adds data, doesn't change flow). Can ship without other v1.1 features. |
-| 6 | End-to-end integration testing | Verify combined dialog + engine + pre-config + smarter search works cohesively. |
+| Phase | Builds | Rationale |
+|-------|--------|-----------|
+| 1 | `GitHubAppAuth` | Cryptographic auth is the critical path and most unknown. Build and validate against real GitHub API before anything else. |
+| 2 | `CollectiveMemoryClient` (read path only) | Validate GET works before adding write complexity. |
+| 3 | `AIService` — query integration | Inject memory context into initial message. Test that agent reasoning incorporates it. |
+| 4 | `CollectiveMemoryClient` (write path) + push integration in `AIService` | Write path requires auth. Build on validated read path. |
+| 5 | Web UI `MemoryController` | Lower risk, depends on all core pieces. Can ship after CLI push is working. |
+| 6 | End-to-end: solve game → push → new session sees context | Full flow validation across two agent sessions. |
+
+---
+
+## Scaling Considerations
+
+This is a single-user CLI tool. Scaling considerations are limited to the shared GitHub repo:
+
+| Concern | Impact | Approach |
+|---------|--------|----------|
+| Multiple agents pushing the same game simultaneously | 409 Conflict on PUT | Retry once with fresh GET to resolve SHA mismatch |
+| Large memory repo (100s of games) | `queryAll()` becomes slow | Lazy: `queryAll()` only for web UI; `query(gameId:)` for CLI sessions |
+| GitHub API rate limits (unauthenticated GET) | 60 requests/hour per IP | Collective memory queries are one GET per session — effectively no concern |
+| GitHub API rate limits (authenticated PUT) | 5000 requests/hour per installation token | Push is at most one per successful session — effectively no concern |
 
 ---
 
 ## Sources
 
-- Direct inspection of `AgentLoop.swift`, `AgentTools.swift`, `AIService.swift`, `WineProcess.swift` (2026-03-28)
-- Direct inspection of `SuccessDatabase.swift`, `GameEntry.swift`, `LaunchCommand.swift` (2026-03-28)
-- `.planning/agentic-architecture-v2.md` — v2 architecture design document (2026-03-28)
-- `.planning/PROJECT.md` — v1.1 requirements and constraints (2026-03-28)
-- `CGWindowListCopyWindowInfo` — CoreGraphics API, macOS 10.5+, no entitlement required for CLI (MEDIUM confidence — based on training data, should verify screen recording permission behavior on macOS 15 Sequoia)
+- [GitHub REST API: Repository Contents (PUT endpoint)](https://docs.github.com/en/rest/repos/contents) — verified March 2026; `PUT /repos/{owner}/{repo}/contents/{path}` requires `message`, `content` (base64), optional `sha` for updates
+- [GitHub REST API: GitHub Apps — Installation Tokens](https://docs.github.com/en/rest/apps/apps) — verified March 2026; `POST /app/installations/{id}/access_tokens` returns token valid 1 hour; `contents: write` permission required for file writes
+- [GitHub Docs: Generating a JWT for a GitHub App](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-json-web-token-jwt-for-a-github-app) — verified March 2026; RS256, iat=now-60s, exp=now+300s, iss=app_id
+- [Apple Security framework: SecKeyCreateSignature](https://developer.apple.com/documentation/security/seckeycreatesignature(_:_:_:_:)) — `.rsaSignatureMessagePKCS1v15SHA256` for RS256 signing; no CryptoKit required for RSA
+- Direct inspection of `AIService.swift`, `AgentLoop.swift`, `AgentTools.swift`, `SuccessDatabase.swift`, `CellarPaths.swift`, `CellarConfig.swift`, `WebApp.swift`, `LaunchController.swift` (2026-03-29)
+- Direct inspection of `Package.swift` — confirmed current dependencies: ArgumentParser, SwiftSoup, Vapor, Leaf (no JWT library present; Security framework approach avoids adding one)
+- [Letta: Git-backed memory for coding agents](https://www.letta.com/blog/context-repositories) — design pattern context for Git as agent memory backing store
+- [GitHub Blog: Building an agentic memory system](https://github.blog/ai-and-ml/github-copilot/building-an-agentic-memory-system-for-github-copilot/) — collective knowledge sharing patterns
 
 ---
-*Architecture research for: Cellar v1.1 Agentic Independence integration*
-*Researched: 2026-03-28*
+*Architecture research for: Cellar v1.2 Collective Agent Memory*
+*Researched: 2026-03-29*

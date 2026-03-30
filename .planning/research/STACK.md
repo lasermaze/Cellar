@@ -1,21 +1,20 @@
 # Stack Research
 
-**Domain:** macOS CLI Wine launcher — v1.1 Agentic Independence stack additions
-**Researched:** 2026-03-28
-**Confidence:** HIGH (CGWindowListCopyWindowInfo, PE parsing, SwiftSoup) / HIGH (max_tokens handling — verified against official Anthropic docs)
+**Domain:** macOS CLI Wine launcher — v1.2 Collective Agent Memory stack additions
+**Researched:** 2026-03-29
+**Confidence:** HIGH (GitHub API patterns — official docs) / HIGH (JWT with Security.framework — Apple dev forums) / HIGH (jwt-kit 5.0 — verified against GitHub repo) / MEDIUM (GitHub App token caching — well-understood pattern, no Swift-specific example found)
 
 ---
 
 ## Context: What This File Is
 
-This file covers **only new stack additions for v1.1**. The existing stack (Swift 6, ArgumentParser, URLSession, Foundation.Process, Wine via Gcenx) is validated and documented in the previous STACK.md. Do not re-litigate those decisions here.
+This file covers **only new stack additions for v1.2**. The existing stack (Swift 6, ArgumentParser, URLSession, Foundation.Process, Vapor, Leaf, SwiftSoup) is validated in previous STACK.md files. Do not re-litigate those decisions.
 
-The five technical questions for v1.1:
-1. CGWindowListCopyWindowInfo for macOS window detection
-2. PE header parsing for game engine detection
-3. Wine trace:msgbox / trace:dialog log parsing
-4. Structured HTML extraction from web pages
-5. Anthropic max_tokens handling in the agent loop
+The three technical questions for v1.2:
+
+1. How does the agent write JSON config entries to a shared GitHub repo without a local git clone?
+2. How does the agent authenticate as a GitHub App bot (no human PAT)?
+3. How does the agent read the collective memory repo to query existing configs?
 
 ---
 
@@ -25,320 +24,281 @@ The five technical questions for v1.1:
 
 | Technology | Version | Purpose | Why Recommended |
 |------------|---------|---------|-----------------|
-| CoreGraphics (built-in) | macOS 14+ | macOS window list enumeration | CGWindowListCopyWindowInfo returns title, owner, bounds, layer for all on-screen windows. No external dependency. Already available in Foundation imports on macOS. |
-| Swift Data (Foundation) | built-in | PE header parsing | PE headers are fixed-offset binary structures. Foundation `Data` + `withUnsafeBytes` reads them without any library. The entire PE magic, machine type, and import table are at documented offsets. |
-| SwiftSoup | 2.8.7 | HTML parsing for structured fix extraction from web pages | Pure Swift, SPM-compatible, jQuery-like CSS selector API. The only production-grade HTML parser in the Swift ecosystem. No C dependencies. |
+| GitHub REST API (Contents) | v2022-11-28 | Create/update individual JSON files in the collective memory repo | Single `PUT /repos/{owner}/{repo}/contents/{path}` call writes a file as a new commit. No local git clone, no libgit2, no shell. Already fits the URLSession pattern used for the Anthropic API. |
+| GitHub REST API (Git Database) | v2022-11-28 | Batch-read the memory index in one request | `GET /repos/{owner}/{repo}/git/trees/{sha}?recursive=1` returns the entire repo file tree without cloning. Used for the initial "does a config for this game already exist?" query. |
+| Security.framework (built-in) | macOS 14+ | RS256 JWT signing for GitHub App authentication | `SecKeyCreateSignature` with `.rsaSignatureMessagePKCS1v15SHA256` produces a valid RS256 JWT without any third-party library. The JWT is only needed to bootstrap an installation access token — 10-20 lines of Swift with `Security` import. |
+| vapor/jwt-kit | 5.0.0 | RS256 JWT signing (alternative to Security.framework approach) | Pure Swift, SPM-native, Swift 6 compatible, supports RSA signing. Only add this if the native Security.framework approach proves brittle in practice. jwt-kit is already adjacent to the existing Vapor dependency. |
+
+**Core decision: GitHub REST API over libgit2.** The agent's write pattern is: produce a JSON file, push it to GitHub. The agent never needs a full local clone with history, branching, or merging. Using `PUT /repos/.../contents/{path}` handles this in one HTTP call. Every libgit2 Swift binding surveyed (SwiftGit2, SwiftGitX 0.4.0, swift-libgit2) adds a compiled C library dependency and significant complexity for no benefit here.
 
 ### Supporting Libraries
 
 | Library | Version | Purpose | When to Use |
 |---------|---------|---------|-------------|
-| SwiftSoup | 2.8.7 | DOM traversal, CSS selectors on fetched HTML | Use when fetch_page needs to extract structured data (tables, code blocks, list items) from WineHQ AppDB, PCGamingWiki, and forum pages rather than returning raw HTML |
+| vapor/jwt-kit | 5.0.0 | RS256 JWT generation for GitHub App authentication | Only if the native Security.framework RS256 approach proves too verbose or fails edge cases (e.g., key format variations). jwt-kit is adjacent to the existing Vapor dependency so adding it does not increase vendor surface much. |
 
-No other new dependencies are required. All other v1.1 features (Wine trace parsing, max_tokens handling, engine detection) are implemented with Foundation types already in use.
+No other new SPM dependencies are required for v1.2.
 
 ### Development Tools
 
 | Tool | Purpose | Notes |
 |------|---------|-------|
-| (no new tools) | — | No new toolchain additions needed for v1.1 |
+| (no new tools) | — | No new toolchain additions for v1.2 |
 
 ---
 
 ## Feature-by-Feature Analysis
 
-### 1. CGWindowListCopyWindowInfo — macOS Window Detection
+### 1. Writing Configs to GitHub — GitHub REST Contents API
 
-**Framework:** `CoreGraphics` — already available on macOS 14+, no import change needed (it's re-exported through AppKit/Cocoa but can also be imported directly as `import CoreGraphics`).
+**Approach: `PUT /repos/{owner}/{repo}/contents/{path}`**
 
-**Function signature:**
+This is the correct tool for the v1.2 write pattern. The agent produces a `SuccessRecord`-derived JSON struct and wants to store it at a known path like `entries/cossacks-european-wars/abc123.json`. One HTTP call does it.
+
+**Sequence for writing a new memory entry:**
+
+1. Check if the file already exists: `GET /repos/{owner}/{repo}/contents/{path}` — returns the current SHA if it exists.
+2. Write (create or update): `PUT /repos/{owner}/{repo}/contents/{path}` with `message`, `content` (base64-encoded JSON), and `sha` (only needed for updates, omit for creates).
+
+**Request body:**
 ```swift
-CGWindowListCopyWindowInfo(_ option: CGWindowListOption, _ relativeToWindow: CGWindowID) -> CFArray?
-```
-
-**Key dictionary keys returned per window:**
-- `kCGWindowOwnerName` — process name (e.g., "wineserver", "wine64-preloader")
-- `kCGWindowName` — window title (e.g., "Error", "DirectDraw Init Failed")
-- `kCGWindowBounds` — CGRect as CFDictionary with X, Y, Width, Height
-- `kCGWindowLayer` — z-order layer (dialogs have layer > 0)
-- `kCGWindowOwnerPID` — PID for matching against known Wine PIDs
-
-**Usage for Wine dialog detection:**
-```swift
-import CoreGraphics
-
-func wineWindows(for pid: pid_t) -> [(title: String, bounds: CGRect)] {
-    let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
-    guard let list = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
-        return []
-    }
-    return list.compactMap { info in
-        guard let ownerPID = info[kCGWindowOwnerPID as String] as? pid_t,
-              ownerPID == pid,
-              let boundsDict = info[kCGWindowBounds as String] as? [String: CGFloat]
-        else { return nil }
-        let title = info[kCGWindowName as String] as? String ?? ""
-        let bounds = CGRect(
-            x: boundsDict["X"] ?? 0, y: boundsDict["Y"] ?? 0,
-            width: boundsDict["Width"] ?? 0, height: boundsDict["Height"] ?? 0
-        )
-        return (title: title, bounds: bounds)
-    }
+struct ContentsWriteBody: Encodable {
+    let message: String            // commit message, e.g. "agent: add cossacks config (wine 9.0, arm64)"
+    let content: String            // base64-encoded JSON
+    let sha: String?               // nil for new file, blob SHA for update
+    let branch: String?            // default: repo's default branch
 }
 ```
 
-**Permission situation (IMPORTANT):**
+**Conflict handling:** If two agents simultaneously write to the same path, the second PUT will return 409 (the SHA in its request will be stale). The correct handling is: retry the write once by re-fetching the current SHA and re-PUT-ing. The collective memory model naturally avoids destructive conflicts — each agent entry is scoped by game ID and a timestamp or run ID, so duplicate writes at identical paths should be rare.
 
-`kCGWindowName` (the window title) requires Screen Recording permission on macOS 10.15+. Without it, the title key returns `nil` or an empty string. However:
+**Why not the Git Database API for writes?** The Git Database API (blobs + trees + commits + refs) is 4-5 sequential HTTP calls to write one file. The Contents API does it in 1-2 calls. The Git Database API is useful for reading (tree traversal) but excessive for writing single files.
 
-- `kCGWindowOwnerName`, `kCGWindowBounds`, `kCGWindowLayer`, and `kCGWindowOwnerPID` are available **without** Screen Recording permission.
-- This means dialog detection via size heuristics (small window = dialog, large window = game) and layer detection works **without requiring any permission**.
-- Window title is a bonus signal — don't require it.
-
-**Not deprecated.** `CGWindowListCopyWindowInfo` is not deprecated as of macOS 15 Sequoia. Only `CGWindowListCreateImage` (screenshot capture) and `CGDisplayStream` are being migrated toward ScreenCaptureKit. Window info enumeration remains available.
-
-**Dialog heuristic without title:**
-- Dialog windows: typically < 600px wide, < 400px tall, layer > 0
-- Game windows: typically large (640x480 minimum for old games), layer = 0 or matches game resolution
-
-**Confidence:** HIGH — verified against Apple developer forum posts, confirmed non-deprecated as of macOS 15.
+**Confidence:** HIGH — official GitHub documentation, well-documented endpoint.
 
 ---
 
-### 2. PE Header Parsing — Game Engine Detection
+### 2. Reading the Collective Memory — GitHub REST Git Trees API
 
-**Approach:** Pure Swift with Foundation `Data`. No external library needed. PE format is a public standard with fixed offsets.
+**Approach: `GET /repos/{owner}/{repo}/git/trees/{sha}?recursive=1`**
 
-**What to extract for engine detection:**
+When the agent starts, it needs to know what games have known configs before downloading individual entries. The tree API returns every file path in the repo in one call.
 
-| Field | PE Offset | Value | Engine Signal |
-|-------|-----------|-------|---------------|
-| Magic | 0x00 | `MZ` (0x4D5A) | Confirms PE file |
-| PE signature offset | 0x3C | uint32 LE | Pointer to IMAGE_NT_HEADERS |
-| Machine type | PE+4 | 0x014C = i386, 0x8664 = x64 | 32-bit vs 64-bit |
-| PE32/PE32+ magic | PE+24 | 0x010B or 0x020B | Optional header type |
-| Import table RVA | PE+24+104 (PE32) or PE+24+120 (PE32+) | RVA | Points to imported DLL list |
-
-**Import table DLL names are the primary engine detector** for old Windows games. The import table lists every DLL the exe loads at startup — these are reliable engine fingerprints.
-
-**Example engine fingerprints from import DLL names:**
-```
-mdraw.dll, MINMM.dll    → GSC DMCR engine (Cossacks, American Conquest)
-binkw32.dll             → Bink video (common in 2000s games, not engine-specific)
-SDL.dll, SDL2.dll       → SDL-based (wide variety of engines)
-PHYSXLOADER.dll         → PhysX (Unreal Engine 3 era)
-d3dx9_43.dll            → DirectX 9, likely 2005-2010 era game
-ddraw.dll               → DirectDraw (pre-DX8, likely pre-2001)
-```
-
-**File pattern detection (second pass, no binary parsing):**
-```
-UnityEngine.dll present in directory  → Unity
-GameAssembly.dll present              → Unity IL2CPP
-ue4_redist.dll or Binaries/Win64/     → Unreal Engine 4
-data.win present                      → GameMaker Studio
-```
-
-**Swift implementation pattern:**
 ```swift
-struct PEInfo {
-    let machineType: UInt16      // 0x014C = i386, 0x8664 = x64
-    let is64Bit: Bool
-    let importedDLLs: [String]   // lowercase DLL names from import table
+// 1. Get current HEAD SHA
+GET /repos/{owner}/{repo}/git/ref/heads/main
+// Response: { "object": { "sha": "abc..." } }
+
+// 2. Walk the tree
+GET /repos/{owner}/{repo}/git/trees/abc...?recursive=1
+// Response: { "tree": [{ "path": "entries/cossacks/abc.json", "sha": "..." }, ...] }
+```
+
+From the tree response, the agent can determine "entries exist for this game ID" without downloading every file. It then fetches only the relevant entry files via `GET /repos/{owner}/{repo}/contents/{path}`.
+
+For reading, unauthenticated requests to a public repo get 60 requests/hour. Authenticated requests get 5,000/hour. The agent should always use its installation token for reads — this avoids rate limiting and also works for private repos during development.
+
+**Confidence:** HIGH — official GitHub documentation.
+
+---
+
+### 3. GitHub App Authentication — RS256 JWT to Installation Token
+
+**The two-step auth flow:**
+
+```
+GitHub App private key (.pem)
+    → RS256-signed JWT (10 minute TTL)
+    → POST /app/installations/{installation_id}/access_tokens
+    → Installation access token (1 hour TTL)
+    → Use as: Authorization: Bearer ghs_...
+```
+
+**Step 1: Build the JWT (no third-party library needed)**
+
+GitHub requires RS256 (PKCS#1 v1.5 + SHA-256). macOS `Security.framework` provides exactly this via `SecKeyCreateSignature(.rsaSignatureMessagePKCS1v15SHA256)`.
+
+Required JWT claims:
+- `iss`: GitHub App client ID (or numeric App ID for legacy apps)
+- `iat`: current Unix time minus 60 seconds (clock skew buffer)
+- `exp`: `iat + 600` (10 minutes maximum)
+
+```swift
+import Security
+import Foundation
+
+func buildGitHubAppJWT(appId: String, privateKeyPEM: String) throws -> String {
+    // 1. Encode header + payload
+    let header = #"{"alg":"RS256","typ":"JWT"}"#
+    let now = Int(Date().timeIntervalSince1970)
+    let payload = "{\"iss\":\"\(appId)\",\"iat\":\(now - 60),\"exp\":\(now + 540)}"
+
+    let headerB64  = base64url(header.data(using: .utf8)!)
+    let payloadB64 = base64url(payload.data(using: .utf8)!)
+    let message    = "\(headerB64).\(payloadB64)"
+
+    // 2. Load RSA private key from PEM
+    let key = try loadRSAPrivateKey(pem: privateKeyPEM)
+
+    // 3. Sign with RS256
+    var error: Unmanaged<CFError>?
+    guard let sig = SecKeyCreateSignature(
+        key,
+        .rsaSignatureMessagePKCS1v15SHA256,
+        message.data(using: .utf8)! as CFData,
+        &error
+    ) else { throw error!.takeRetainedValue() }
+
+    return "\(message).\(base64url(sig as Data))"
 }
 
-func parsePEImports(from url: URL) -> PEInfo? {
-    guard let data = try? Data(contentsOf: url, options: .mappedIfSafe),
-          data.count > 0x40 else { return nil }
-
-    // Check MZ magic
-    guard data[0] == 0x4D, data[1] == 0x5A else { return nil }
-
-    // PE header offset is at 0x3C as little-endian uint32
-    let peOffset = Int(data.loadLE32(at: 0x3C))
-    guard peOffset + 4 < data.count,
-          data[peOffset] == 0x50, data[peOffset+1] == 0x45 else { return nil }
-
-    let machineType = data.loadLE16(at: peOffset + 4)
-    let optionalMagic = data.loadLE16(at: peOffset + 24)
-    let is64Bit = optionalMagic == 0x020B
-
-    // Import table RVA: offset 104 from optional header start for PE32, 120 for PE32+
-    let importRVAOffset = peOffset + 24 + (is64Bit ? 120 : 104)
-    // ... resolve RVA to file offset via section table, walk import descriptors
-    // Each IMAGE_IMPORT_DESCRIPTOR has Name RVA pointing to null-terminated DLL name
-
-    return PEInfo(machineType: machineType, is64Bit: is64Bit, importedDLLs: [])
-}
-```
-
-**Practical note on implementation complexity:** Walking the import table requires resolving RVAs to file offsets via the section table. This is ~80-100 lines of Swift but no external library is needed. The alternative is shelling out to `objdump -p` (available via Xcode command line tools) which is simpler and already used elsewhere in the codebase. Use `objdump` first; implement native parsing if portability becomes an issue.
-
-**`objdump` approach (already proven in the codebase):**
-```bash
-objdump -p /path/to/game.exe 2>/dev/null | grep "DLL Name:"
-# Output: DLL Name: KERNEL32.dll
-#         DLL Name: mdraw.dll
-```
-
-**Recommendation:** Use `objdump -p` for import table extraction (fast, no parsing code, already available). Add file-pattern engine detection (directory scan for engine-specific files) as a second pass. Reserve native PE binary parsing for future if `objdump` proves insufficient.
-
-**Confidence:** HIGH — PE format is a published Microsoft standard, `objdump` approach is already proven in the codebase.
-
----
-
-### 3. Wine trace:msgbox and trace:dialog Parsing
-
-**No new framework needed.** Wine logs are plain text on stderr. Existing log parsing infrastructure handles this.
-
-**Wine debug channels for dialog detection:**
-- `WINEDEBUG=+dialog` — traces dialog creation, `DialogBoxParam`, `CreateDialog`, `MessageBox` calls
-- `WINEDEBUG=+msgbox` — specific channel declared in `dlls/user32/msgbox.c` that traces message box text content
-
-**Log line format** (standard Wine format):
-```
-XXXX:class:channel:function message
-```
-Where `XXXX` is thread ID (4 hex digits), `class` is trace/warn/fixme/err, `channel` is dialog or msgbox.
-
-**Key patterns to match:**
-
-```
-# MessageBox creation (dialog channel)
-0000:trace:dialog:DIALOG_CreateIndirect ...
-0000:trace:dialog:DialogBoxIndirectParamAW ...
-
-# MessageBox text content (msgbox channel)
-0000:trace:msgbox:MessageBoxTimeoutW <text of the message box>
-
-# Common Wine dialog errors that indicate stuck game
-0000:fixme:dialog:DIALOG_CreateIndirect ...
-0000:err:dialog:EndDialog ...
-
-# Dialog class in window creation
-0000:trace:win:CreateWindowExW ... class "#32770" ...
-# #32770 is Windows' built-in dialog window class
-```
-
-**Practical implementation:** Add `+dialog,+msgbox` to the WINEDEBUG flags used in diagnostic `trace_launch` calls. Parse stderr with `NSRegularExpression` or simple string matching for `":trace:msgbox:"`, `":trace:dialog:DialogBox"`, and `"class \"#32770\""` patterns.
-
-**Window class `#32770`** is the most reliable indicator — it is Windows' system dialog class, always present for MessageBox and DialogBox windows regardless of Wine debug channel verbosity.
-
-**Confidence:** MEDIUM — Wine source confirmed (`dlls/user32/msgbox.c`), but exact trace output format requires validation with a running Wine instance. The `#32770` window class approach is HIGH confidence (documented Windows API behavior).
-
----
-
-### 4. Structured HTML Extraction — SwiftSoup
-
-**Why add a dependency:** The existing `fetch_page` tool returns raw HTML stripped to plain text via string manipulation. For v1.1's "extract actionable fixes" requirement, structured extraction is needed: find tables with Wine configuration values, code blocks with env var settings, and list items with step-by-step fixes. String stripping loses structure.
-
-**Recommendation: SwiftSoup 2.8.7**
-
-- Pure Swift, zero C/Objective-C dependencies
-- SPM-compatible: `.package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.8.7")`
-- CSS selector API: `doc.select("code")`, `doc.select("table")`, `doc.select("pre")`
-- Actively maintained (latest release March 2025, 104 releases over 9 years)
-- macOS 14 compatible
-
-**Package.swift addition:**
-```swift
-dependencies: [
-    .package(url: "https://github.com/apple/swift-argument-parser", from: "1.7.0"),
-    .package(url: "https://github.com/scinfu/SwiftSoup.git", from: "2.8.7"),
-],
-targets: [
-    .executableTarget(
-        name: "cellar",
-        dependencies: [
-            .product(name: "ArgumentParser", package: "swift-argument-parser"),
-            .product(name: "SwiftSoup", package: "SwiftSoup"),
-        ]
-    ),
-```
-
-**Usage for fix extraction:**
-```swift
-import SwiftSoup
-
-func extractFixes(from html: String, url: String) -> [String] {
-    guard let doc = try? SwiftSoup.parse(html) else { return [] }
-
-    var fixes: [String] = []
-
-    // PCGamingWiki: config tables
-    if let tables = try? doc.select("table.wikitable td") {
-        fixes += tables.array().compactMap { try? $0.text() }
-    }
-
-    // WineHQ AppDB: code blocks with env vars
-    if let code = try? doc.select("code, pre, .code") {
-        fixes += code.array().compactMap { try? $0.text() }
-    }
-
-    // Forum posts: numbered list items
-    if let lists = try? doc.select("ol li, .post-body li") {
-        fixes += lists.array().compactMap { try? $0.text() }
-    }
-
-    return fixes.filter { $0.count > 10 && $0.count < 500 }
+private func base64url(_ data: Data) -> String {
+    data.base64EncodedString()
+        .replacingOccurrences(of: "+", with: "-")
+        .replacingOccurrences(of: "/", with: "_")
+        .replacingOccurrences(of: "=", with: "")
 }
 ```
 
-**Alternative considered — Foundation XMLParser:** Foundation's XMLParser is SAX-based and verbose for HTML (HTML is not valid XML). It requires significant delegate boilerplate and does not handle malformed HTML (which describes most WineHQ forum pages). SwiftSoup handles tag soup. Use XMLParser only for actual XML/RSS. Use SwiftSoup for HTML.
+Loading the PEM key requires `SecItemImport` or `SecKeyCreateWithData` — the PEM must be stripped of its header/footer and base64-decoded to DER before passing to `SecKeyCreateWithData`. This is ~20 lines but well-documented on Apple developer forums.
 
-**Alternative considered — regex on raw HTML:** Fragile, breaks on attribute order changes, fails on nested elements. Not recommended for structured extraction.
+**Alternative (simpler): vapor/jwt-kit 5.0**
 
-**Confidence:** HIGH — SwiftSoup is the established Swift HTML parsing library, actively maintained, SPM-native.
+If the native Security.framework approach produces too much boilerplate, add jwt-kit:
+
+```swift
+// Package.swift
+.package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0")
+
+// Usage
+import JWTKit
+let keys = JWTKeyCollection()
+try await keys.add(rsa: Insecure.RSA.PrivateKey(pem: privateKeyPEM), digestAlgorithm: .sha256, kid: "github-app")
+let token = try await keys.sign(payload, kid: "github-app")
+```
+
+jwt-kit 5.0 is Swift 6 compatible, does not require Vapor, and is standalone. Note that RSA key types are placed in the `Insecure` namespace in v5 (GitHub notes this discourages new RSA use in favor of ECDSA, but GitHub Apps require RS256, so Insecure.RSA is the correct choice here).
+
+**Recommendation:** Start with native Security.framework. If the PEM loading proves fiddly, add jwt-kit. The functionality is identical; jwt-kit is just more ergonomic.
+
+**Step 2: Exchange JWT for Installation Access Token**
+
+```swift
+// POST /app/installations/{installation_id}/access_tokens
+// Header: Authorization: Bearer <JWT>
+// Response: { "token": "ghs_...", "expires_at": "2026-03-29T15:00:00Z" }
+```
+
+**Token caching:** Installation tokens expire after 1 hour. The agent should cache the token with its `expires_at` timestamp and refresh it proactively when less than 5 minutes remain. A simple `TokenCache` struct with an expiry check before each API call is sufficient — no complex refresh middleware needed since agent runs are typically short-lived.
+
+```swift
+struct InstallationToken {
+    let token: String
+    let expiresAt: Date
+
+    var isValid: Bool { Date().addingTimeInterval(300) < expiresAt }  // 5 min buffer
+}
+```
+
+**Where to store the private key:** The GitHub App private key (.pem) and App ID are configuration — store in `~/.cellar/.env` alongside `ANTHROPIC_API_KEY`. The existing `loadEnvironment()` in `AIService.swift` already handles this pattern.
+
+```
+GITHUB_APP_ID=123456
+GITHUB_APP_INSTALLATION_ID=78901234
+GITHUB_APP_PRIVATE_KEY_PATH=/path/to/private-key.pem
+COLLECTIVE_MEMORY_REPO=owner/cellar-memory
+```
+
+**Confidence:** HIGH — GitHub App auth flow documented in official GitHub docs. RS256 via Security.framework confirmed on Apple developer forums.
 
 ---
 
-### 5. Anthropic max_tokens Handling — Agent Loop Resilience
+### 4. Collective Memory Schema — Extending SuccessRecord
 
-**No new framework needed.** This is a logic change in `AgentLoop.swift`.
+The existing `SuccessRecord` struct in `SuccessDatabase.swift` already captures the right fields: Wine version, OS, bottle type, environment variables, DLL overrides, registry, pitfalls, and a narrative. This is the right foundation.
 
-**Official Anthropic guidance (verified March 2026):**
-
-The existing `max_tokens` handler in `AgentLoop.swift` (line 126-130) appends a continuation prompt. This is the correct pattern for pure text responses but has a **critical bug for tool-use**: if `stop_reason == "max_tokens"` and the last content block is a `tool_use` block, the tool_use block is **incomplete** (truncated mid-JSON). Appending it to messages and asking to continue will not work — the API cannot recover a partial tool_use.
-
-**Correct handling per official docs:**
+The collective memory entry needs three additions over the local `SuccessRecord`:
 
 ```swift
-case "max_tokens":
-    // Check if the last block is an incomplete tool_use
-    let lastBlock = response.content.last
-    if case .toolUse(_, _, _) = lastBlock {
-        // Incomplete tool_use — CANNOT continue, must retry with higher max_tokens
-        // The current response cannot be appended to messages as-is
-        print("[Agent: max_tokens hit mid tool-use — retrying with higher token budget]")
-        // Increment maxTokens for next call (up to model limit)
-        // Do NOT append the truncated response to messages
-        // Simply retry the same messages array with higher maxTokens
-        let newMaxTokens = min(maxTokens * 2, 32768)
-        // ... retry logic
-    } else {
-        // Truncated text — safe to continue
-        messages.append(AnthropicToolRequest.Message(
-            role: "assistant",
-            content: .blocks(response.content)
-        ))
-        messages.append(AnthropicToolRequest.Message(
-            role: "user",
-            content: .text("Continue from where you left off.")
-        ))
-    }
+struct CollectiveMemoryEntry: Codable {
+    // Core config (same as SuccessRecord)
+    let schemaVersion: Int           // start at 1, increment on breaking changes
+    let gameId: String
+    let gameName: String
+    let wineVersion: String?
+    let os: String?                  // "macOS 15.2"
+    let arch: String?                // "arm64", "x86_64"
+    let bottleType: String?
+    let environment: [String: String]
+    let dllOverrides: [DLLOverrideRecord]
+    let registry: [RegistryRecord]
+    let gameSpecificDlls: [GameSpecificDLL]
+    let pitfalls: [PitfallRecord]
+
+    // Collective additions
+    let reasoningChain: [String]     // agent's diagnosis steps in order
+    let confidenceVotes: Int         // times other agents confirmed this config works
+    let contributedAt: String        // ISO8601
+    let contributedBy: String        // agent run ID or "community"
+    let environmentFingerprint: EnvironmentFingerprint
+}
+
+struct EnvironmentFingerprint: Codable {
+    let wineVersion: String          // "wine-9.0 (Gcenx)"
+    let macOSVersion: String         // "15.2"
+    let cpuArch: String              // "arm64"
+    let metalSupported: Bool
+    let gptInstalled: Bool           // GPTK/D3DMetal present
+}
 ```
 
-**Key distinction** verified against Anthropic docs:
-- Truncated text block with `max_tokens`: append and continue (current code is correct)
-- Truncated tool_use block with `max_tokens`: **cannot append** — must retry with higher `max_tokens` without appending the truncated response
+**Repo layout:**
 
-**Token budget recommendation:**
-- Current `maxTokens: 16384` in AIService.swift is appropriate for claude-sonnet-4-20250514
-- Add a `currentMaxTokens` mutable property to `AgentLoop` that doubles on retry (16384 → 32768)
-- Cap at model maximum (claude-sonnet-4 supports 64K output with streaming, 16K non-streaming)
-- Non-streaming is the current pattern — cap retry escalation at 32768
+```
+cellar-memory/
+  index.json                         # game IDs with entry counts + last updated
+  entries/
+    {gameId}/
+      {contributedAt}-{arch}.json    # e.g. cossacks-european-wars/2026-03-29T10:00:00Z-arm64.json
+```
 
-**Confidence:** HIGH — behavior verified against official Anthropic stop_reason documentation (March 2026).
+The `index.json` is a lightweight catalog the agent can download on startup (~1-5KB for early versions) to determine what games have known configs before fetching full entries.
+
+**Confidence:** HIGH — based on analysis of existing SuccessRecord schema, architecture follows established Git-backed knowledge base patterns.
+
+---
+
+### 5. Environment Matching — No New Library
+
+The agent's "reason about fit" step is a comparison function, not a new library. It takes a stored `EnvironmentFingerprint` and a `LocalEnvironment` struct and returns a confidence score.
+
+```swift
+func configFitScore(stored: EnvironmentFingerprint, local: LocalEnvironment) -> ConfigFit {
+    // Exact match: full confidence
+    // Wine major version match, different minor: high confidence
+    // Different CPU arch: reject (arm64 config will not help x86_64 and vice versa)
+    // GPTK present locally but not in stored entry: might unlock new options (flag to agent)
+    // macOS major version match, minor differs: medium confidence
+}
+```
+
+`LocalEnvironment` is populated at agent startup from `sw_vers`, `uname -m`, and `wine --version` shell calls — all already used in the codebase.
+
+**Confidence:** HIGH — logic only, no library needed.
+
+---
+
+## Installation
+
+```swift
+// Package.swift — ONLY if using jwt-kit instead of Security.framework for JWT:
+.package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.0")
+
+// Add to target dependencies if jwt-kit is used:
+.product(name: "JWTKit", package: "jwt-kit")
+```
+
+If the native Security.framework RS256 approach is used, **no Package.swift changes are needed for v1.2**. All GitHub API calls use URLSession (already in use). All JWT crypto uses Security.framework (already available on macOS 14+).
 
 ---
 
@@ -346,58 +306,58 @@ case "max_tokens":
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| SwiftSoup for HTML | Foundation XMLParser | Only for well-formed XML (RSS feeds, structured API responses). Not for HTML. |
-| SwiftSoup for HTML | Regex on raw HTML | Never for structured extraction. Acceptable only for pattern matching on known fixed strings (e.g., extracting a WINEDEBUG value from a known format). |
-| objdump for PE imports | Native PE binary parsing in Swift | If distributing without Xcode CLI tools, or if objdump proves unreliable for cross-architecture EXEs. 80-100 lines of Swift to implement natively. |
-| CGWindowListCopyWindowInfo | ScreenCaptureKit | ScreenCaptureKit is for screen capture (video frames, screenshots). CGWindowListCopyWindowInfo is for window metadata enumeration. They are different tools for different jobs. |
-| CGWindowListCopyWindowInfo | NSWorkspace.runningApplications | NSWorkspace gives process names but not window titles or bounds. Use NSWorkspace to find the process, CGWindowListCopyWindowInfo to find its windows. |
+| GitHub REST API (URLSession) | libgit2 via SwiftGitX or SwiftGit2 | Only if Cellar needs full local clone semantics (branch management, history traversal, local-first offline writes). Not needed for v1.2's "read index, write entry" pattern. |
+| GitHub REST API (URLSession) | `git` process via Foundation.Process | Viable fallback if GitHub API rate limits become a problem. `git clone --depth 1` + `git add/commit/push` with a bot token in the URL works fine. Adds ~100ms per operation and requires a temp directory. Do not implement preemptively — the API approach is cleaner. |
+| Security.framework RS256 | vapor/jwt-kit | Use jwt-kit if PEM key loading via Security.framework proves too verbose or if the project already imports jwt-kit for another reason. |
+| Security.framework RS256 | Kitura/Swift-JWT | Swift-JWT is Kitura-era (IBM), minimally maintained since 2022. Do not add. jwt-kit is the active alternative if Security.framework is not used. |
+| Contents API (PUT /contents) | Git Database API (blobs + trees + commits) | Use the Git Database API if writing many files in one commit (e.g., bulk import). For single-file writes, the Contents API is simpler: 2 HTTP calls vs 5. |
 
 ## What NOT to Use
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| ScreenCaptureKit for window detection | Requires Screen Recording permission, designed for video capture, async/complex API | CGWindowListCopyWindowInfo (metadata only, simpler, no capture permission needed) |
-| Foundation XMLParser for HTML | SAX-based, verbose, fails on malformed HTML (all WineHQ forum pages are malformed) | SwiftSoup |
-| pe-parse or libpe (C/C++ libraries) | Requires bridging header, breaks Swift 6 concurrency safety, adds build complexity | objdump (already available) + native Swift parsing if needed |
-| Streaming Anthropic API for max_tokens | Adds significant complexity to synchronous DispatchSemaphore pattern currently used | Higher `max_tokens` ceiling + proper retry logic on truncation |
-| AppKit for window detection | Requires NSApplicationDelegate, GUI event loop, incompatible with CLI context | CoreGraphics CGWindowListCopyWindowInfo |
+| SwiftGit2 | Last meaningful SPM support PR was 2020, libgit2 version is stale, does not support Swift 6 Sendable | GitHub REST API via URLSession |
+| SwiftGitX 0.4.0 | Newest Swift libgit2 wrapper (December 2025), but push/authentication support is unconfirmed in docs. Version 0.x signals API instability. Would add a compiled C library (libgit2) to the build. | GitHub REST API via URLSession |
+| Kitura/Swift-JWT | Minimally maintained since 2022, Kitura project effectively dormant | vapor/jwt-kit 5.0 or Security.framework |
+| Octokit.swift | Version 0.11.0, does not document GitHub App authentication or git database operations | Direct URLSession calls to GitHub REST API |
+| GitHub Personal Access Token (PAT) | Tied to a human account, requires manual rotation, does not scale to community use | GitHub App installation token (bot identity, scoped, auto-expires) |
+| Vector embedding / RAG for memory lookup | Massively over-engineered for v1.2. The game ID is a stable key; config lookup is a dictionary lookup, not semantic search. | Direct JSON file fetch by game ID from GitHub repo |
 
 ## Stack Patterns by Variant
 
-**If Screen Recording permission is granted:**
-- Use `kCGWindowName` from CGWindowListCopyWindowInfo for title-based dialog detection ("Error", "Warning", "DirectDraw Init Failed")
-- Combine with size heuristics for higher-confidence signal
+**If the collective memory repo is private (during development):**
+- Use authenticated requests for all reads (not just writes)
+- The GitHub App installation token handles both read and write to private repos it has access to
 
-**If Screen Recording permission is NOT granted (default for new installs):**
-- Use bounds + layer from CGWindowListCopyWindowInfo (no permission needed)
-- Dialog: width < 600, height < 400, layer > 0
-- Combine with Wine trace:dialog log parsing for confirmation
-- Do not prompt the user for Screen Recording permission — it creates friction for a non-critical feature
+**If the collective memory repo is public (community launch):**
+- Use unauthenticated GET for reads (60 req/hour per IP is fine for startup query)
+- Use installation token only for writes (POST/PUT)
+- This avoids distributing the private key to users who only want to read
 
-**If objdump is not available:**
-- Check `which objdump` at startup
-- Fall back to file-pattern detection only (directory scan for engine DLLs)
-- Native PE parsing is the long-term solution if objdump proves unreliable
+**If the GitHub App private key is not configured:**
+- Agent skips the "push to collective memory" step after solving a game
+- Agent can still read from a public repo without auth
+- Degrade gracefully — never block the agent loop on missing collective memory auth
 
 ## Version Compatibility
 
 | Package | Compatible With | Notes |
 |---------|-----------------|-------|
-| SwiftSoup 2.8.7 | Swift 5.5+, macOS 12+ | Package targets swift-tools-version 5.5 minimum. Project is macOS 14+ so no compatibility concern. |
-| SwiftSoup 2.8.7 | Swift 6 | Compatible — no Swift 6 concurrency issues reported. Pure value-type parsing. |
-| CoreGraphics CGWindowListCopyWindowInfo | macOS 10.9+ | Long-stable API, not deprecated through macOS 15. |
+| vapor/jwt-kit 5.0.0 | Swift 6.0+, macOS 14+ | Swift 6 native. RSA is in `Insecure` namespace by design (GitHub Apps require RS256, so this is the correct choice regardless of the namespace name). |
+| Security.framework (built-in) | macOS 14+ | `SecKeyCreateSignature` with `.rsaSignatureMessagePKCS1v15SHA256` is available since macOS 10.12. Not deprecated. |
+| GitHub REST API v2022-11-28 | — | Current stable API version. Set `X-GitHub-Api-Version: 2022-11-28` header on all requests. |
 
 ## Sources
 
-- [Apple Developer Documentation — CGWindowListCopyWindowInfo](https://developer.apple.com/documentation/coregraphics/1455137-cgwindowlistcopywindowinfo) — function signature and key constants
-- [Apple Developer Forums — window name gated by Screen Recording](https://developer.apple.com/forums/thread/126860) — permission requirements confirmed
-- [Nonstrict.eu — ScreenCaptureKit on macOS Sonoma](https://nonstrict.eu/blog/2023/a-look-at-screencapturekit-on-macos-sonoma/) — confirmed CGWindowListCopyWindowInfo not deprecated, CGWindowListCreateImage/CGDisplayStream are the migrating APIs (MEDIUM confidence)
-- [Anthropic — Handling stop reasons](https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons) — incomplete tool_use on max_tokens, correct retry pattern (HIGH confidence — official docs)
-- [Wine source — dlls/user32/msgbox.c](https://github.com/wine-mirror/wine/blob/master/dlls/user32/msgbox.c) — confirmed `WINE_DEFAULT_DEBUG_CHANNEL(dialog)` and `WINE_DECLARE_DEBUG_CHANNEL(msgbox)` channels (HIGH confidence)
-- [SteamDatabase FileDetectionRuleSets](https://github.com/SteamDatabase/FileDetectionRuleSets) — game engine detection patterns (two-pass regex approach) (HIGH confidence)
-- [Microsoft PE Format](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format) — PE header structure, import table offsets (HIGH confidence — official spec)
-- [SwiftSoup GitHub](https://github.com/scinfu/SwiftSoup) — version 2.8.7, March 2025 (HIGH confidence)
+- [GitHub Docs — Creating or updating file contents](https://docs.github.com/en/rest/repos/contents#create-or-update-file-contents) — PUT /contents endpoint, SHA requirement for updates (HIGH confidence — official docs)
+- [GitHub Docs — Using the REST API to interact with your Git database](https://docs.github.com/en/rest/guides/using-the-rest-api-to-interact-with-your-git-database) — Git trees/blobs/commits sequence (HIGH confidence — official docs)
+- [GitHub Docs — Generating a JWT for a GitHub App](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-json-web-token-jwt-for-a-github-app) — RS256 requirement, iss/iat/exp claims, 10-minute expiry (HIGH confidence — official docs)
+- [GitHub Docs — Generating an installation access token](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app) — POST /app/installations/{id}/access_tokens, 1-hour token expiry (HIGH confidence — official docs)
+- [Apple Developer Forums — Generate JWT token using RS256](https://developer.apple.com/forums/thread/702003) — SecKeyCreateSignature with rsaSignatureMessagePKCS1v15SHA256 confirmed (HIGH confidence)
+- [vapor/jwt-kit GitHub](https://github.com/vapor/jwt-kit) — v5.0.0, Swift 6, standalone (no Vapor required), RSA in Insecure namespace (HIGH confidence)
+- [JWTKit is no longer Boring! — Vapor Blog](https://blog.vapor.codes/posts/jwtkit-v5/) — v5 migration notes, RSA moved to Insecure namespace (HIGH confidence)
+- [ibrahimcetin/SwiftGitX GitHub](https://github.com/ibrahimcetin/SwiftGitX) — v0.4.0 December 2025, push auth unconfirmed (MEDIUM confidence)
 
 ---
-*Stack research for: Cellar v1.1 Agentic Independence — new capabilities only*
-*Researched: 2026-03-28*
+*Stack research for: Cellar v1.2 Collective Agent Memory — new capabilities only*
+*Researched: 2026-03-29*

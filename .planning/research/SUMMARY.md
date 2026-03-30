@@ -1,17 +1,17 @@
 # Project Research Summary
 
-**Project:** Cellar v1.1 — Agentic Independence
-**Domain:** macOS CLI Wine game launcher — agent autonomy layer additions
-**Researched:** 2026-03-28
+**Project:** Cellar v1.2 — Collective Agent Memory
+**Domain:** Git-backed shared knowledge base for AI agents contributing and consuming Wine game compatibility configs
+**Researched:** 2026-03-29
 **Confidence:** HIGH
 
 ## Executive Summary
 
-Cellar v1.1 extends an existing, proven agent loop (18 tools, Research-Diagnose-Adapt system prompt, success database) rather than building from scratch. The research confirms that all five technical questions for v1.1 — window detection, PE parsing, Wine trace parsing, HTML extraction, and max_tokens handling — have well-understood solutions using either standard Apple frameworks or a single new Swift dependency (SwiftSoup 2.8.7). The only genuinely new external dependency is SwiftSoup for structured HTML extraction from fetched web pages; everything else builds on CoreGraphics, Foundation, and the existing `objdump` toolchain. The recommended approach is to layer v1.1 features incrementally: fix the agent loop's correctness gaps first (max_tokens mid-tool-use truncation is a latent bug that will corrupt loop state under real usage), then add the engine detection and proactive pre-configuration layer that eliminates the most common class of first-run failures, then add dialog detection as a fallback.
+Cellar v1.2 extends a working local-first Wine game launcher with collective memory: after an AI agent solves a game, it pushes a structured config entry to a shared GitHub repository so future agents on other machines can find and apply the solution. This is an agent-first compatibility database — the first of its kind, as ProtonDB, WineHQ AppDB, and similar databases are all human-written and human-read. The key differentiator is the stored reasoning chain: not just "what settings work" but "why they work," enabling future agents to adapt configs intelligently rather than copy them blindly. The architecture is deliberately minimal — GitHub as the database, GitHub App authentication for writes, URLSession (already in use) for all API calls, and no new infrastructure dependencies beyond an optional `vapor/jwt-kit` fallback for JWT signing.
 
-The key architectural insight from research is that the three new capabilities — dialog detection, engine detection, and proactive pre-configuration — are not independent features. They form a causal chain: engine detection enables pre-configuration (which eliminates first-run dialogs before they appear), and dialog detection is the fallback when pre-configuration is incomplete or wrong. Building them in isolation and integrating them later creates rework. The recommended delivery sequence (engine detection → pre-configuration → dialog detection) mirrors the causal data flow at runtime. All three new modules (`GameEngineDetector`, `ProactiveConfigurator`, `WindowMonitor`) are self-contained and can be built without changes to the existing agent loop API surface.
+The recommended implementation avoids two major wrong turns. First, libgit2 wrappers are not the right tool: this feature writes one JSON file per game via the GitHub Contents API, which is two HTTP calls. A libgit2 dependency adds a compiled C library and significant complexity with no benefit. Second, and non-negotiably, the GitHub App private key must not ship with the CLI binary — every user would be able to impersonate the bot. The correct architecture is a thin server-side token proxy that holds the private key and returns short-lived installation access tokens on demand. This is the standard pattern for open-source CLI bots (Renovate, Probot, semantic-release) and skipping it is a security failure, not a simplification.
 
-The top risk for the entire v1.1 effort is a cluster of silent-failure modes: `CGWindowListCopyWindowInfo` silently omitting window titles without Screen Recording permission, Wine trace format varying across Gcenx CrossOver builds, and engine detection producing false-positive pre-configuration that breaks games. All three fail without errors, producing behavior that is hard to attribute to the new features. The mitigation is consistent across all three cases: build graceful degradation and fallback paths before assuming the happy path works, test against actual Gcenx-distributed Wine binaries (not upstream Wine documentation), and prefer trace:msgbox (no permissions required, fires synchronously) over `CGWindowListCopyWindowInfo` as the primary dialog detection signal.
+The critical risk concentration is in Phase 1 (GitHub App auth + proxy). Once the authentication plumbing works and the collective memory entry schema is locked, the remaining phases follow clear patterns with low uncertainty. Schema design must happen before any community entries are written — retroactive migrations on a public Git repo are painful and breaking schema changes require coordinated rollouts across all client versions. Confidence voting requires Sybil resistance from day one; per-game-per-account deduplication is the minimum viable protection before public launch.
 
 ---
 
@@ -19,133 +19,183 @@ The top risk for the entire v1.1 effort is a cluster of silent-failure modes: `C
 
 ### Recommended Stack
 
-The v1.1 stack requires only one new external dependency. All window detection, PE parsing, Wine trace parsing, and agent loop changes use existing Apple frameworks or toolchain utilities already present. SwiftSoup 2.8.7 (pure Swift, SPM-compatible, actively maintained as of March 2025) replaces the current raw-text HTML stripping in `fetch_page` with structured CSS-selector-based extraction capable of pulling tables, code blocks, and list items from WineHQ AppDB and PCGamingWiki pages.
+No new SPM dependencies are required if the native `Security.framework` RS256 approach is used for JWT signing. `SecKeyCreateSignature(.rsaSignatureMessagePKCS1v15SHA256)` is available on macOS 14+ and produces a valid GitHub App JWT in ~60 lines of Swift. The optional alternative is `vapor/jwt-kit 5.0.0` — Swift 6 compatible, standalone (does not require Vapor), RSA in the `Insecure` namespace by design. All GitHub API calls use URLSession, which already handles the Anthropic API. See `.planning/research/STACK.md` for full analysis.
 
 **Core technologies:**
-- `CoreGraphics` (built-in, macOS 14+): macOS window list enumeration via `CGWindowListCopyWindowInfo` — returns bounds, owner PID, layer, and window title (with Screen Recording permission) for all on-screen windows; not deprecated as of macOS 15 Sequoia
-- `Foundation.Data` + `objdump -p` (built-in toolchain): PE header and import table extraction — use `objdump -p` first (already proven in the codebase); native Swift binary parsing (~80-100 lines) is available as fallback if `objdump` proves unreliable
-- `SwiftSoup 2.8.7`: structured HTML extraction from fetched web pages — the only production-grade HTML parser in the Swift ecosystem; pure Swift, no C dependencies, Swift 6 compatible, SPM native
-- `AgentLoop.swift` logic changes only: max_tokens + incomplete tool_use block handling, stuck-loop detection, budget ceiling — no new framework needed
+- GitHub REST API — Contents endpoint (`PUT /repos/.../contents/{path}`): single HTTP call to write a memory entry file; no local git clone needed
+- GitHub REST API — Git Trees endpoint (`GET /repos/.../git/trees/{sha}?recursive=1`): efficient bulk read of the repo file index for startup queries
+- Security.framework (built-in, macOS 14+): RS256 JWT signing for GitHub App auth with no SPM dependency
+- vapor/jwt-kit 5.0.0 (optional fallback): if PEM key loading via Security.framework proves verbose; already adjacent to the existing Vapor dependency
 
-**Critical version note:** When `stop_reason == "max_tokens"` and the last content block is a `tool_use` block, the correct recovery is to retry with higher `max_tokens` without appending the truncated response. The current AgentLoop handles text truncation correctly but will corrupt state on tool_use truncation. This is a correctness fix with documented Anthropic guidance.
+**What to avoid:**
+- SwiftGit2 / SwiftGitX: Swift 6 incompatible or 0.x API instability; compiled C dependency for no benefit over the Contents API
+- Kitura/Swift-JWT: dormant since 2022; use Security.framework or jwt-kit instead
+- Vector embeddings / RAG for memory lookup: massively over-engineered; game ID is a stable key, not a semantic query
+- GitHub Personal Access Token: tied to a human account, does not scale to community use
 
 ### Expected Features
 
-**Must have (table stakes — P1):**
-- Agent loop resilience: max_tokens mid-tool-use truncation handled correctly; 3-attempt exponential backoff on HTTP 5xx; budget ceiling with session cost summary printed at session end
-- Game engine detection from file patterns and PE imports — enables proactive pre-configuration and richer research queries
-- Engine-aware proactive pre-configuration — write `ddraw.ini`, renderer INI, or known-working registry values before first launch for recognized engines; eliminates the "stuck on renderer dialog" class of first-run failures
-- Wine trace:msgbox dialog detection — add `+msgbox` to WINEDEBUG in `trace_launch`, parse structured dialog title and text from stderr; no new macOS permissions required
-- Actionable fix extraction from `fetch_page` — SwiftSoup post-processing returns `extracted_fixes` (env vars, winetricks verbs, registry keys) alongside existing `text_content`
+See `.planning/research/FEATURES.md` for full analysis, competitor comparison, and dependency graph.
 
-**Should have (competitive — P2):**
-- Engine-aware search queries — include engine name and graphics API in DuckDuckGo queries constructed after engine detection runs
-- Cross-game pattern matching via success DB — query by engine/graphics_api tags; use similarity matches as hypotheses requiring trace_launch verification, not direct configuration application
-- Hybrid window detection (CGWindowListCopyWindowInfo) — size/layer heuristics as optional complement to trace:msgbox; degrades gracefully without Screen Recording permission
+**Must have (table stakes — v1.2 core, P1):**
+- Memory entry schema definition — must be locked before any code is written; fields: game_id, wine_config, reasoning_chain, environment snapshot (arch, wine_flavor, macOS version), confirmations, status, schemaVersion
+- GitHub App authentication — app credentials configured for write access; required by all write features
+- Query collective memory — agent checks for existing solutions before diagnosis; best-effort, non-blocking
+- Environment-aware fit assessment — agent reasons about environment delta before applying any stored config; never blindly applies
+- Automatic push after success — agent pushes after `save_success` + user-confirmed launch; no human approval in the path
+- Confidence accumulation — increments confirmations on matching config; tracks unique environment hashes; deduplication from day one
 
-**Defer (v2+):**
-- Proton compatibility database integration — high value but high maintenance; web search sufficient for now
-- Multi-session agent memory — defer until context window limits become an actual bottleneck
-- Vision-based dialog detection — expensive (vision model API), fragile, requires additional permissions
+**Should have (v1.2 stretch, add after P1 path validated, P2):**
+- Staleness detection — flags entries where current Wine major version is more than one ahead of last confirmation; triggers re-validation
+- Web interface memory state — extend existing web UI to show memory stats, per-game entries, recent contributions
+- Entry deprecation (superseded status) — marks old configs without deleting; Git history provides audit trail
 
-**Anti-features (confirmed, do not build):**
-- Virtual desktop mode — confirmed broken on macOS winemac.drv (XQuartz-only feature)
-- Automatic Wine version switching — Gcenx tap provides one active build; version gambling is not a viable repair strategy
-- Winetricks mass-installation — breaks bottle cleanliness, masks actual dependency gaps
-- AI-generated dialog button clicking — requires Accessibility API permission, dangerous if wrong button is clicked
+**Defer to v2+:**
+- Environment diversity weighting for confidence — meaningful only at 50+ games in database
+- Cross-game config transfer (same-engine suggestions) — requires enough entries per engine to be useful
+- Abuse / spam detection — defer until community scale makes it a real problem
+
+**Anti-features (do not build):**
+- Human approval workflow for contributions — kills automatic contribution, which is the core value prop; WineHQ AppDB's gated model explains its staleness
+- Centralized backend API instead of Git — adds server infrastructure, hosting costs, uptime requirements
+- User identity / attribution — privacy concern; environment hash is sufficient contributor identity
+- Mandatory collective memory with no opt-out — forced contribution of system specs violates user trust
 
 ### Architecture Approach
 
-The architecture is an incremental modification of the existing `AgentLoop` / `AgentTools` / `AIService` triad, adding three new modules (`GameEngineDetector`, `ProactiveConfigurator`, `WindowMonitor`) and making targeted changes to `WineProcess`, `AgentTools.inspectGame()`, `AgentTools.fetchPage()`, and `AgentLoop.run()`. The key structural decision is that proactive pre-configuration runs as a synchronous phase in `AIService.runAgentLoop()` before the first API call — it is not an agent tool. This eliminates 4-6 agent iterations for known-working games and is the right use of deterministic pattern matching (no LLM needed for engine detection). Window monitoring runs inside `WineProcess.run()`'s existing 2-second polling loop, not as a separate agent tool (the agent cannot call tools while a synchronous launch is blocking the executor).
+The integration is additive and surgical: two new Core files (`CollectiveMemoryClient.swift`, `GitHubAppAuth.swift`), one new Model (`CollectiveMemoryEntry.swift`), one new web Controller (`MemoryController.swift`), and targeted modifications to `AIService.runAgentLoop()`, `CellarConfig`, `CellarPaths`, and `WebApp`. `AgentLoop`, `AgentTools`, `BottleManager`, `SuccessDatabase`, `RecipeEngine`, and all existing Controllers are untouched. The agent does NOT get new tools for collective memory — query and push happen in the AIService orchestration layer, before and after the loop. This preserves the agent's role as a problem-solver rather than a data curator. See `.planning/research/ARCHITECTURE.md` for component diagrams, data flow, and the recommended build order.
 
 **Major components:**
-1. `GameEngineDetector` (new, `Core/GameEngineDetector.swift`) — pure Swift pattern matching on PE imports and file signatures; called from both `ProactiveConfigurator` and `AgentTools.inspectGame()`; returns confidence-scored engine hypothesis, not an assertion
-2. `ProactiveConfigurator` (new, `Core/ProactiveConfigurator.swift`) — runs before first API call in `AIService.runAgentLoop()`; detects engine, checks success DB for exact match, applies mechanical Wine-compatibility defaults (INI fields, minimal registry); reports all applied actions in initial message
-3. `WindowMonitor` (new, `Core/WindowMonitor.swift`) — CoreGraphics wrapper, called every 2s inside `WineProcess.run()` polling loop; returns `WindowSnapshot` (owner name, bounds, layer, optional title); requires Screen Recording permission only for window title
-4. `AgentLoop.run()` modifications — adds `consecutiveMaxTokens` counter, `lastToolCall` dedup tracking (inject reminder after 2 identical tool+arg calls), budget warning at `remainingIterations <= 3`, and correct mid-tool-use truncation retry
-5. `AgentTools.fetchPage()` modification — adds `ExtractedFix` SwiftSoup post-processing alongside existing `text_content`; extraction may be empty (always include raw text as fallback)
+1. `GitHubAppAuth` — JWT generation via Security.framework + installation token exchange; token cached with 5-minute safety buffer before the 1-hour expiry
+2. `CollectiveMemoryClient` — read/write operations against GitHub Contents API; best-effort (returns Optional / Bool, never throws; network failure is a soft failure that degrades gracefully)
+3. `CollectiveMemoryEntry` — lean Codable schema derived from `SuccessRecord`; includes `schemaVersion`, `reasoningChain`, `environmentContext`, `confirmations`; lenient decoding for forward compatibility
+4. `AIService.runAgentLoop()` modifications — query before loop (injects memory context into initial user message); push after loop on confirmed success (never blocks the success message to user)
+5. `MemoryController` — Vapor routes for web UI `/memory` list and `/memory/:gameId` detail views
 
-**Build order (dependency-driven):**
-- Level 1 (no dependencies): `GameEngineDetector`, `WindowMonitor`
-- Level 2: `WineProcess` + `WineResult` field additions, `inspectGame` embedding of `GameEngineDetector`, `ProactiveConfigurator`
-- Level 3: `AIService` pre-config phase, `AgentLoop` resilience changes, `fetch_page` SwiftSoup extraction
-- Level 4: System prompt search strategy refinements
+**Key patterns:**
+- Best-effort reads: `CollectiveMemoryClient.query()` returns `Optional`, never throws; nil = proceed without context, same as pre-v1.2 behavior
+- Post-loop push: write happens after `AgentLoop.run()` completes, never inside the loop or in agent tools
+- Optimistic locking: PUT requires current blob SHA; on 409 Conflict, retry once with fresh GET (fetch-rebase-push pattern)
+- Single file per game: `entries/{gameId}.json`; same-game concurrent writes are rare and resolved by retry
 
 ### Critical Pitfalls
 
-1. **CGWindowListCopyWindowInfo silently omits window titles without Screen Recording permission** — `kCGWindowName` key is absent (not nil) without permission; code treating nil title as "no window found" will always report no dialog. Mitigation: check permission before using title; fall back to bounds+layer heuristics (no permission required) and trace:msgbox as the primary signal.
+See `.planning/research/PITFALLS.md` for all 10 pitfalls with full prevention strategies, warning signs, recovery steps, and a "Looks Done But Isn't" checklist.
 
-2. **Wine windows are owned by `wine64`/`wine-preloader`, not by the game process name or root PID** — filtering by the root Wine PID passed to `WineProcess.run()` will miss windows owned by Wine child processes. Mitigation: filter by owner name (`wine64`, `wine-preloader`, `wine`); use bounds heuristic (game windows ≥640×480, dialog windows ≤600×300) as the primary classifier.
+1. **GitHub App private key cannot ship in the binary** — use a token proxy server (Cloudflare Worker, Railway, or Fly.io); private key stays server-side; CLI requests short-lived installation tokens from the proxy. Non-negotiable: embedding the key grants every user bot impersonation capability. Address in Phase 1 before any other code is written.
 
-3. **Wine trace:msgbox output format varies between Gcenx CrossOver builds and upstream Wine** — strict prefix matching on `trace:msgbox:MessageBoxW` will silently miss dialogs on different Wine sub-versions. Mitigation: write a permissive regex; log raw lines that look like msgbox entries but don't parse; test against actual Gcenx `wine-crossover` binary output before shipping.
+2. **Push race condition on concurrent agent writes** — implement fetch-rebase-push retry loop (max 3 attempts, exponential backoff: 2s, 4s, 8s); missing retry means confirmed solutions are silently lost; confirmed by real GitHub internal issue report (`push_repo_memory.cjs` bug #19476). One file per game minimizes conflicts. Address in Phase 1/2.
 
-4. **Proactive INI writes break games that generate their INI on first run** — pre-writing a full INI skips the setup wizard but may embed wrong resolution or audio values for the user's system. Mitigation: write only Wine-compatibility-required fields (e.g., `renderer=opengl` in `ddraw.ini`); check if INI exists before writing; patch specific keys rather than replacing the file.
+3. **Environment schema underspecified** — capture `arch` (arm64/x86_64), `wine_flavor` (crossover/stable/devel), `metal_supported`, `rosetta`, `gptk_installed`, not just `wine_version` and `macos_version`. ARM/Intel mismatch is a hard rejection, not a warning. Address in Phase 2 (schema design, before first write).
 
-5. **max_tokens truncation mid-tool-use block corrupts agent loop state** — the current code attempts to continue with truncated tool_use JSON, which either fails to decode or produces inconsistent loop state. Mitigation: detect `stop_reason == "max_tokens"` with last block type `toolUse`, retry with doubled `max_tokens` (capped at 32768), do NOT append the truncated response to message history.
+4. **Schema forward compatibility** — include `schemaVersion: 1` from day one; all non-identifier fields optional for readers; use lenient Codable decoding; new fields must have defaults. Breaking this retroactively requires migrating a public repo. Address in Phase 2.
+
+5. **Reasoning chain privacy** — sanitize paths (`/Users/`, `WINEPREFIX=`, username patterns) before committing to the public repo; store a summarized diagnosis narrative (2KB cap), not the raw tool-call transcript. Make reasoning chain sharing opt-in. Address in Phase 3.
 
 ---
 
 ## Implications for Roadmap
 
-Based on the dependency graph in FEATURES.md and the build order in ARCHITECTURE.md, the natural phase structure for v1.1 is:
+Based on combined research, the dependency graph drives the phase order: auth is foundational for all writes, schema must be locked before first community write, read path must be validated before write path, and web UI is purely additive and comes last.
 
-### Phase 1: Agent Loop Resilience
-**Rationale:** All v1.1 features are fragile if the loop can abort on max_tokens mid-tool-use truncation or silent HTTP errors. The max_tokens + tool_use truncation issue is a correctness defect — it must be fixed before any new feature is tested against it. Budget tracking and loop deduplication are changes to the same `AgentLoop.run()` state machine and belong together.
-**Delivers:** A correct, resilient agent loop with session cost visibility. No feature additions, just correctness and observability.
-**Addresses:** Agent loop resilience (max_tokens retry, HTTP retry), budget tracking + ceiling, stuck-loop detection (all P1)
-**Avoids:** Pitfall 7 (max_tokens truncation corrupts state), Pitfall 6 (loop repetition without progress)
-**Research flag:** Standard patterns — Anthropic docs are authoritative and specific. No additional research needed.
+### Phase 1: GitHub App Authentication + Token Proxy
 
-### Phase 2: Game Engine Detection
-**Rationale:** Engine detection is the prerequisite for proactive pre-configuration (Phase 3) and smarter search queries (Phase 5). It is a self-contained pure-Swift module with no UI or agent changes. Adding it to `inspect_game` output gives immediate agent benefit (richer LLM context for the Research phase) even before Phase 3 ships.
-**Delivers:** `GameEngineDetector` struct; `inspect_game` tool result gains `engine` field with confidence score, detected signals, and known-config hint.
-**Uses:** `objdump -p` (existing), Foundation file system APIs, PE import DLL name patterns from research
-**Avoids:** Pitfall 4 (engine detection false positives) — output must be confidence-scored hypotheses (`"likely DirectDraw"`) not assertions (`"DirectDraw"`)
-**Research flag:** Standard patterns — file signatures and PE import patterns are a published standard. No additional research needed.
+**Rationale:** Auth is the critical path and the highest technical uncertainty. It is also the most security-sensitive: getting it wrong means shipping a binary with a compromised credential surface. Nothing else can be built correctly until the auth model is settled. Per pitfall research, the proxy architecture must be decided before any code is written — it affects what the CLI sends, what the server validates, and how token refresh works. The 1-hour token expiry must be handled from the start; retrofitting it after a session-length bug appears in production is harder.
 
-### Phase 3: Proactive Pre-configuration
-**Rationale:** With engine detection available, proactive pre-configuration is deterministic logic calling existing subsystems. This is the highest-leverage feature in v1.1 — for known-working games, it eliminates the entire Research-Diagnose-Adapt cycle and replaces it with a sub-second mechanical config application, directly unblocking the v1.1 UAT milestone (American Conquest as the target game).
-**Delivers:** `ProactiveConfigurator` struct; pre-config phase inserted into `AIService.runAgentLoop()` before the first API call; fast path for exact success DB matches; initial message injection reporting all applied actions.
-**Implements:** Pre-Launch Phase Runner pattern; SuccessDatabase exact-match fast path
-**Avoids:** Pitfall 5 (INI pre-write breaks games), Pitfall 10 (proactive registry edits breaking bottle)
-**Research flag:** Implementation risk in INI partial-write behavior (existing-file patch vs full replace). Validate this specifically during implementation.
+**Delivers:** Working GitHub App installation token flow; RS256 JWT via Security.framework; token caching with 5-minute safety buffer; thin proxy endpoint (or documented per-user setup if proxy deployment is deferred to v1.3); `GitHubAppAuth.swift`; `CellarPaths.githubAppKeyFile`
 
-### Phase 4: Dialog Detection (trace:msgbox primary, window monitor optional)
-**Rationale:** Dialog detection is the diagnostic complement to proactive pre-configuration — when pre-config doesn't fully work, the agent needs to detect dialog stuck-state from a `launch_game` result. Wine trace:msgbox is the primary signal (no permissions, faster, tolerant of format variation when written defensively). `CGWindowListCopyWindowInfo` is an optional complementary signal added only after trace-based detection is validated.
-**Delivers:** `+msgbox` added to WINEDEBUG in `trace_launch`; structured `dialog_detected`, `dialog_title`, `dialog_message` fields in `launch_game` tool result; `WindowMonitor` struct (optional, graceful degradation without Screen Recording permission); `WineResult` gains `dialogsDetected` and `gameWindowDetected` fields.
-**Uses:** CoreGraphics `CGWindowListCopyWindowInfo`, Wine debug channels (`+msgbox`, `+dialog`)
-**Avoids:** Pitfall 1 (Screen Recording permission silent failure), Pitfall 2 (Wine window owner PID filtering), Pitfall 3 (trace format variation)
-**Research flag:** NEEDS VALIDATION — must test against actual Gcenx `wine-crossover` build trace output before shipping the parser. Screen Recording permission behavior on macOS 15 Sequoia for CLI tools should be verified on target hardware.
+**Addresses:** GitHub App authentication (P1 feature); token expiry handling (Pitfall 5); private key security model (Pitfall 1)
 
-### Phase 5: Smarter Research Tools
-**Rationale:** With the loop corrected, engine detection feeding richer context to the agent, and dialog detection providing structured failure signals, the research phase becomes significantly more precise. Actionable fix extraction (SwiftSoup post-processing in `fetch_page`) and engine-aware search query construction are lower-risk changes that make the LLM's research output more token-efficient. Success DB similarity match tightening belongs here as well.
-**Delivers:** SwiftSoup 2.8.7 added as SPM dependency; `fetch_page` returns `extracted_fixes` (structured env vars, winetricks verbs, registry keys) alongside `text_content`; system prompt gains explicit search strategy section with engine-name and symptom query construction; success DB similarity match relevance threshold raised from 0.3 to 0.6.
-**Uses:** SwiftSoup 2.8.7, DuckDuckGo HTML scrape (existing), system prompt engineering
-**Avoids:** Pitfall 8 (DuckDuckGo rate limiting — cache-first behavior, 403 graceful fallback), Pitfall 9 (success DB wrong match applied directly)
-**Research flag:** SwiftSoup integration is standard. DuckDuckGo rate limiting is a known limitation — document it explicitly, implement cache-first behavior, and add User-Agent header + 403 graceful fallback before shipping.
+**Avoids:** Embedding private key in binary or `~/.cellar/config`; unhandled 401 on long sessions; blocking downstream phases on unresolved auth design
 
-### Phase 6: Integration and End-to-End Validation
-**Rationale:** With all five capability layers in place, end-to-end testing verifies the combined system: engine detection feeds proactive config, pre-config summary is reported in the initial message, and the agent builds on it using trace:msgbox dialog detection and smarter search queries when needed. Target UAT scenario (American Conquest launch to gameplay) exercises the full v1.1 system.
-**Delivers:** All v1.1 features working cohesively; v1.1 UAT passing; milestone complete.
-**Research flag:** Standard integration testing. No new research needed.
+---
+
+### Phase 2: Memory Entry Schema + Collective Memory Repo
+
+**Rationale:** Schema must be locked before any community entries are written — one bad design decision now means a painful migration across all public entries later. This phase has zero code dependencies on Phase 1 (it is pure data modelling) and can be designed in parallel with Phase 1, but the repo setup (creating `cellar-community/memory`, establishing `entries/` structure, testing writes) requires auth from Phase 1.
+
+**Delivers:** `CollectiveMemoryEntry.swift` model; `entries/{gameId}.json` repo layout; `index.json` catalog for fast startup queries; `schemaVersion: 1` from entry one; lenient Codable decoding pattern (unknown fields ignored, optional fields defaulted); `CellarConfig` additions for GitHub App config fields
+
+**Addresses:** Memory entry schema (P1 feature); forward compatibility (Pitfall 7); environment underspecification (Pitfall 3)
+
+**Implements:** `CollectiveMemoryEntry` schema component; collective memory repo structure
+
+**Avoids:** Strict Codable decode on community data; missing `arch`/`wine_flavor` fields; schema without version field
+
+---
+
+### Phase 3: Read Path — Query + Environment-Aware Fit Assessment
+
+**Rationale:** The read path (query → assess → apply) is the primary user-facing value. Get reads right before writes. Wrong reads waste the agent's time; wrong writes corrupt community data. The read path also validates that the Phase 2 schema design works in the agent context before the write path commits entries to the public repo.
+
+**Delivers:** `CollectiveMemoryClient.swift` (read operations: `query(gameId:)`, `queryAll()`); `AIService.runAgentLoop()` modification to inject memory context into initial user message before the loop; local/collective priority router logic (local successdb match wins over collective memory query for already-solved games); `MemoryRouter` or equivalent
+
+**Addresses:** Query collective memory (P1 feature); environment-aware fit assessment (P1 feature); local/collective inconsistency (Pitfall 10); performance trap of cloning on every launch (Pitfall 6)
+
+**Implements:** `CollectiveMemoryClient` read path; `AIService` pre-loop integration
+
+**Avoids:** Blocking launch on network fetch; replacing local successdb match with collective query; agent applying configs without environment reasoning
+
+---
+
+### Phase 4: Write Path — Automatic Push + Confidence Accumulation
+
+**Rationale:** Write path requires Phase 1 (auth) and Phase 3 (read path, to fetch existing entry SHA for updates). Building write on top of a validated read path reduces the risk of writing malformed entries. Confidence accumulation ships with the write path — a write path without deduplication is a Sybil attack surface from day one, and retrofitting it after public launch requires migrating all existing vote counts.
+
+**Delivers:** `CollectiveMemoryClient.swift` (write operations: `push(entry:)`); `AIService.runAgentLoop()` post-loop push (best-effort, never blocks success message); `CollectiveMemoryEntry.from(successRecord:reasoningChain:existingEntry:)` factory; retry-on-409 conflict handling (max 3 attempts, exponential backoff); per-game-per-account confirmation deduplication; reasoning chain sanitization (path pattern replacement); pending-contributions local queue for push failures
+
+**Addresses:** Automatic push after success (P1 feature); confidence accumulation (P1 feature); push race condition (Pitfall 2); memory poisoning / confidence inflation (Pitfalls 4, 9); reasoning chain privacy (Pitfall 8)
+
+**Avoids:** Push without retry; raw agent transcript stored in public entry; new entry starting at high confidence; same account voting multiple times on same game
+
+---
+
+### Phase 5: Web UI — Memory State View
+
+**Rationale:** Informational only; no blocking dependencies except needing real entries to display. Ships after the core agent-facing features are working and the database has real entries to show. Lower risk, follows the exact same Vapor + Leaf pattern as `GameController`.
+
+**Delivers:** `MemoryController.swift`; `/memory` list and `/memory/:gameId` detail Leaf templates; `WebApp.configure()` registration; `SettingsController` additions for memory config fields (GitHub App ID, installation ID, memory repo, key path)
+
+**Addresses:** Web interface memory state (P2 stretch feature); transparency in trust model ("57 games solved, 234 confirmations")
+
+**Implements:** `MemoryController` web component
+
+---
+
+### Phase 6: End-to-End Validation + Stretch Features
+
+**Rationale:** Full flow validation across two agent sessions (solve → push → new session sees context) requires all prior phases to be complete. Staleness detection and entry deprecation are P2 stretch features that need real entries to be meaningful.
+
+**Delivers:** End-to-end test: solve game → verify push to test repo → launch again → verify agent sees memory context in initial message; staleness detection (flag entries where current Wine major version is ahead of last confirmation range); entry deprecation (`superseded` status without deletion); performance verification (clone time with 500-entry synthetic repo); all "Looks Done But Isn't" checklist items from PITFALLS.md verified
+
+**Addresses:** Staleness detection (P2 stretch); entry deprecation (P2 stretch); offline behavior verified; schema version handling verified
+
+---
 
 ### Phase Ordering Rationale
 
-- Loop resilience must come first because all other phases add test surface area — testing them on a loop with a latent correctness bug produces misleading failures.
-- Engine detection must precede pre-configuration because `ProactiveConfigurator` directly calls `GameEngineDetector`; there is a code dependency.
-- Pre-configuration before dialog detection because pre-configuration is the proactive path that makes dialog detection less frequently exercised; validating pre-config establishes what dialog detection needs to handle as its fallback scope.
-- Research tools last because they require SwiftSoup (a new SPM dependency) and involve system prompt changes that are best tuned after the structural features are stable and validated.
+- Auth before everything: the proxy architecture decision cascades into CLI request format, server validation, and token refresh — it cannot be retrofitted cleanly
+- Schema before first write: public Git repos cannot be cleanly migrated; every field omission becomes permanent debt across all community entries
+- Read before write: validates the schema works in practice before committing to the public; wrong reads are recoverable (agent falls back to fresh diagnosis), wrong writes pollute community data
+- Write before web UI: the web UI has nothing meaningful to display until real entries exist
+- Confidence deduplication ships with write path, not as a later addition: Sybil resistance cannot be retroactively applied to existing vote counts
+- `AgentLoop`, `AgentTools`, `SuccessDatabase`, `BottleManager` are never touched: the integration lives entirely in `AIService` orchestration, preserving the agent's stable tool surface
+
+---
 
 ### Research Flags
 
-Phases needing deeper research or real-device validation before shipping:
-- **Phase 4 (Dialog Detection):** Must capture and examine actual Gcenx `wine-crossover` stderr trace output from a Wine program that produces a MessageBox. Do not ship the parser based on Wine source code or documentation alone. Screen Recording permission degradation on macOS 15 Sequoia for a CLI binary launched from Terminal.app requires device verification.
-- **Phase 5 (Research Tools):** DuckDuckGo anti-bot behavior under multiple-queries-per-session needs validation in the actual usage environment before assuming the 1-second inter-query delay is sufficient.
+Phases likely needing deeper research during planning:
 
-Phases with well-documented, low-risk patterns (no additional research needed):
-- **Phase 1 (Loop Resilience):** Anthropic stop_reason docs are authoritative and specific. Pattern is unambiguous.
-- **Phase 2 (Engine Detection):** PE format is a published Microsoft standard. File signature patterns are from established community tools.
-- **Phase 3 (Proactive Config):** Pure Swift calling existing subsystems (`GameEngineDetector`, `SuccessDatabase`, `write_game_file` logic). Implementation risk is limited to INI partial-write behavior.
+- **Phase 1 (GitHub App Auth + Proxy):** The proxy server architecture needs concrete implementation decisions — hosting platform (Cloudflare Worker vs Railway vs Fly.io), request format, rate limiting strategy per-IP or per-Cellar-installation. The CLI-side auth flow is well-documented; the proxy design is not. Recommend `/gsd:research-phase` focus on "open-source CLI bot token proxy patterns."
+- **Phase 4 (Write Path):** Confidence deduplication across a distributed system with no user accounts requires careful design. The GitHub account age + per-account weekly limit approach from pitfalls research is directionally correct but the GitHub App rejection mechanism implementation is unspecified. Needs concrete design before Phase 4 begins.
+
+Phases with standard patterns (skip research-phase):
+
+- **Phase 2 (Schema):** Codable schema design and lenient JSON decoding are well-documented Swift patterns. The schema fields are fully specified across FEATURES.md and ARCHITECTURE.md.
+- **Phase 3 (Read Path):** GitHub Contents API GET is simple and well-documented. URLSession pattern is established in the codebase. No unknowns.
+- **Phase 5 (Web UI):** Vapor + Leaf route pattern is established in the codebase. `MemoryController` follows the exact same structure as `GameController`.
+- **Phase 6 (Validation):** Integration testing, not research.
 
 ---
 
@@ -153,45 +203,59 @@ Phases with well-documented, low-risk patterns (no additional research needed):
 
 | Area | Confidence | Notes |
 |------|------------|-------|
-| Stack | HIGH | One new dependency (SwiftSoup); all others are built-in Apple frameworks or existing toolchain. SwiftSoup verified against GitHub source and package metadata. max_tokens recovery pattern verified against official Anthropic stop_reason docs. |
-| Features | HIGH | Based on direct codebase inspection plus Anthropic API docs. Feature dependency graph is well-established from code analysis. Anti-feature list is grounded in concrete macOS Wine behavior (virtual desktop broken on winemac.drv is empirically confirmed in prior phases). |
-| Architecture | HIGH | Based on direct source code inspection of `AgentLoop.swift`, `AgentTools.swift`, `AIService.swift`, `WineProcess.swift`. Integration points are concrete, not speculative. Build order derived from actual code dependencies, not estimated. |
-| Pitfalls | HIGH (most) / MEDIUM (Wine trace format) | Critical pitfalls verified against Apple developer docs (Screen Recording permission gating), Anthropic official docs (max_tokens truncation), and Wine source code (debug channel declarations). Wine trace:msgbox format variation is MEDIUM confidence because the exact CrossOver build output format was not verified against a running Gcenx Wine instance. |
+| Stack | HIGH | GitHub REST API and GitHub App auth flow verified against official docs. Security.framework RS256 confirmed on Apple developer forums. vapor/jwt-kit 5.0.0 verified from source. No ambiguous dependency choices remain. |
+| Features | MEDIUM | No direct prior art for agent-first Git-backed game config sharing. Analogous systems (ProtonDB, WineHQ AppDB, DebugBase MCP) researched and compared. Core table-stakes features are clear; confidence voting design has implementation unknowns around Sybil resistance. |
+| Architecture | HIGH | Integration points verified by direct codebase inspection. Data flow is explicit. Build order follows clear dependency graph. Component responsibilities cleanly bounded and non-overlapping. |
+| Pitfalls | HIGH | GitHub App auth mechanics verified against official docs. Git concurrency pitfall confirmed by real GitHub internal issue report. Memory poisoning vectors from OWASP Agentic AI taxonomy. Key leakage threat confirmed by industry data. |
 
 **Overall confidence:** HIGH
 
 ### Gaps to Address
 
-- **Wine trace format on actual Gcenx build:** The `trace:msgbox:MessageBoxW` format described in STACK.md comes from Wine source code and community documentation, not from a live Gcenx `wine-crossover` trace capture. Before shipping the dialog parser, run a minimal Wine program that triggers a MessageBox and capture raw stderr from the Gcenx build. Write the parser against that actual output.
-- **Screen Recording permission on macOS 15 Sequoia for CLI tools:** Documented behavior is that the permission is granted to the terminal application (Terminal.app, iTerm2), not the CLI binary. This is MEDIUM confidence — verify on target hardware that `cellar` launched from Terminal.app can read `kCGWindowName` when Terminal.app holds Screen Recording permission, and confirm behavior from iTerm2 as well.
-- **DuckDuckGo anti-bot behavior at scale:** One search per launch works; multiple searches within a single session may trigger rate limiting. Validate that the 1-second inter-query delay plus realistic User-Agent header is sufficient before shipping Phase 5.
+- **Token proxy hosting and deployment:** The proxy architecture is the correct answer for key distribution, but the specific hosting platform and request protocol are unspecified. Needs a decision before Phase 1 implementation begins. If proxy deployment is out of scope for v1.2, the per-user installation fallback (each user provides their own app ID + key) needs documented UX — first-run setup flow and clear error messaging when auth is unconfigured.
+
+- **Confidence deduplication mechanism:** The per-game-per-account weekly limit requires server-side state or GitHub-side enforcement. How this state is maintained without a full database is unresolved. Options: store a `confirmed_by_accounts` set in the entry JSON (readable by the proxy before accepting a write), or use GitHub App rate limiting per installation. Needs concrete design before Phase 4.
+
+- **Collective memory repo naming and ownership:** Research assumes `cellar-community/memory` but the actual GitHub org, repo name, and who administers the GitHub App are unresolved. Needs a decision before any auth code is written — the app ID and installation ID are baked into the CLI config format.
+
+- **Opt-in UX for collective memory contribution:** FEATURES.md specifies opt-in with a first-run prompt ("Contribute working configs to the community? Y/n"). The exact flow — where in the setup sequence, what the default is, how to toggle later in web settings — is unspecified. Needs UX decisions before Phase 4 implementation.
 
 ---
 
 ## Sources
 
 ### Primary (HIGH confidence)
-- [Anthropic: Handling Stop Reasons (official)](https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons) — max_tokens + tool_use truncation behavior, correct retry pattern
-- [Anthropic: Tool Use with Claude (official)](https://platform.claude.com/docs/en/build-with-claude/tool-use) — tool_use block structure, incomplete JSON on truncation
-- [Apple Developer Docs: CGWindowListCopyWindowInfo](https://developer.apple.com/documentation/coregraphics/cgwindowlistcopywindowinfo(_:_:)) — kCGWindowName requires Screen Recording permission; key is absent, not nil
-- [Apple Developer Forums: window name not available in macOS 10.15](https://developer.apple.com/forums/thread/126860) — Screen Recording permission requirement confirmed officially
-- [Wine source: dlls/user32/msgbox.c](https://github.com/wine-mirror/wine/blob/master/dlls/user32/msgbox.c) — confirmed WINEDEBUG=+msgbox channel and MessageBoxW trace output
-- [Microsoft PE Format spec](https://learn.microsoft.com/en-us/windows/win32/debug/pe-format) — PE header structure, import table offsets
-- [SwiftSoup GitHub](https://github.com/scinfu/SwiftSoup) — version 2.8.7, March 2025, Swift 6 compatible, macOS 14+
-- Cellar codebase: `AgentLoop.swift`, `AgentTools.swift`, `AIService.swift`, `WineProcess.swift` — direct inspection 2026-03-28
-- `.planning/agentic-architecture-v2.md` — v1.1 architecture design document with empirical Wine/macOS findings
+
+- [GitHub Docs — Creating or updating file contents](https://docs.github.com/en/rest/repos/contents#create-or-update-file-contents) — Contents API PUT endpoint, SHA requirement for updates
+- [GitHub Docs — Generating a JWT for a GitHub App](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-json-web-token-jwt-for-a-github-app) — RS256 requirement, claims format, 10-minute expiry
+- [GitHub Docs — Generating an installation access token](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-an-installation-access-token-for-a-github-app) — 1-hour token expiry (explicit statement)
+- [GitHub Docs — Best practices for creating a GitHub App](https://docs.github.com/en/apps/creating-github-apps/about-creating-github-apps/best-practices-for-creating-a-github-app) — "never ship private key with native clients"; public vs confidential client distinction
+- [GitHub Docs — Rate limits for the REST API](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api) — authenticated vs unauthenticated limits
+- [Apple Developer Forums — Generate JWT token using RS256](https://developer.apple.com/forums/thread/702003) — SecKeyCreateSignature with rsaSignatureMessagePKCS1v15SHA256 confirmed
+- [Apple Security framework: SecKeyCreateSignature](https://developer.apple.com/documentation/security/seckeycreatesignature(_:_:_:_:)) — RS256 signing without CryptoKit
+- [vapor/jwt-kit GitHub](https://github.com/vapor/jwt-kit) — v5.0.0, Swift 6, RSA in Insecure namespace
+- [JWTKit v5 migration blog — Vapor](https://blog.vapor.codes/posts/jwtkit-v5/) — RSA moved to Insecure namespace by design
+- [GitHub issue: push_repo_memory.cjs has no retry/backoff](https://github.com/github/gh-aw/issues/19476) — concurrent push data loss confirmed in real agent workflows
+- [OWASP Agentic AI: Agent Knowledge Poisoning](https://github.com/precize/OWASP-Agentic-AI/blob/main/agent-knowledge-poisoning-10.md) — knowledge base poisoning taxonomy and mitigations
+- Direct codebase inspection: `AIService.swift`, `AgentLoop.swift`, `AgentTools.swift`, `SuccessDatabase.swift`, `CellarPaths.swift`, `CellarConfig.swift`, `WebApp.swift`, `Package.swift` (2026-03-29)
 
 ### Secondary (MEDIUM confidence)
-- [Nonstrict.eu: ScreenCaptureKit on macOS Sonoma](https://nonstrict.eu/blog/2023/a-look-at-screencapturekit-on-macos-sonoma/) — CGWindowListCopyWindowInfo not deprecated; CGWindowListCreateImage/CGDisplayStream are the migrating APIs
-- [Wine Developer's Guide: Debug Channels](https://fossies.org/linux/misc/old/winedev-guide.html) — trace output format documentation (version-dated; exact CrossOver output may differ)
-- [CodeWeavers: Working on Wine Part 4 - Debugging Wine](https://www.codeweavers.com/blog/aeikum/2019/1/15/working-on-wine-part-4-debugging-wine) — CrossOver Wine debug output perspective
-- [game-engine-finder](https://github.com/vetleledaal/game-engine-finder), [enginedetect](https://github.com/YellowberryHN/enginedetect) — game engine file pattern references
-- [SteamDatabase FileDetectionRuleSets](https://github.com/SteamDatabase/FileDetectionRuleSets) — engine detection patterns used by Steam
-- [DuckDuckGo rate limiting (duckduckgo-search PyPI)](https://pypi.org/project/duckduckgo-search/) — RatelimitException behavior documented by scraping community
+
+- [WineHQ AppDB FAQ + Rating Definitions](https://wiki.winehq.org/AppDB_FAQ) — human-gated submission model and its staleness consequences
+- [DebugBase MCP server](https://github.com/DebugBase/mcp-server) — agent-first shared error/fix knowledge base design
+- [Kaspersky: GitVenom campaign](https://www.kaspersky.com/blog/malicious-code-in-github/53085/) — GitHub repo-based malware distribution confirms threat model is real
+- [The Register: AI companies leaking API keys to GitHub](https://www.theregister.com/2025/11/10/ai_companies_private_api_keys_github/) — widespread key leakage in production projects; 65% of Forbes AI 50 had leaked secrets
+- [Resultsense — Multi-Agent Memory as Computer Architecture](https://www.resultsense.com/insights/2026-03-19-multi-agent-memory-computer-architecture-perspective) — collective memory architecture patterns
+- [DEV Community — Each AI Agent Gets Its Own GitHub Identity](https://dev.to/agent_paaru/each-ai-agent-gets-its-own-github-identity-how-we-gave-every-bot-its-own-bot-commit-signature-1197) — GitHub App for bot commits pattern
+- [Letta: Git-backed memory for coding agents](https://www.letta.com/blog/context-repositories) — Git as agent memory backing store
+- [ProtonDB](https://www.protondb.com/) — community compatibility report model; hardware + notes schema (observed from site structure)
+- [Sophia Bits — Avoid JSON file merge conflicts](https://sophiabits.com/blog/avoid-json-file-merge-conflicts) — one-file-per-entity conflict avoidance pattern
 
 ### Tertiary (LOW confidence)
+
 - None identified — all findings have at least MEDIUM-confidence corroboration from multiple sources.
 
 ---
-*Research completed: 2026-03-28*
+
+*Research completed: 2026-03-29*
 *Ready for roadmap: yes*

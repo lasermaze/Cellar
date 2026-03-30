@@ -1,23 +1,22 @@
-# Feature Research: Cellar v1.1 — Agentic Independence
+# Feature Research: Cellar v1.2 — Collective Agent Memory
 
-**Domain:** macOS CLI+TUI Wine game launcher — agent autonomy layer
-**Researched:** 2026-03-28
-**Confidence:** HIGH (existing codebase examined, Anthropic API docs verified)
+**Domain:** Git-backed shared knowledge base for AI agents contributing and consuming game compatibility configs
+**Researched:** 2026-03-29
+**Confidence:** MEDIUM (analogous systems researched — ProtonDB, WineHQ AppDB, DebugBase MCP; no direct prior art for agent-first Git-backed game config sharing)
 
 ---
 
-## Context: What v1.0 Already Ships
+## Context: What Already Exists (Do Not Rebuild)
 
-These features exist and are NOT scope for v1.1:
+These features are in production and are NOT scope for v1.2:
 
-- 18-tool agent loop (inspect_game, launch_game, place_dll, set_environment, set_registry, install_winetricks, read_log, read_registry, ask_user, save_recipe, write_game_file, trace_launch, check_file_access, verify_dll_override, query_successdb, save_success, search_web, fetch_page)
-- Research-Diagnose-Adapt three-phase system prompt
-- DuckDuckGo web search with 7-day research cache
-- Success database with symptom fuzzy matching
-- DLL placement with companion files and syswow64 auto-detection
-- Working directory fix (CWD set to game exe parent)
+- Per-game local success database (`query_successdb`, `save_success`) — local SQLite, per-machine
+- Recipe system — bundled + AI-generated per-game configs, stored as YAML files
+- Agent loop with 20+ tools, Research-Diagnose-Adapt workflow
+- Engine detection, dialog detection, smart web research, actionable fix extraction
+- Web interface with game CRUD and live agent logs (SSE streaming)
 
-The v1.1 features build on this foundation. The agent loop exists — it needs to be *smarter*, more *resilient*, and more *aware* of what the game is doing.
+The v1.2 features extend the local success database into a **collective, community-wide** knowledge layer. The agent already solves games — now it remembers solutions across the entire user base.
 
 ---
 
@@ -25,107 +24,112 @@ The v1.1 features build on this foundation. The agent loop exists — it needs t
 
 ### Table Stakes (Users Expect These)
 
-For a tool that claims "agentic independence," the following are minimum credibility requirements. Missing any of these means the agent will silently give up, waste money on repeated failures, or get stuck on trivially detectable problems.
+These are required for "collective agent memory" to be credible. Missing any of these means the feature is either unsafe (applying wrong configs), useless (never checked), or closed (no community benefit).
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Agent persists through max_tokens truncation | API responses are sometimes cut mid-tool-call; agent must not abort | LOW | Pattern is documented by Anthropic: detect incomplete tool_use block when stop_reason == max_tokens, retry with higher max_tokens. AgentLoop.swift already handles stop_reason: max_tokens with a continuation prompt — this needs hardening for the incomplete tool_use block case specifically. |
-| Agent persists through API errors with retry | Network blips should not abort a 20-minute session | LOW | Current code returns immediately on any HTTP error. Needs 3-attempt retry with exponential backoff for 5xx and network errors; 4xx (except 429) are fatal. |
-| Agent persists through tool execution errors | A tool returning an error JSON should not halt the loop | LOW | Tool executor already returns strings, not throws. The loop continues. Needs explicit "error" framing in tool result so agent understands it must handle it, not give up. |
-| Budget tracking — total token cost visible | Users need to know if they spent $0.10 or $5.00 on a session | LOW | AnthropicToolResponse already includes usage.input_tokens and usage.output_tokens. Sum across iterations. Print at end of session. |
-| Agent stops when budget ceiling is hit | Open-ended loops can run up unexpected bills | MEDIUM | Configurable budget ceiling (default $1.00). Track cumulative cost using model pricing constants. Warn at 80%, halt at 100%. Current loop has no cost awareness. |
-| Wine trace parsing delivers structured output | trace_launch already exists; output must be structured, not raw stderr | MEDIUM | Already implemented per agentic-architecture-v2.md. Verify actual test results (UAT test 7). The key capability is parsing `+loaddll` output to `{ name, path, type: "native/builtin" }`. |
-| Dialog stuck detection via Wine traces | Agent must know if game is blocked on a dialog vs crashed | HIGH | WINEDEBUG=+msgbox emits `trace:msgbox:MessageBoxW` with dialog title and text. Format: `yyy:xxx:FunctionName message`. Parsing this stream identifies stuck-on-dialog state. No competitor does this automatically. |
+| Query collective memory before diagnosis | "Check if someone else already solved this" is the entire point of collective memory | MEDIUM | Agent calls a read-only lookup at the start of the Research phase. Must be fast enough not to slow the happy path. Cache locally after first fetch. |
+| Rich memory entries (config + reasoning + environment) | A config without context is useless. Users need to know *why* settings work, not just *what* they are | MEDIUM | Each entry stores: working Wine config, agent reasoning chain, environment snapshot (Wine version, macOS version, CPU arch, RAM), and confidence score. Analogous to ProtonDB reports which include hardware + tweaks + notes. |
+| Environment-aware fit assessment before applying | Blindly applying a config from a different Wine version or macOS release breaks games | HIGH | Agent reasons explicitly about environment delta: "This config was recorded on Wine 9.0 / macOS Sonoma. I am on Wine 9.21 / Sequoia. These diffs are unlikely to matter for this DX8 game." Agent adapts or skips based on reasoning, never applies blindly. |
+| Automatic push after solving a game | Manual contribution kills community databases (see: WineHQ AppDB). Agent must push automatically after user confirms success | MEDIUM | After `save_success` and user-confirmed launch, agent calls a `push_collective_memory` tool. No human approval needed for push. GitHub App bot token authenticates the write. |
+| GitHub App authentication for agent writes | Personal access tokens rot, require user setup, leak in logs | MEDIUM | GitHub App installed on the collective memory repo. App credentials ship with Cellar. Agent uses app token to create/update files via GitHub API. Scoped to write access on that repo only. |
+| Public read / authenticated write | Any Cellar user reads for free. Only authenticated agents write | LOW | Git repo is public. Reads are unauthenticated (git clone or API). Writes require GitHub App token. Standard open-source pattern. |
+| Confidence accumulates across agents | A config confirmed by one agent is good. Confirmed by five is gold | LOW | Each entry has a `confirmations` count and `confirmedBy` list (environment hashes, not user identity). Agent increments on match, never on first application without validation. |
+| Conflict-safe entry format (one file per game) | Multiple agents writing to the same file simultaneously must not corrupt the database | MEDIUM | One JSON/YAML file per game (keyed by game identifier hash). Agents append to or replace their own entry section. Conflicts on different games = no conflict. Same-game concurrent writes: last-write-wins is acceptable (entries are additive, not destructive). |
 
 ### Differentiators (Competitive Advantage)
 
-These are what makes Cellar genuinely autonomous rather than a fancy script runner.
+These make Cellar's collective memory qualitatively better than existing compatibility databases.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| Game engine detection from files | Engine type predicts the entire fix strategy (DirectDraw game = cnc-ddraw path; Unreal 1 = OpenGL renderer flags; Build engine = different DLL set) | MEDIUM | File patterns are reliable: `UnrealI.u` / `*.u` + `*.ini` = Unreal 1; `*.GRP` + `DUKE3D.EXE` = Build engine; `dmcr.exe` + `mdraw.dll` = GSC/DMCR engine; `*.pak` + `Binaries/Win64` = UE4+. PE imports are a secondary signal. No existing macOS tool detects engine for Wine compatibility purposes. |
-| Engine-aware pre-configuration | Skip renderer selection dialogs before first launch by writing correct INI/registry values | HIGH | For Unreal 1 games: write `[WinDrv.WindowsClient] WindowedViewportX=1024` to `[game].ini` before launch. For DirectDraw games: write `ddraw.ini`. For Build engine games: write `setup.cfg`. Agent can do this proactively based on engine detection, eliminating the "stuck on renderer dialog" class of failure. This is unique — no competitor handles old-game first-run configuration automatically. |
-| Hybrid dialog detection (Wine + window list) | Combine `trace:msgbox` parsing with CGWindowListCopyWindowInfo window size/title to confirm dialog vs game | HIGH | CGWindowListCopyWindowInfo (Screen Recording permission) returns kCGWindowBounds, kCGWindowName, kCGWindowOwnerPID. A dialog: small window (< 600x400), title contains "Error"/"Warning"/"Setup"/"Renderer". A game: large window or titled with game name. Wine msgbox trace fires synchronously before the dialog appears. Hybrid signal gives high confidence. Competitors (Bottles, Heroic, Lutris) do none of this — they rely entirely on user reporting. |
-| Cross-game success pattern matching | When encountering a new game, query success DB by engine/graphics API/symptoms to seed the diagnosis | MEDIUM | Already designed in agentic-architecture-v2.md. `query_successdb({ engine: "GSC", tags: ["directdraw"] })` returns Cossacks fix strategy for American Conquest. The differentiator is the tag schema and the agent's willingness to use analogical reasoning. Competitors have static script databases with no dynamic cross-game reasoning. |
-| Engine-aware web search queries | Search "Cossacks Wine macOS" not just "game name Wine" — include engine name, graphics API, specific error | MEDIUM | search_web already exists. Enhancement: agent constructs richer queries from engine detection output. `"[engine] [graphics_api] Wine macOS [symptom]"` returns far more relevant results than `"[game_name] Wine"`. |
-| Actionable fix extraction from web pages | fetch_page already exists — agent needs structured extraction, not free-text summarization | MEDIUM | Agent system prompt needs explicit extraction instruction: "Extract: exact env var names and values, exact registry paths, exact DLL names, exact winetricks verbs, exact INI file changes. Discard: general descriptions, unrelated OS advice, version-specific notes for Windows only." No tooling change needed — prompt engineering. |
+| Agent reasoning chain stored with config | ProtonDB and WineHQ AppDB store "what worked" with no "why." Cellar stores the diagnostic trace so future agents can understand intent, not just copy settings | MEDIUM | Store the agent's reasoning chain (key decision points, what was tried and rejected, why the final config was chosen) alongside the working config. Future agents use this to adapt intelligently rather than cargo-culting. |
+| Environment-delta reasoning (not just environment matching) | Filtering to exact environment matches produces zero results for most games. Reasoning about which environment differences actually matter for this specific game engine is the key capability | HIGH | Agent receives entries that don't exactly match its environment. Agent reasons: "The GPU changed but this game uses software rendering — irrelevant. The Wine version changed by 2 minor versions — unlikely to break DX8 behavior." This is unique; no compatibility database does environment delta reasoning. |
+| Confidence voting with environment diversity | Five confirmations from identical hardware is weak. Five confirmations from different CPUs, GPU vendors, and Wine versions is strong | LOW | Weight confidence score by environment diversity of confirmers, not raw count. A config confirmed on M1/M2/M3 across Wine 9.0-9.21 has higher confidence than 10 confirmations on the same machine. |
+| Staleness detection via Wine/macOS version bumps | A config that worked on Wine 8.x may silently break on Wine 10.x | MEDIUM | Each entry records the Wine version range it was confirmed on. When agent checks an entry, flag as "may be stale" if current Wine version is more than one major version ahead of the last confirmation. Trigger re-validation rather than silent application. |
+| Per-entry deprecation without deletion | Old configs shouldn't disappear — they're useful for diagnosing regressions | LOW | Entries have a `status` field: `active`, `superseded`, `unconfirmed`. Agents mark entries as `superseded` when they find a better config. Old entries remain in history (Git provides full audit trail). |
+| Web interface shows memory state | Transparency builds trust. Users should be able to see "57 games solved, 234 confirmations, last contributed 2 hours ago" | MEDIUM | Extend existing web interface (already built in v1.1) to show: collective memory stats, per-game entries, environment diversity, recent contributions. Read-only view of the shared repo. |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| Automated screenshot-based success detection | Users want zero-touch launches | Requires screen recording permission, vision model API calls ($$$), high false positive rate on loading screens vs game windows | User-confirmed validation (already shipped). For v1.1, add hybrid window size + title heuristic as a soft signal, but keep user confirmation as authoritative. |
-| Virtual desktop mode for stuck dialogs | "Wine virtual desktop fixes display issues" | Does NOT work on macOS winemac.drv — only works with XQuartz X11. Confirmed broken. Already removed from system prompt. | cnc-ddraw via syswow64 for DirectDraw games. OpenGL renderer INI pre-set for 3D engines. |
-| Automatic Wine version switching | Users expect "try different Wine version" as a fix | Gcenx tap only provides one active Wine build. Version switching is not a viable repair strategy in this setup. Would require downloading multiple Wine builds. | Focus on correct configuration, not version gambling. |
-| Winetricks mass-installation | "Install all common Windows components preemptively" | Breaks bottle cleanliness, installs unneeded components, masks actual missing dependency. Winetricks verbs take 5-30 minutes. | Install only what PE imports or runtime errors specifically require. |
-| AI-generated dialog button clicking | "Agent should click OK on dialogs automatically" | Requires Accessibility API (separate permission), fragile to window layout changes, dangerous if it clicks wrong button in a game-critical dialog | Proactive pre-configuration eliminates most first-run dialogs. Remaining ones handled by asking user. |
-| Parallel multi-config testing | "Try 5 configs simultaneously and pick what works" | Wine processes share X11/winemac resources; parallel Wine processes cause display corruption and race conditions on macOS | Sequential Research-Diagnose-Adapt with a budget ceiling is faster and more reliable. |
+| Human approval workflow for contributions | "Community moderation prevents bad configs" | Kills automatic contribution — the core value prop. Pull request review requires maintainer bandwidth. Breaks the "any agent contributes automatically" design. WineHQ AppDB's human-gated submissions explain its staleness. | Trust the environment hash + confidence model. Bad configs self-correct: low confirmation count + environment mismatch signals "treat with skepticism." Automate, then add abuse detection later. |
+| Vector search / embeddings for memory lookup | "Semantic search finds similar games even without exact match" | Adds infrastructure dependency (embedding API or local model). Adds latency to every agent startup. Overkill for structured game compatibility data where game ID, engine, and tags are reliable keys. | Structured lookup by game identifier hash, engine type, and tags. Fuzzy matching on game name for the lookup step. Use LLM reasoning (already in the loop) to interpret non-exact results — don't build a retrieval pipeline. |
+| Real-time conflict resolution / distributed locking | "Two agents writing simultaneously could corrupt data" | Git's append-friendly structure with one-file-per-game means true conflicts are rare. Locking requires coordination infrastructure. Last-write-wins is safe for this data shape (entries are additive). | One JSON file per game. Agent writes are additive (new entry or update own entry section). Concurrent same-game writes: resolve by keeping both entries — both are valid data points. |
+| Centralized backend API instead of Git | "A proper API is more scalable and queryable" | Adds server infrastructure, hosting costs, auth management, rate limits, uptime requirements. Git repo is zero-infrastructure, survives Cellar abandonment, forkable. | Git as the database. GitHub API for writes. Local clone for reads. Full compatibility with the existing recipes-in-Git model already shipping. |
+| User identity / attribution in entries | "Credit contributors" | Privacy concern: entries should identify environment (hardware/software), not users. Linking configs to identifiable users adds friction (accounts, OAuth) and scope. | Environment hash as contributor identity. No PII stored. Community trust comes from confirmed working configs, not named contributors. |
+| Mandatory collective memory (no opt-out) | "Every agent should contribute" | Legal and privacy: some users may not want to contribute system specs to a public repo (corporate machines, privacy-conscious users). Forced contribution breaks trust. | Opt-in with a clear default. First-run prompt: "Contribute working configs to the community? (Y/n)." Default yes for open-source users, easy no for everyone else. |
+| Retroactive config invalidation across all users | "When a config is marked bad, force re-diagnosis for everyone" | Agents run locally. There is no push notification channel to running agents. Forced invalidation requires infrastructure that doesn't exist. | Mark entries as `superseded` or `unconfirmed`. Agents check status on next run. Stale or superseded configs trigger the agent to re-run diagnosis rather than abort — graceful degradation. |
 
 ---
 
 ## Feature Dependencies
 
 ```
-Agent Loop Resilience (max_tokens + retry + budget)
-  └── required by: all other features (foundational)
+GitHub App Authentication
+  └──required by──> Automatic Push after solving
+  └──required by──> Confidence voting (writes)
 
-Wine Trace Parsing (already in trace_launch)
-  └── enhances──> Dialog Detection via trace:msgbox
-                      └── requires──> WINEDEBUG=+msgbox in trace_launch call
-                      └── enhances──> Hybrid Dialog Detection (window list)
+Query Collective Memory
+  └──required by──> Environment-Aware Fit Assessment
+                       └──required by──> Apply or Adapt Config from Memory
 
-CGWindowListCopyWindowInfo Window Detection
-  └── requires──> Screen Recording permission (macOS entitlement)
-  └── enhances──> Dialog Detection
-  └── optional complement to trace:msgbox (not a replacement)
+Automatic Push after solving
+  └──requires──> User-confirmed success (already exists: save_success)
+  └──requires──> GitHub App Authentication
+  └──enhances──> Confidence voting (first confirmation = new entry, subsequent = increment count)
 
-Game Engine Detection
-  └── enhances──> Engine-Aware Pre-Configuration (INI/registry before launch)
-  └── enhances──> Engine-Aware Web Search (better query construction)
-  └── enhances──> Cross-Game Pattern Matching (engine tag in success DB)
+Rich Memory Entries
+  └──required by──> Environment-Aware Fit Assessment
+  └──required by──> Staleness Detection
+  └──required by──> Agent Reasoning Chain Storage
 
-Cross-Game Pattern Matching (query_successdb by engine/tags)
-  └── requires──> Success database with engine+tags fields (already in schema)
-  └── enhances──> Research phase (query DB before web search)
+Staleness Detection
+  └──requires──> Rich Memory Entries (Wine version range field)
+  └──enhances──> Environment-Aware Fit Assessment
 
-Actionable Fix Extraction
-  └── requires──> fetch_page (already exists)
-  └── requires──> system prompt extraction instructions (prompt change only)
-  └── enhances──> Engine-Aware Web Search (better inputs → better extraction)
+Confidence Voting with Environment Diversity
+  └──requires──> Rich Memory Entries (confirmedBy environment hashes)
+  └──enhances──> Query Collective Memory (sort results by confidence)
+
+Web Interface Memory State
+  └──requires──> Collective memory repo exists and is populated
+  └──enhances──> Existing web interface (already built in v1.1)
 ```
 
 ### Dependency Notes
 
-- **Agent Loop Resilience must come first:** every other feature fails ungracefully if the loop aborts on max_tokens or a network error. This is Phase 1.
-- **Engine Detection enables Pre-Configuration:** you cannot pre-set INI files for an unknown engine. Engine detection unlocks the entire pre-configuration category.
-- **Window Detection requires Screen Recording entitlement:** this is a macOS permission the user must grant. Add late — don't block core features on this optional enhancement.
-- **Dialog Detection via trace:msgbox is independent of window detection:** the Wine trace approach works without any new macOS permissions. Prefer it.
-- **Cross-Game Matching requires populated success DB:** one entry (Cossacks) is enough to demo the concept. The value compounds over time.
+- **GitHub App auth is foundational for writes:** every write feature (push, confidence voting, deprecation) requires this. It must be the first thing set up. Without it, collective memory is read-only.
+- **Rich memory entry format must be defined before any writes:** the schema determines what queries are possible. Lock the format early — migrations on a public Git repo are painful.
+- **Query + fit assessment must work before push:** the read path (query → assess → apply) is the primary user-facing value. Get reads right before writes. Wrong reads waste the agent's time; wrong writes corrupt community data.
+- **Confidence voting requires entries to exist first:** can't vote on an empty database. Ship the write path (push after success) before the vote path (increment confirmations on re-validation).
+- **Web interface is the last piece:** it's informational. Add after the agent-facing features (query, push, vote) are working.
 
 ---
 
-## MVP Definition for v1.1
+## MVP Definition for v1.2
 
-### Launch With (v1.1 core — must ship)
+### Launch With (v1.2 core — must ship)
 
-- [ ] **Agent loop resilience** — max_tokens recovery, API retry, budget ceiling, empty response handling. Foundational. Without this, all other improvements are fragile.
-- [ ] **Budget tracking with session summary** — print total tokens + cost at end of every agent session. Immediate user trust improvement.
-- [ ] **Game engine detection** — detect engine from file patterns and PE imports. Required for pre-configuration and smarter research. Low-to-medium complexity, high leverage.
-- [ ] **Engine-aware pre-configuration** — write INI / registry before first launch for known engines (Unreal 1, DirectDraw/cnc-ddraw, Build engine). Eliminates "stuck on renderer dialog" class of first-run failure.
-- [ ] **Wine trace:msgbox dialog detection** — add `+msgbox` to WINEDEBUG in trace_launch, parse `trace:msgbox:MessageBoxW` lines, return structured dialog info. No new permissions required.
-- [ ] **Actionable fix extraction** — system prompt instruction update only. No code change. Immediate improvement to research quality.
+- [ ] **Memory entry schema** — define the JSON format for collective memory entries. Fields: game_id, game_name, engine, wine_config, reasoning_chain, environment (Wine version, macOS version, CPU arch), confirmations, confirmed_by_env_hashes, status, created_at, updated_at. Lock this before writing any code.
+- [ ] **GitHub App setup** — register a GitHub App for Cellar, configure write access to the collective memory repo, ship app credentials with Cellar. Required for all agent writes.
+- [ ] **Query collective memory** — agent tool `query_collective_memory(gameId, engine)` fetches matching entries from the public repo (local cache + GitHub API). Called at the start of the Research phase before any diagnosis.
+- [ ] **Environment-aware fit assessment** — agent reasons about environment delta between stored entry and current environment before applying any config. No blind application. Reasoning logged to session output.
+- [ ] **Automatic push after success** — agent tool `push_collective_memory(entry)` writes a new entry or increments confirmations on an existing entry after `save_success` + user-confirmed launch. Uses GitHub App token.
+- [ ] **Confidence accumulation** — `push_collective_memory` checks if an identical or compatible entry already exists. If yes, increment confirmations and add environment hash to `confirmed_by_env_hashes`. If no, create new entry.
 
-### Add After Validation (v1.1 stretch)
+### Add After Validation (v1.2 stretch)
 
-- [ ] **Engine-aware search queries** — extend search_web to accept engine/graphics-api hints and construct richer queries. Add when engine detection is validated.
-- [ ] **Cross-game pattern matching** — extend query_successdb to query by engine and graphics_api tags, not just game_id. Add after Cossacks success record is confirmed.
-- [ ] **Hybrid window detection (CGWindowListCopyWindowInfo)** — add as a complement to trace:msgbox. Requires Screen Recording permission. Add after trace-based detection is proven. Keep optional (graceful degradation if permission denied).
+- [ ] **Staleness detection** — flag entries where current Wine version is more than one major version ahead of last confirmation. Trigger re-validation rather than skip. Add after base read/write path is confirmed working.
+- [ ] **Web interface memory state** — extend existing web interface to show memory stats, per-game entries, recent contributions. Add after collective memory has at least a handful of real entries to display.
+- [ ] **Entry deprecation (superseded status)** — when agent finds a better config, mark old entry as `superseded`. Add after multiple entries exist per game.
 
 ### Future Consideration (v2+)
 
-- [ ] **Proton compatibility database integration** — ProtonDB API or scraper for community reports. High value but high maintenance. Defer until web search proves insufficient.
-- [ ] **Multi-session agent memory** — persist agent reasoning across sessions (not just recipes). Requires conversation compaction design. Defer until context window limits become a real bottleneck.
-- [ ] **Vision-based dialog detection** — screenshot analysis to identify stuck state without user confirmation. Expensive (vision model API), requires permissions, fragile. Defer until v2 maturity.
+- [ ] **Environment diversity weighting for confidence** — weight confidence score by hardware/software diversity of confirming agents. Requires enough data volume to make the weighting meaningful. Defer until 50+ games in the database.
+- [ ] **Cross-game config transfer** — when no entry exists for a game, find entries for games with the same engine and suggest adaptation. Requires enough entries per engine to be useful. Defer until database matures.
+- [ ] **Abuse / spam detection** — automated rejection of implausible entries (config claims to fix a DX12 game via DX8 path, environment hash repeats suspiciously). Defer until community scale makes this a real problem.
 
 ---
 
@@ -133,119 +137,109 @@ Actionable Fix Extraction
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Agent loop resilience (max_tokens + retry) | HIGH | LOW | P1 |
-| Budget tracking + session cost summary | HIGH | LOW | P1 |
-| Game engine detection | HIGH | MEDIUM | P1 |
-| Engine-aware pre-configuration | HIGH | MEDIUM | P1 |
-| Wine trace:msgbox dialog detection | HIGH | MEDIUM | P1 |
-| Actionable fix extraction (prompt only) | HIGH | LOW | P1 |
-| Engine-aware search queries | MEDIUM | LOW | P2 |
-| Cross-game pattern matching | MEDIUM | LOW | P2 |
-| Hybrid window detection (CGWindowListCopyWindowInfo) | MEDIUM | HIGH | P2 |
-| Vision-based dialog detection | LOW | HIGH | P3 |
-| Multi-session agent memory | MEDIUM | HIGH | P3 |
+| Memory entry schema definition | HIGH | LOW | P1 |
+| GitHub App authentication setup | HIGH | MEDIUM | P1 |
+| Query collective memory tool | HIGH | MEDIUM | P1 |
+| Environment-aware fit assessment | HIGH | HIGH | P1 |
+| Automatic push after success | HIGH | MEDIUM | P1 |
+| Confidence accumulation | HIGH | LOW | P1 |
+| Staleness detection | MEDIUM | MEDIUM | P2 |
+| Web interface memory state | MEDIUM | MEDIUM | P2 |
+| Entry deprecation (superseded status) | MEDIUM | LOW | P2 |
+| Environment diversity confidence weighting | LOW | MEDIUM | P3 |
+| Cross-game config transfer | MEDIUM | HIGH | P3 |
+| Abuse / spam detection | LOW | HIGH | P3 |
 
 **Priority key:**
-- P1: Must have for v1.1 launch
-- P2: Should have, add when P1 is validated
-- P3: Nice to have, future consideration
+- P1: Must have for v1.2 launch — the feature doesn't exist without these
+- P2: Should have, add when P1 path is validated
+- P3: Nice to have, meaningful only at scale
 
 ---
 
 ## Competitor Feature Analysis
 
-| Feature | Bottles (Linux) | Lutris (Linux) | Heroic (Linux/macOS) | Cellar v1.1 |
-|---------|-----------------|---------------|----------------------|-------------|
-| Dialog/msgbox detection | None — user reports stuck | None — user reports stuck | None — user reports stuck | trace:msgbox parsing + optional window heuristic |
-| Engine detection | None — manual config | None — manual scripts | None — launcher scripts | File pattern + PE imports auto-detection |
-| Pre-configuration (INI/renderer) | Manual — user edits files | Script-based per-game | Manual — per-game launch options | Automatic based on engine detection |
-| AI repair loop | None | None | None | 18-tool Research-Diagnose-Adapt loop |
-| Budget/cost tracking | N/A (no AI) | N/A (no AI) | N/A (no AI) | Per-session token + cost summary |
-| Cross-game learning | Static community scripts | Static install scripts | None | Success DB with tag-based similarity queries |
-| macOS-native | No (Linux) | No (Linux) | Partial (uses CrossOver) | Yes — wined3d/OpenGL, Apple silicon, Swift 6 |
+| Feature | ProtonDB | WineHQ AppDB | DebugBase (MCP) | Cellar v1.2 |
+|---------|----------|--------------|-----------------|-------------|
+| Contribution model | Human submits web form | Human submits web form | Agent submits automatically via tool | Agent submits automatically after user-confirmed success |
+| Entry content | Rating + hardware + notes | Rating + version + text description | Error/fix pair + metadata | Working config + reasoning chain + environment snapshot |
+| Environment matching | Filter by hardware manually | No filtering | Not applicable | Agent reasons about environment delta before applying |
+| Confidence model | Aggregate rating from votes | Maintainer-set rating | Community votes | Confirmation count × environment diversity |
+| Staleness handling | None — old reports stay | None — entries go stale silently | None | Version range tracking + stale flag on major Wine version jump |
+| Infrastructure dependency | Centralized DB + API | Centralized DB + web app | SaaS service | Git repo only — zero infrastructure |
+| Offline capability | No | No | No | Yes — local cache of collective memory works offline |
+| Agent-readable format | No — human-readable HTML | No — human-readable HTML | Yes — MCP tool interface | Yes — structured JSON, agent-native |
 
-**Key insight:** No competitor does dialog detection, engine detection, or proactive pre-configuration. These are genuinely novel capabilities in the macOS Wine compatibility space. The agent architecture is the moat.
+**Key insight:** All existing compatibility databases are human-written and human-read. Cellar v1.2 is the first agent-first compatibility database — written by agents, read by agents, with structured machine-readable entries. The reasoning chain is the unique differentiator; no other database explains *why* a config works.
 
 ---
 
-## Technical Implementation Notes
+## Technical Notes
 
-### Agent Loop Resilience — What Already Exists vs What's Missing
+### Memory Entry Schema (Proposed)
 
-**Already in AgentLoop.swift:**
-- `stop_reason: max_tokens` → appends assistant turn + continuation prompt (line 125-129)
-- Max iteration ceiling (`maxIterations: 20`)
-- Error logging on API failure
-
-**Missing (needs adding):**
-- Incomplete `tool_use` block detection when `max_tokens` fires mid-tool-call. Current code sends a continuation text prompt, but if the last content block is a partial `tool_use` block (no complete `input` JSON), Claude may confuse itself. The documented fix: detect `response.content.last?.type == .toolUse` when `stop_reason == max_tokens`, then retry with higher `maxTokens` (not a continuation message).
-- 3-attempt exponential backoff retry on HTTP 5xx and network errors (currently returns immediately)
-- Token accumulation across iterations (`usage.input_tokens + usage.output_tokens` per call)
-- Budget ceiling check (configurable, default $1.00) with 80% warning
-- Empty `end_turn` response guard (Anthropic docs: empty response after tool results means Claude thinks it's done — send "Please continue" user message)
-
-### Game Engine Detection — Reliable File Patterns
-
-Patterns ordered by specificity (check specific before general):
-
-| Engine | File Indicators | Confidence |
-|--------|----------------|------------|
-| GSC/DMCR (Cossacks, American Conquest) | `dmcr.exe` + `mdraw.dll` | HIGH |
-| Unreal 1 (1998-2000) | `*.u` files + `System/` dir + `[game].ini` | HIGH |
-| Build Engine (Duke Nukem 3D, Blood) | `*.GRP` file in root | HIGH |
-| id Tech 2 (Quake II) | `baseq2/pak0.pak` | HIGH |
-| id Tech 3 (Quake III) | `baseq3/pak0.pk3` | HIGH |
-| Unity (2010+) | `[GameName]_Data/` directory | HIGH |
-| Unreal Engine 4/5 | `[Game]/Binaries/Win64/` | HIGH |
-| Westwood/C&C | `*.mix` files | MEDIUM |
-| Blizzard (StarCraft 1) | `Storm.dll` + `*.mpq` | MEDIUM |
-| Custom/Unknown | PE imports analysis, no pattern match | LOW |
-
-PE imports are a secondary signal: `ddraw.dll` import = DirectDraw game; `d3d9.dll` = DX9; `opengl32.dll` = OpenGL; custom shim DLL (like `mdraw.dll`) = game-specific wrapper.
-
-### Wine trace:msgbox Output Format
-
-When WINEDEBUG includes `+msgbox`, Wine emits to stderr:
-
-```
-trace:msgbox:MessageBoxW hwnd=0x0 text=L"Direct Draw Init Failed (80004001)" caption=L"Error" type=0x10
-```
-
-Parse fields: `text=L"[message]"` and `caption=L"[title]"` to extract dialog content. This fires synchronously as the dialog appears, before user interaction. The agent can read this from the trace_launch stderr output and return a structured result like:
 ```json
-{ "dialog_detected": true, "title": "Error", "message": "Direct Draw Init Failed (80004001)" }
+{
+  "game_id": "sha256:abc123...",
+  "game_name": "Cossacks: European Wars",
+  "engine": "GSC/DMCR",
+  "status": "active",
+  "wine_config": {
+    "wine_version_min": "9.0",
+    "winetricks": ["d3dx9", "vcrun2005"],
+    "env_vars": { "WINEDLLOVERRIDES": "mdraw=n,b" },
+    "registry": { "HKCU\\Software\\Wine\\Direct3D": { "renderer": "gl" } }
+  },
+  "reasoning_chain": "Engine detected as GSC/DMCR from mdraw.dll presence. DirectDraw game confirmed via PE imports. Attempted native ddraw: failed with 80004001. Switched to mdraw override with OpenGL renderer. Confirmed at menu.",
+  "environment": {
+    "wine_version": "9.21",
+    "macos_version": "15.3",
+    "cpu_arch": "arm64",
+    "cpu_model": "Apple M2"
+  },
+  "confirmations": 3,
+  "confirmed_by_env_hashes": ["sha256:env1...", "sha256:env2...", "sha256:env3..."],
+  "created_at": "2026-03-29T12:00:00Z",
+  "updated_at": "2026-03-30T08:22:00Z"
+}
 ```
 
-This is enough to skip the "launch failed — read the log" cycle and go straight to a targeted fix.
+### Conflict Safety Pattern
 
-### CGWindowListCopyWindowInfo — Dialog Heuristic
+Store as `games/{game_id_prefix}/{game_id}.json` — one file per game. Agents operating on different games never conflict. For same-game concurrent writes (rare), last-write-wins is acceptable: both writes are valid data points (additive). Git history preserves both.
 
-Requires Screen Recording entitlement (`com.apple.security.screen-recording` or runtime prompt via `CGRequestScreenCaptureAccess()`). Returns window list with `kCGWindowBounds`, `kCGWindowName`, `kCGWindowOwnerPID`, `kCGWindowLayer`.
+### Read Path (Agent Query)
 
-Dialog heuristic for Wine windows:
-- Owner process is `wine64`, `wine`, or `wineserver`
-- Window size is small: width < 600 OR height < 200
-- Window title contains "Error", "Warning", "Setup", "Select", "Renderer", "DirectX", or is exactly the game name followed by nothing
+1. On agent startup for a game, clone/fetch the collective memory repo (or use cached local copy, freshen if >24h old).
+2. Look up `games/{prefix}/{game_id}.json`. If found, load all entries with `status: active`.
+3. Sort by `confirmations × environment_diversity_score` descending.
+4. Pass top entries to agent as context: "Collective memory found N entries for this game. Best match: [summary]. Environment delta: [diff]. Reasoning: [chain]."
+5. Agent decides: apply directly, adapt, or ignore and diagnose fresh.
 
-Game window heuristic:
-- Owner is wine process family
-- Window size is large: width >= 640 AND height >= 480
-- Window title matches game name or is empty (fullscreen)
+### Write Path (Agent Push)
 
-This is supplementary to trace:msgbox, not a replacement. The trace fires faster and requires no permissions.
+1. After `save_success` + user confirmation, agent calls `push_collective_memory`.
+2. Tool fetches current `{game_id}.json` from repo (GitHub API).
+3. If an entry with matching `wine_config` hash exists: increment `confirmations`, append env hash, update `updated_at`.
+4. If no matching entry: create new entry, set `confirmations: 1`.
+5. Commit via GitHub API using GitHub App token. Commit message: `feat(memory): {game_name} confirmed by {env_hash[:8]}`
+
+### GitHub App Scope
+
+Minimal scope: `contents: write` on the collective memory repo only. No access to user's repos. No user OAuth required. App credentials (app ID + private key) embedded in Cellar config, not per-user.
 
 ---
 
 ## Sources
 
-- Anthropic API documentation — stop_reason handling, max_tokens recovery: [Handling stop reasons](https://platform.claude.com/docs/en/build-with-claude/handling-stop-reasons) — HIGH confidence
-- Anthropic API documentation — context windows and token awareness: [Context windows](https://platform.claude.com/docs/en/build-with-claude/context-windows) — HIGH confidence
-- Wine debug channel format — WineHQ community documentation: [Debug Channels (WineHQ staging wiki)](https://github.com/wine-compholio/wine-staging/wiki/Debug) — HIGH confidence
-- Wine msgbox.c source — confirms WINEDEBUG=+msgbox output format: [wine-mirror/wine msgbox.c](https://github.com/wine-mirror/wine/blob/master/dlls/user32/msgbox.c) — HIGH confidence
-- CGWindowListCopyWindowInfo — Apple developer documentation: [Apple Developer Docs](https://developer.apple.com/documentation/coregraphics/1455137-cgwindowlistcopywindowinfo) — HIGH confidence
-- Game engine file patterns — community tools and PCGamingWiki: [game-engine-finder (vetleledaal)](https://github.com/vetleledaal/game-engine-finder), [enginedetect (YellowberryHN)](https://github.com/YellowberryHN/enginedetect) — MEDIUM confidence (source code not fully inspected)
-- Existing codebase analysis — AgentLoop.swift, AgentTools.swift, agentic-architecture-v2.md — HIGH confidence
+- ProtonDB — community compatibility report model: [ProtonDB](https://www.protondb.com/) — MEDIUM confidence (site structure observed, schema inferred from reports)
+- WineHQ AppDB — rating definitions and entry format: [AppDB Rating Definitions](https://wiki.winehq.org/AppDB_Maintainer_Rating_Definitions), [AppDB FAQ](https://wiki.winehq.org/AppDB_FAQ) — HIGH confidence
+- DebugBase MCP server — agent-first shared error/fix knowledge base: [DebugBase MCP server](https://github.com/DebugBase/mcp-server) — HIGH confidence (source read directly)
+- Multi-agent shared memory architecture patterns: [The New Stack — Agentic Knowledge Base Patterns](https://thenewstack.io/agentic-knowledge-base-patterns/), [Resultsense — Multi-Agent Memory as Computer Architecture](https://www.resultsense.com/insights/2026-03-19-multi-agent-memory-computer-architecture-perspective) — MEDIUM confidence
+- GitHub App for bot commits: [DEV Community — Each AI Agent Gets Its Own GitHub Identity](https://dev.to/agent_paaru/each-ai-agent-gets-its-own-github-identity-how-we-gave-every-bot-its-own-bot-commit-signature-1197) — MEDIUM confidence
+- JSON merge conflict avoidance: [Sophia Bits — Avoid JSON file merge conflicts](https://sophiabits.com/blog/avoid-json-file-merge-conflicts) — MEDIUM confidence
+- Airbnb Knowledge Repo (Git-backed knowledge base pattern): [knowledge-repo deployment docs](https://knowledge-repo.readthedocs.io/en/latest/deployment.html) — MEDIUM confidence
 
 ---
-*Feature research for: Cellar v1.1 Agentic Independence*
-*Researched: 2026-03-28*
+*Feature research for: Cellar v1.2 Collective Agent Memory*
+*Researched: 2026-03-29*
