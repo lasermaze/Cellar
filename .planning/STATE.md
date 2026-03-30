@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: Agentic Independence
-status: in-progress
-last_updated: "2026-03-29T23:37:00Z"
+status: complete
+last_updated: "2026-03-30T05:29:00Z"
 progress:
   total_phases: 12
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 35
-  completed_plans: 34
+  completed_plans: 35
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-28)
 
 **Core value:** Any user can go from "I have these old game files" to "the game launches and works" without manually configuring Wine.
-**Current focus:** Phase 12 in progress — web interface for game management with CRUD, live agent logs, and direct launch.
+**Current focus:** Phase 12 complete — all plans delivered. v1.1 milestone ready for final audit.
 
 ## Current Position
 
 Phase: 12 of 12 (Web Interface)
-Plan: 3 of 4 complete
-Status: Plans 12-01, 12-02, and 12-03 complete. Plan 12-04 remaining.
-Last activity: 2026-03-29 — Completed 12-03 (GameController CRUD + Leaf templates for game library UI).
+Plan: 4 of 4 complete
+Status: All plans complete. Phase 12 finished.
+Last activity: 2026-03-30 — Completed 12-04 (LaunchController with SSE streaming + launch-log template).
 
-Progress: [███████████████████░] Phase 12: 3/4 plans complete
+Progress: [████████████████████] Phase 12: 4/4 plans complete
 
 ## Performance Metrics
 
@@ -62,6 +62,7 @@ Progress: [███████████████████░] Phase 1
 | Phase 12 | 12-01 | 12 min |
 | Phase 12 | 12-02 | 5 min |
 | Phase 12 | 12-03 | 2 min |
+| Phase 12 P04 | 8 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,9 @@ Progress: [███████████████████░] Phase 1
 - [Phase 12-03]: GameViewData.status derived from lastResult.reachedMenu rather than raw status field
 - [Phase 12-03]: Form field named installPath (matching GameEntry) not installerPath from plan
 - [Phase 12-03]: Extracted loadGameViewData helper to avoid duplicating game-to-viewmodel mapping across routes
+- [Phase 12-04]: DispatchQueue.global bridge for agent loop to avoid NIO event loop deadlock from DispatchSemaphore
+- [Phase 12-04]: Single active launch guard via NSLock to prevent parallel Wine process conflicts
+- [Phase 12-04]: SSE event types: status, log, iteration, tool, cost, error, complete for granular UI updates
 
 ### Roadmap Evolution
 
@@ -121,5 +125,5 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-29
-Stopped at: Completed 12-03-PLAN.md — GameController CRUD routes + Leaf templates for game library UI.
+Last session: 2026-03-30
+Stopped at: Completed 12-04-PLAN.md -- all Phase 12 plans complete, v1.1 milestone ready for audit.
