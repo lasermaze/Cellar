@@ -1,17 +1,26 @@
 @preconcurrency import Vapor
 @preconcurrency import Leaf
+import Foundation
 
 enum WebApp {
     static func configure(_ app: Application, port: Int) throws {
         // Template engine
         app.views.use(.leaf)
 
-        // Resolve views directory from SPM bundle resource path
-        if let resourcePath = Bundle.module.resourcePath {
-            app.leaf.configuration.rootDirectory = resourcePath
-            app.directory.viewsDirectory = resourcePath + "/Views/"
-            app.directory.publicDirectory = resourcePath + "/Public/"
+        // Resolve views directory — prefer source tree (avoids LeafKit .build sandbox rejection),
+        // fall back to bundle resources for deployed binaries
+        let sourceViews = FileManager.default.currentDirectoryPath + "/Sources/cellar/Resources/Views"
+        let viewsPath: String
+        if FileManager.default.fileExists(atPath: sourceViews + "/base.leaf") {
+            viewsPath = sourceViews + "/"
+        } else if let resourcePath = Bundle.module.resourcePath {
+            viewsPath = resourcePath + "/Views/"
+        } else {
+            fatalError("Cannot find Leaf template directory")
         }
+
+        app.leaf.configuration.rootDirectory = viewsPath
+        app.directory.viewsDirectory = viewsPath
 
         // Static files
         app.middleware.use(
@@ -27,5 +36,8 @@ enum WebApp {
 
         // Launch routes (SSE streaming)
         try LaunchController.register(app)
+
+        // Settings routes (API keys)
+        try SettingsController.register(app)
     }
 }

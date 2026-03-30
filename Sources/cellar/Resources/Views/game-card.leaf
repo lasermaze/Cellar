@@ -1,30 +1,20 @@
-<article>
-  <header>
-    <strong>#(game.name)</strong>
-  </header>
-  <p>Status: #(game.status)</p>
-  <p>Last played: #(game.lastPlayed)</p>
-  <footer style="display: flex; gap: 0.5rem;">
+<div class="game-card">
+  <h4>#(game.name)</h4>
+  <p class="meta">Status: #(game.status)</p>
+  <p class="meta">Last played: #(game.lastPlayed)</p>
+  <div class="actions">
     #if(game.canDirectLaunch):
-      <a href="/games/#(game.id)/launch" role="button" class="secondary">
-        Launch
-      </a>
-      <a href="/games/#(game.id)/launch?agent=true" role="button" class="outline">
-        Launch with AI
-      </a>
+      <a href="/games/#(game.id)/launch" role="button" class="secondary">Launch</a>
+      <a href="/games/#(game.id)/launch?agent=true" role="button" class="outline">Launch with AI</a>
     #else:
-      <a href="/games/#(game.id)/launch?agent=true" role="button">
-        Launch with AI
-      </a>
+      <a href="/games/#(game.id)/launch?agent=true" role="button">Launch with AI</a>
     #endif
+    <span class="spacer"></span>
     <button
       hx-delete="/games/#(game.id)?cleanBottle=true"
       hx-target="#game-list"
       hx-confirm="Delete #(game.name) and its Wine bottle?"
       class="secondary outline"
-      style="margin-left: auto;"
-    >
-      Delete
-    </button>
-  </footer>
-</article>
+    >Delete</button>
+  </div>
+</div>

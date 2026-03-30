@@ -1,0 +1,102 @@
+@preconcurrency import Vapor
+import Foundation
+
+enum SettingsController {
+    static func register(_ app: Application) throws {
+        let settings = app.grouped("settings")
+
+        // GET /settings — render settings page
+        settings.get { req async throws -> View in
+            let env = loadEnvFile()
+            let anthropicKey = env["ANTHROPIC_API_KEY"] ?? ""
+            let openaiKey = env["OPENAI_API_KEY"] ?? ""
+            return try await req.view.render("settings", SettingsContext(
+                title: "Settings",
+                anthropicKey: maskKey(anthropicKey),
+                openaiKey: maskKey(openaiKey),
+                hasAnthropicKey: !anthropicKey.isEmpty,
+                hasOpenaiKey: !openaiKey.isEmpty
+            ))
+        }
+
+        // POST /settings/keys — update API keys
+        settings.post("keys") { req async throws -> Response in
+            let input = try req.content.decode(KeysInput.self)
+            var env = loadEnvFile()
+
+            // Only update if the field isn't the masked placeholder
+            if let key = input.anthropicKey, !key.isEmpty, !key.contains("••••") {
+                env["ANTHROPIC_API_KEY"] = key
+            } else if input.anthropicKey?.isEmpty == true {
+                env.removeValue(forKey: "ANTHROPIC_API_KEY")
+            }
+
+            if let key = input.openaiKey, !key.isEmpty, !key.contains("••••") {
+                env["OPENAI_API_KEY"] = key
+            } else if input.openaiKey?.isEmpty == true {
+                env.removeValue(forKey: "OPENAI_API_KEY")
+            }
+
+            try writeEnvFile(env)
+            return req.redirect(to: "/settings")
+        }
+    }
+
+    // MARK: - .env File Handling
+
+    private static func loadEnvFile() -> [String: String] {
+        let envFile = CellarPaths.base.appendingPathComponent(".env")
+        guard let contents = try? String(contentsOf: envFile, encoding: .utf8) else {
+            return [:]
+        }
+        var result: [String: String] = [:]
+        for line in contents.components(separatedBy: .newlines) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.isEmpty || trimmed.hasPrefix("#") { continue }
+            let parts = trimmed.split(separator: "=", maxSplits: 1)
+            guard parts.count == 2 else { continue }
+            let key = String(parts[0]).trimmingCharacters(in: .whitespaces)
+            var value = String(parts[1]).trimmingCharacters(in: .whitespaces)
+            if (value.hasPrefix("\"") && value.hasSuffix("\"")) ||
+               (value.hasPrefix("'") && value.hasSuffix("'")) {
+                value = String(value.dropFirst().dropLast())
+            }
+            result[key] = value
+        }
+        return result
+    }
+
+    private static func writeEnvFile(_ env: [String: String]) throws {
+        let envFile = CellarPaths.base.appendingPathComponent(".env")
+        // Ensure directory exists
+        try FileManager.default.createDirectory(
+            at: CellarPaths.base,
+            withIntermediateDirectories: true
+        )
+        let lines = env.sorted(by: { $0.key < $1.key }).map { "\($0.key)=\($0.value)" }
+        let content = lines.joined(separator: "\n") + "\n"
+        try content.write(to: envFile, atomically: true, encoding: .utf8)
+    }
+
+    private static func maskKey(_ key: String) -> String {
+        guard key.count > 8 else { return key.isEmpty ? "" : "••••" }
+        let prefix = String(key.prefix(4))
+        let suffix = String(key.suffix(4))
+        return "\(prefix)••••••••\(suffix)"
+    }
+
+    // MARK: - View Models
+
+    struct SettingsContext: Content {
+        let title: String
+        let anthropicKey: String
+        let openaiKey: String
+        let hasAnthropicKey: Bool
+        let hasOpenaiKey: Bool
+    }
+
+    struct KeysInput: Content {
+        let anthropicKey: String?
+        let openaiKey: String?
+    }
+}

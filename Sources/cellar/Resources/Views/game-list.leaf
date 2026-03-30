@@ -1,5 +1,5 @@
 #if(count(games) > 0):
-  <div class="grid">
+  <div class="game-grid">
     #for(game in games):
       #extend("game-card")
     #endfor

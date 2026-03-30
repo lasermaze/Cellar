@@ -1,14 +1,14 @@
 #extend("base"):
   #export("content"):
     <section>
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h2>Game Library</h2>
-        <a href="/games/add" role="button" class="outline">+ Add Game</a>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h2 style="margin-bottom: 0;">Game Library</h2>
+        <a href="/games/add" role="button" class="outline" style="margin-bottom: 0;">+ Add Game</a>
       </div>
 
       <div id="game-list">
         #if(count(games) > 0):
-          <div class="grid">
+          <div class="game-grid">
             #for(game in games):
               #extend("game-card")
             #endfor
