@@ -67,17 +67,45 @@ Requirements for v1.1 Agentic Independence. Each maps to roadmap phases.
 - [x] **RSRCH-02**: Agent queries success database by engine type and graphics API tags to find similar-game solutions for new games
 - [x] **RSRCH-03**: fetch_page uses SwiftSoup for structured HTML parsing instead of string stripping — extracts content from known sources (WineHQ, PCGamingWiki, forums)
 
-## v1.2 Requirements
-
-Requirements for v1.2 Web Interface. Maps to Phase 12.
-
-### Web Interface
+### Web Interface (v1.1)
 
 - [x] **WEB-01**: User can view game library as a card grid in the browser at localhost:8080, showing game name, status, and last played date
 - [x] **WEB-02**: User can add a game (providing installer path) and delete a game (with optional bottle cleanup) through the web interface
 - [x] **WEB-03**: User can directly launch a game that has a working recipe or success record, with Wine output streamed to the browser via SSE
 - [x] **WEB-04**: User can launch a game with the AI agent, with real-time agent loop events (iterations, tool calls, reasoning, cost) streamed to the browser via SSE
 - [x] **WEB-05**: `cellar serve` subcommand starts a Vapor web server on localhost:8080, sharing all existing business logic without duplication
+
+## v1.2 Requirements
+
+Requirements for v1.2 Collective Agent Memory. Each maps to roadmap phases.
+
+### Authentication
+
+- [ ] **AUTH-01**: Agent authenticates to GitHub API using GitHub App credentials (RS256 JWT + installation token) shipped with CLI
+- [ ] **AUTH-02**: Agent token refreshes automatically before expiry (1-hour lifetime, refresh at 55 minutes)
+
+### Schema
+
+- [ ] **SCHM-01**: Collective memory entry stores working config, agent reasoning chain, and environment fingerprint (Wine version, macOS version, CPU arch, wine flavor)
+- [ ] **SCHM-02**: Each game has one JSON file in the collective memory repo (`entries/{game-id}.json`), containing an array of entries from different agents/environments
+- [ ] **SCHM-03**: Entry includes schema version field for forward-compatible evolution
+
+### Read Path
+
+- [ ] **READ-01**: Agent queries collective memory for the current game before starting diagnosis — if a matching entry exists, it's injected as context in the initial agent message
+- [ ] **READ-02**: Agent reasons about environment delta between stored entry and local environment before applying (not blind application)
+- [ ] **READ-03**: Agent flags entries as potentially stale when current Wine version is more than one major version ahead of last confirmation
+
+### Write Path
+
+- [ ] **WRIT-01**: After user-confirmed successful launch, agent automatically pushes config + reasoning + environment to collective memory repo via GitHub Contents API
+- [ ] **WRIT-02**: Confidence counter increments when a different agent confirms the same config works (deduplicated by environment hash)
+- [ ] **WRIT-03**: User is prompted on first run to opt into collective memory contribution; preference saved in config
+
+### Web Interface (v1.2)
+
+- [ ] **WEBM-01**: Web UI shows collective memory stats (games covered, total confirmations, recent contributions)
+- [ ] **WEBM-02**: Web UI shows per-game memory entries with environment details and confidence scores
 
 ## v2 Requirements
 
@@ -145,6 +173,11 @@ Deferred to future release. Tracked but not in current roadmap.
 | Mass winetricks pre-install | Breaks bottles, masks deps, wastes time |
 | Parallel multi-config testing | Wine processes share winemac; causes corruption |
 | Screenshot-based success detection | Expensive, requires permissions, high false positives |
+| Vector search / embeddings for memory lookup | Overkill for structured game data — game ID, engine, tags are reliable keys |
+| Human approval workflow for contributions | Kills automatic contribution — WineHQ AppDB's staleness proves this |
+| Centralized backend API for memory | Git repo is zero-cost, forkable, survives project abandonment |
+| User identity / attribution in entries | Privacy concern — environment hash is sufficient contributor identity |
+| Token proxy service (v1.2) | Accepted risk: ship GitHub App key with CLI. Rotate if abused |
 
 ## Traceability
 
@@ -182,18 +215,32 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RSRCH-02 | Phase 11 | Complete |
 | RSRCH-03 | Phase 11 | Complete |
 
-| WEB-01 | Phase 12 | Planned |
-| WEB-02 | Phase 12 | Planned |
-| WEB-03 | Phase 12 | Planned |
-| WEB-04 | Phase 12 | Planned |
-| WEB-05 | Phase 12 | Planned |
+| WEB-01 | Phase 12 | Complete |
+| WEB-02 | Phase 12 | Complete |
+| WEB-03 | Phase 12 | Complete |
+| WEB-04 | Phase 12 | Complete |
+| WEB-05 | Phase 12 | Complete |
+| AUTH-01 | — | Pending |
+| AUTH-02 | — | Pending |
+| SCHM-01 | — | Pending |
+| SCHM-02 | — | Pending |
+| SCHM-03 | — | Pending |
+| READ-01 | — | Pending |
+| READ-02 | — | Pending |
+| READ-03 | — | Pending |
+| WRIT-01 | — | Pending |
+| WRIT-02 | — | Pending |
+| WRIT-03 | — | Pending |
+| WEBM-01 | — | Pending |
+| WEBM-02 | — | Pending |
 
 **Coverage:**
-- v1.1 requirements: 14 total (all complete)
-- v1.2 requirements: 5 total
-- Mapped to phases: 19
-- Unmapped: 0
+- v1.0 requirements: 15 total (all complete)
+- v1.1 requirements: 19 total (all complete)
+- v1.2 requirements: 13 total
+- Mapped to phases: 0
+- Unmapped: 13 ⚠️
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-29 after v1.2 Phase 12 planning*
+*Last updated: 2026-03-30 after v1.2 Collective Agent Memory requirements*
