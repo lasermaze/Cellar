@@ -26,19 +26,26 @@ Any user can go from "I have these old game files" to "the game launches and wor
 - ✓ Web search and page fetching for compatibility research — v1.0
 - ✓ Diagnostic traces, DLL verification, success database — v1.0
 
+<!-- Shipped in v1.1 — 5 phases, 14 plans -->
+
+- ✓ Agent persists through failures, handles max_tokens, budget-aware escalation — v1.1
+- ✓ Dialog detection via Wine trace parsing + macOS window list — v1.1
+- ✓ Game engine detection and pre-configuration — v1.1
+- ✓ Smart web research with actionable fix extraction — v1.1
+- ✓ Web interface for game management with CRUD and live agent logs — v1.1
+
 ### Active
 
-<!-- v1.1: Agentic Independence -->
+<!-- v1.2: Collective Agent Memory -->
 
-- [ ] Agent persists through failures — stays in diagnosis loop, handles max_tokens mid-response, budget-aware escalation
-- [ ] Agent detects Wine dialog boxes via trace:msgbox parsing
-- [ ] Agent detects game/dialog state via macOS window list (CGWindowListCopyWindowInfo) — size/title heuristics distinguish dialogs from game windows
-- [ ] Agent uses hybrid signal: Wine traces + window list combined to determine if game is stuck on a dialog
-- [ ] Agent detects game engine type from exe metadata, file patterns, and registry
-- [ ] Agent pre-configures game settings to skip known dialogs (renderer selection, resolution) via INI files and registry before first launch
-- [ ] Agent uses smarter search strategies — engine-aware, symptom-aware web queries across the full internet
-- [ ] Agent extracts actionable fixes from web pages (not just reads them)
-- [ ] Agent cross-references success database with current symptoms to find similar-game solutions
+- [ ] Agent queries collective memory (Git-backed) before starting diagnosis — checks if another agent has already solved this game
+- [ ] Agent reasons about whether a stored config fits its local environment (hardware, Wine version, macOS version) before applying
+- [ ] Agent pushes successful configs to collective memory after solving a game — including reasoning chain, environment context, and final config
+- [ ] Collective memory stores rich entries: working config, reasoning chain, environment context, confidence/votes
+- [ ] GitHub App bot token authenticates agent writes — no human approval needed
+- [ ] Confidence builds through multiple agents confirming same config works
+- [ ] Web interface shows collective memory state (configs, success rates, game coverage)
+- [ ] Community ready — public repo, documented, any Cellar user contributes and benefits automatically
 
 ### Out of Scope
 
@@ -77,15 +84,16 @@ Any user can go from "I have these old game files" to "the game launches and wor
 - **License**: Open source (GPL-3.0 aligns with Whisky/Heroic ecosystem)
 - **Scope**: One game family first (old strategy games), expand from there
 
-## Current Milestone: v1.1 Agentic Independence
+## Current Milestone: v1.2 Collective Agent Memory
 
-**Goal:** Make the agent truly autonomous — it should detect dialog errors, deeply research game fixes, and persist through failures instead of giving up after one attempt.
+**Goal:** Build a shared knowledge layer so that when any Cellar agent solves a game, every other agent benefits — an agent-first collective memory backed by a Git repo.
 
 **Target features:**
-- Loop resilience: agent persists through failures, handles max_tokens, budget-aware escalation
-- Dialog awareness: hybrid Wine trace parsing + macOS window list detection
-- Game-aware pre-configuration: engine detection, pre-set renderer/settings in INI/registry to skip dialogs
-- Smart research: engine-aware and symptom-aware web search, actionable fix extraction, cross-game success matching
+- Collective memory: Git-backed shared knowledge base of working configs, reasoning chains, and environment context
+- Agent-first queries: agent checks collective memory before starting diagnosis, reasons about fit before applying
+- Automatic contribution: agent pushes successful configs after solving a game, no human approval needed (GitHub App bot token)
+- Rich memory entries: working config + reasoning chain + environment context + confidence/votes
+- Community ready: public repo, documented, web interface shows memory state
 
 ## Key Decisions
 
@@ -103,5 +111,9 @@ Any user can go from "I have these old game files" to "the game launches and wor
 | wined3d/OpenGL for DX8/DX9 | D3DMetal doesn't cover old DirectX. Only viable path for target wedge | — Pending |
 | GPTK detect-only (not bundled) | Apple EULA prohibits redistribution of D3DMetal. Detect if installed. | — Pending |
 
+| Collective memory via Git repo | Agent-first, open-source friendly, no infrastructure dependency, version-controlled | — Pending |
+| GitHub App for agent auth | Agents push without human approval, scoped access, no PAT management | — Pending |
+| Agents always reason before applying | Compare environments + adapt configs, not blind application | — Pending |
+
 ---
-*Last updated: 2026-03-28 after v1.1 scope refinement*
+*Last updated: 2026-03-30 after v1.2 milestone start*
