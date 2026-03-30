@@ -122,7 +122,11 @@ Plans:
   1. Running `cellar` with GitHub App credentials configured produces a valid installation access token from the GitHub API — no error, no manual steps
   2. After 55 minutes, the agent automatically fetches a fresh installation token without any user intervention or failed API calls
   3. When GitHub App credentials are absent or misconfigured, Cellar degrades gracefully: collective memory reads work (unauthenticated), writes are skipped with a clear message, and the agent loop is not interrupted
-**Plans**: TBD
+**Plans:** 2 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — Data layer: GitHubModels (Codable types, error enum), placeholder resources (PEM + JSON), CellarPaths extension
+- [ ] 13-02-PLAN.md — Service layer: GitHubAuthService with RS256 JWT signing, installation token exchange, in-memory cache with 55-min TTL, credential cascade, graceful degradation
 
 ### Phase 14: Memory Entry Schema
 **Goal**: The collective memory entry schema is locked and the community repo structure is established — every field is specified, versioned, and forward-compatible before any entries are written
