@@ -102,4 +102,7 @@ struct CellarPaths {
         formatter.timeZone = TimeZone(identifier: "UTC")
         return logDir(for: gameId).appendingPathComponent("repair-report-\(formatter.string(from: timestamp)).txt")
     }
+
+    /// Default collective memory repository identifier (owner/repo).
+    static let defaultMemoryRepo = "cellar-community/memory"
 }
