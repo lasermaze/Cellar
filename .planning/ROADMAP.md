@@ -3,7 +3,8 @@
 ## Milestones
 
 - ✅ **v1.0 Research-Diagnose-Adapt** — Phases 1–7 (shipped 2026-03-28)
-- 🚧 **v1.1 Agentic Independence** — Phases 8–11 (in progress)
+- ✅ **v1.1 Agentic Independence** — Phases 8–12 (shipped 2026-03-30)
+- 🚧 **v1.2 Collective Agent Memory** — Phases 13–17 (in progress)
 
 ## Phases
 
@@ -20,14 +21,26 @@
 
 </details>
 
-### 🚧 v1.1 Agentic Independence (In Progress)
+<details>
+<summary>✅ v1.1 Agentic Independence (Phases 8–12) — SHIPPED 2026-03-30</summary>
 
-**Milestone Goal:** Make the agent truly autonomous — it persists through failures, detects dialog blockers, pre-configures games before launch, and extracts actionable fixes from web research.
+- [x] **Phase 8: Loop Resilience** — Fix max_tokens truncation bug, retry on transient errors, budget tracking with ceiling
+- [x] **Phase 9: Engine Detection and Pre-configuration** — Detect game engine from file patterns and PE imports; pre-configure games before first launch to skip known dialogs
+- [x] **Phase 10: Dialog Detection** — Wine trace:msgbox parsing and macOS window list monitoring to detect stuck-on-dialog state
+- [x] **Phase 11: Smarter Research** — Actionable fix extraction from web pages, engine-aware search queries, cross-game success matching
+- [x] **Phase 12: Web Interface for Game Management** — Browser-based game library management, CRUD, and live agent logs
 
-- [ ] **Phase 8: Loop Resilience** — Fix max_tokens truncation bug, retry on transient errors, budget tracking with ceiling
-- [ ] **Phase 9: Engine Detection and Pre-configuration** — Detect game engine from file patterns and PE imports; pre-configure games before first launch to skip known dialogs
-- [x] **Phase 10: Dialog Detection** — Wine trace:msgbox parsing and macOS window list monitoring to detect stuck-on-dialog state (completed 2026-03-29)
-- [x] **Phase 11: Smarter Research** — Actionable fix extraction from web pages, engine-aware search queries, cross-game success matching (completed 2026-03-29)
+</details>
+
+### 🚧 v1.2 Collective Agent Memory (In Progress)
+
+**Milestone Goal:** Build a shared knowledge layer so that when any Cellar agent solves a game, every other agent benefits — an agent-first collective memory backed by a Git repo.
+
+- [ ] **Phase 13: GitHub App Authentication** — RS256 JWT generation, installation token exchange, automatic refresh before expiry
+- [ ] **Phase 14: Memory Entry Schema** — Lock the collective memory entry schema and establish the repo structure before any community writes
+- [ ] **Phase 15: Read Path** — Agent queries collective memory before diagnosis; environment-aware fit assessment before applying any stored config
+- [ ] **Phase 16: Write Path** — Agent pushes configs after confirmed success; confidence accumulation with deduplication; opt-in contribution prompt
+- [ ] **Phase 17: Web Memory UI** — Browser views for collective memory stats and per-game memory entries
 
 ## Phase Details
 
@@ -83,19 +96,6 @@ Plans:
 - [ ] 11-02-PLAN.md — Rewrite fetchPage() with SwiftSoup + PageParser, add queryBySimilarity() and similar_games to querySuccessdb()
 - [ ] 11-03-PLAN.md — Research Quality methodology in agent system prompt
 
-## Progress
-
-**Execution Order:**
-Phases execute in numeric order: 8 → 9 → 10 → 11
-
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 1–7. v1.0 phases | v1.0 | All complete | Complete | 2026-03-28 |
-| 8. Loop Resilience | v1.1 | 0/2 | Planned | - |
-| 9. Engine Detection and Pre-configuration | v1.1 | 0/? | Not started | - |
-| 10. Dialog Detection | 2/2 | Complete    | 2026-03-29 | - |
-| 11. Smarter Research | 3/3 | Complete    | 2026-03-29 | - |
-
 ### Phase 12: Web Interface for Game Management
 **Goal**: Users can manage their game library, add/delete games, launch games (directly or with AI agent), and watch real-time agent logs — all from a browser-based web UI served on localhost:8080 via Vapor + HTMX
 **Depends on**: Phase 11
@@ -113,3 +113,74 @@ Plans:
 - [ ] 12-02-PLAN.md — AgentLoop streaming: AgentEvent enum, onOutput callback, replace print() calls
 - [ ] 12-03-PLAN.md — Game library CRUD: GameController routes, index/card/add templates, HTMX partials
 - [ ] 12-04-PLAN.md — Launch & SSE: LaunchController, direct + agent launch, SSE streaming, launch-log template
+
+### Phase 13: GitHub App Authentication
+**Goal**: The agent can authenticate to GitHub as a bot — generating RS256 JWTs, exchanging them for installation tokens, and refreshing those tokens automatically — so that all write operations in later phases have a working auth layer to depend on
+**Depends on**: Phase 12
+**Requirements**: AUTH-01, AUTH-02
+**Success Criteria** (what must be TRUE):
+  1. Running `cellar` with GitHub App credentials configured produces a valid installation access token from the GitHub API — no error, no manual steps
+  2. After 55 minutes, the agent automatically fetches a fresh installation token without any user intervention or failed API calls
+  3. When GitHub App credentials are absent or misconfigured, Cellar degrades gracefully: collective memory reads work (unauthenticated), writes are skipped with a clear message, and the agent loop is not interrupted
+**Plans**: TBD
+
+### Phase 14: Memory Entry Schema
+**Goal**: The collective memory entry schema is locked and the community repo structure is established — every field is specified, versioned, and forward-compatible before any entries are written
+**Depends on**: Phase 13
+**Requirements**: SCHM-01, SCHM-02, SCHM-03
+**Success Criteria** (what must be TRUE):
+  1. A `CollectiveMemoryEntry` value round-trips through JSON encode/decode with all fields intact — working config, reasoning chain, environment fingerprint (arch, Wine version, macOS version, Wine flavor), and schema version
+  2. The collective memory repo contains an `entries/` directory where each game has one file at `entries/{game-id}.json` holding an array of entries from different agents
+  3. A JSON file with unknown fields (simulating a future schema version) decodes without error — unknown fields are ignored and optional fields default gracefully
+**Plans**: TBD
+
+### Phase 15: Read Path
+**Goal**: The agent queries collective memory before starting diagnosis and reasons about whether a stored config fits the local environment — so that agents on new machines benefit from prior solutions without blindly applying them
+**Depends on**: Phase 14
+**Requirements**: READ-01, READ-02, READ-03
+**Success Criteria** (what must be TRUE):
+  1. When launching a game that has a collective memory entry, the agent's initial message includes the stored config and reasoning chain as context — before any tool calls are made
+  2. The agent's reasoning explicitly compares the stored entry's environment (arch, Wine version, macOS version) against the local environment before applying any config — entries for a different CPU arch are flagged as incompatible, not silently applied
+  3. When the local Wine major version is more than one ahead of the version recorded in the entry's last confirmation, the agent flags the entry as potentially stale in its reasoning
+  4. When collective memory is unavailable (network down, repo not configured), the agent proceeds with normal diagnosis — no error is surfaced to the user and launch is not blocked
+**Plans**: TBD
+
+### Phase 16: Write Path
+**Goal**: After a user confirms a game reached the menu, the agent automatically pushes the working config and reasoning chain to collective memory — and if an entry already exists for that game and environment, increments the confirmation count rather than creating a duplicate
+**Depends on**: Phase 15
+**Requirements**: WRIT-01, WRIT-02, WRIT-03
+**Success Criteria** (what must be TRUE):
+  1. After a user answers "yes" to the launch validation prompt, a new or updated entry appears in the collective memory repo within the same session — no manual action required
+  2. When a second agent on a different machine confirms the same config for the same game, the existing entry's confirmation count increments and no duplicate entry is created — deduplication is by environment hash
+  3. On first run, the user sees a prompt asking whether to contribute working configs to the community; their choice is saved to config and not asked again; contribution can be toggled later
+  4. When a push fails (network error, conflict), the failure is logged and the agent session completes normally — the user's success confirmation is not blocked or re-prompted
+**Plans**: TBD
+
+### Phase 17: Web Memory UI
+**Goal**: The web interface surfaces collective memory state — how many games are covered, recent contributions, and per-game entry details — giving users transparency into what the community has solved
+**Depends on**: Phase 16
+**Requirements**: WEBM-01, WEBM-02
+**Success Criteria** (what must be TRUE):
+  1. Navigating to `/memory` in the web UI shows aggregate stats: total games covered, total confirmations across all entries, and recent contributions
+  2. Clicking a game in the memory view shows its individual entries with environment details (arch, Wine version, macOS version) and confidence scores (confirmation count)
+  3. The memory views load without error when the collective memory repo is unreachable — they degrade to an empty state with an explanatory message, not a 500 error
+**Plans**: TBD
+
+## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 13 → 14 → 15 → 16 → 17
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1–7. v1.0 phases | v1.0 | All complete | Complete | 2026-03-28 |
+| 8. Loop Resilience | v1.1 | 2/2 | Complete | 2026-03-29 |
+| 9. Engine Detection and Pre-configuration | v1.1 | 2/2 | Complete | 2026-03-29 |
+| 10. Dialog Detection | v1.1 | 2/2 | Complete | 2026-03-29 |
+| 11. Smarter Research | v1.1 | 3/3 | Complete | 2026-03-29 |
+| 12. Web Interface for Game Management | v1.1 | 4/4 | Complete | 2026-03-30 |
+| 13. GitHub App Authentication | v1.2 | 0/? | Not started | - |
+| 14. Memory Entry Schema | v1.2 | 0/? | Not started | - |
+| 15. Read Path | v1.2 | 0/? | Not started | - |
+| 16. Write Path | v1.2 | 0/? | Not started | - |
+| 17. Web Memory UI | v1.2 | 0/? | Not started | - |

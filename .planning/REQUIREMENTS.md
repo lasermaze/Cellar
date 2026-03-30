@@ -214,33 +214,32 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RSRCH-01 | Phase 11 | Complete |
 | RSRCH-02 | Phase 11 | Complete |
 | RSRCH-03 | Phase 11 | Complete |
-
 | WEB-01 | Phase 12 | Complete |
 | WEB-02 | Phase 12 | Complete |
 | WEB-03 | Phase 12 | Complete |
 | WEB-04 | Phase 12 | Complete |
 | WEB-05 | Phase 12 | Complete |
-| AUTH-01 | — | Pending |
-| AUTH-02 | — | Pending |
-| SCHM-01 | — | Pending |
-| SCHM-02 | — | Pending |
-| SCHM-03 | — | Pending |
-| READ-01 | — | Pending |
-| READ-02 | — | Pending |
-| READ-03 | — | Pending |
-| WRIT-01 | — | Pending |
-| WRIT-02 | — | Pending |
-| WRIT-03 | — | Pending |
-| WEBM-01 | — | Pending |
-| WEBM-02 | — | Pending |
+| AUTH-01 | Phase 13 | Pending |
+| AUTH-02 | Phase 13 | Pending |
+| SCHM-01 | Phase 14 | Pending |
+| SCHM-02 | Phase 14 | Pending |
+| SCHM-03 | Phase 14 | Pending |
+| READ-01 | Phase 15 | Pending |
+| READ-02 | Phase 15 | Pending |
+| READ-03 | Phase 15 | Pending |
+| WRIT-01 | Phase 16 | Pending |
+| WRIT-02 | Phase 16 | Pending |
+| WRIT-03 | Phase 16 | Pending |
+| WEBM-01 | Phase 17 | Pending |
+| WEBM-02 | Phase 17 | Pending |
 
 **Coverage:**
 - v1.0 requirements: 15 total (all complete)
 - v1.1 requirements: 19 total (all complete)
 - v1.2 requirements: 13 total
-- Mapped to phases: 0
-- Unmapped: 13 ⚠️
+- Mapped to phases: 13
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-03-25*
-*Last updated: 2026-03-30 after v1.2 Collective Agent Memory requirements*
+*Last updated: 2026-03-29 after v1.2 roadmap creation (phases 13–17)*
