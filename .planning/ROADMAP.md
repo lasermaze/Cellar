@@ -4,7 +4,7 @@
 
 - ✅ **v1.0 Research-Diagnose-Adapt** — Phases 1–7 (shipped 2026-03-28)
 - ✅ **v1.1 Agentic Independence** — Phases 8–12 (shipped 2026-03-30)
-- 🚧 **v1.2 Collective Agent Memory** — Phases 13–17 (in progress)
+- 🚧 **v1.2 Collective Agent Memory** — Phases 13–18 (in progress)
 
 ## Phases
 
@@ -41,6 +41,7 @@
 - [ ] **Phase 15: Read Path** — Agent queries collective memory before diagnosis; environment-aware fit assessment before applying any stored config
 - [ ] **Phase 16: Write Path** — Agent pushes configs after confirmed success; confidence accumulation with deduplication; opt-in contribution prompt
 - [ ] **Phase 17: Web Memory UI** — Browser views for collective memory stats and per-game memory entries
+- [ ] **Phase 18: Deepseek API Support** — Add Deepseek as an additional AI provider alongside Claude; users choose which provider for recipe generation, log interpretation, and the agent loop
 
 ## Phase Details
 
@@ -176,7 +177,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 13 → 14 → 15 → 16 → 17
+Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
@@ -191,3 +192,14 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17
 | 15. Read Path | v1.2 | 0/? | Not started | - |
 | 16. Write Path | v1.2 | 0/? | Not started | - |
 | 17. Web Memory UI | v1.2 | 0/? | Not started | - |
+| 18. Deepseek API Support | v1.2 | 0/? | Not started | - |
+
+### Phase 18: Deepseek API Support
+**Goal**: Users can choose Deepseek as an alternative AI provider to Claude for recipe generation, log interpretation, and the full agent loop — with provider selection in config and the web settings UI
+**Depends on**: Phase 17
+**Requirements**: TBD
+**Success Criteria** (what must be TRUE):
+  1. When `AI_PROVIDER=deepseek` is set in config or .env, Cellar uses the Deepseek API for all AI operations (recipe generation, log interpretation, agent loop) instead of Claude
+  2. The web settings page allows selecting the active AI provider and entering the Deepseek API key
+  3. When the configured provider's API key is missing, Cellar shows a clear error message naming the provider — not a generic "API key missing"
+**Plans**: TBD

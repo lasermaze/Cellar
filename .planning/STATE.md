@@ -66,6 +66,10 @@ Progress: [██████████░░░░░░░░░░] ~50% (1
 - [Phase 13-github-app-authentication]: @unchecked Sendable on GitHubAuthService — NSLock provides external synchronization for Swift 6 mutable global state
 - [Phase 13-github-app-authentication]: JWT iat=now-60 (clock skew buffer) and exp=now+510 (8.5-min window under GitHub 10-min max) per GitHub recommendations
 
+### Roadmap Evolution
+
+- Phase 18 added (2026-03-30): Deepseek API Support — alternative AI provider alongside Claude
+
 ### Pending Todos
 
 None.
