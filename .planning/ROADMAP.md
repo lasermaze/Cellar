@@ -122,7 +122,7 @@ Plans:
   1. Running `cellar` with GitHub App credentials configured produces a valid installation access token from the GitHub API — no error, no manual steps
   2. After 55 minutes, the agent automatically fetches a fresh installation token without any user intervention or failed API calls
   3. When GitHub App credentials are absent or misconfigured, Cellar degrades gracefully: collective memory reads work (unauthenticated), writes are skipped with a clear message, and the agent loop is not interrupted
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 13-01-PLAN.md — Data layer: GitHubModels (Codable types, error enum), placeholder resources (PEM + JSON), CellarPaths extension
@@ -183,7 +183,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17
 | 10. Dialog Detection | v1.1 | 2/2 | Complete | 2026-03-29 |
 | 11. Smarter Research | v1.1 | 3/3 | Complete | 2026-03-29 |
 | 12. Web Interface for Game Management | v1.1 | 4/4 | Complete | 2026-03-30 |
-| 13. GitHub App Authentication | v1.2 | 0/? | Not started | - |
+| 13. GitHub App Authentication | 1/2 | In Progress|  | - |
 | 14. Memory Entry Schema | v1.2 | 0/? | Not started | - |
 | 15. Read Path | v1.2 | 0/? | Not started | - |
 | 16. Write Path | v1.2 | 0/? | Not started | - |

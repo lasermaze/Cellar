@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
-status: in-progress
-last_updated: "2026-03-29T00:00:00Z"
+status: unknown
+last_updated: "2026-03-30T15:33:35.031Z"
 progress:
-  total_phases: 5
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_phases: 13
+  completed_phases: 12
+  total_plans: 37
+  completed_plans: 36
 ---
 
 # Project State
@@ -46,6 +46,7 @@ Progress: [██████████░░░░░░░░░░] ~50% (1
 | Phase 12 | 4 | 5.8 min |
 
 *Updated after each plan completion*
+| Phase 13-github-app-authentication P01 | 1 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -58,6 +59,9 @@ Progress: [██████████░░░░░░░░░░] ~50% (1
 - [v1.2 roadmap]: Read path before write path — validate concept before committing to public repo
 - [v1.2 roadmap]: Opt-in contribution prompt on first run; preference saved in CellarConfig
 - [Phase 12-04]: SSE event types: status, log, iteration, tool, cost, error, complete for granular UI updates
+- [Phase 13-01]: GitHubAppConfig.appID uses String to accept both numeric App IDs and string Client IDs
+- [Phase 13-01]: Placeholder credentials use empty strings — loader returns .unavailable rather than crashing
+- [Phase 13-01]: CellarPaths.defaultMemoryRepo centralizes the collective memory repo slug
 
 ### Pending Todos
 
