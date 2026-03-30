@@ -136,7 +136,10 @@ Plans:
   1. A `CollectiveMemoryEntry` value round-trips through JSON encode/decode with all fields intact — working config, reasoning chain, environment fingerprint (arch, Wine version, macOS version, Wine flavor), and schema version
   2. The collective memory repo contains an `entries/` directory where each game has one file at `entries/{game-id}.json` holding an array of entries from different agents
   3. A JSON file with unknown fields (simulating a future schema version) decodes without error — unknown fields are ignored and optional fields default gracefully
-**Plans**: TBD
+**Plans:** 1 plan
+
+Plans:
+- [ ] 14-01-PLAN.md — Schema types (CollectiveMemoryEntry, WorkingConfig, EnvironmentFingerprint), slugify(), environment hash, round-trip + forward-compat tests
 
 ### Phase 15: Read Path
 **Goal**: The agent queries collective memory before starting diagnosis and reasons about whether a stored config fits the local environment — so that agents on new machines benefit from prior solutions without blindly applying them
