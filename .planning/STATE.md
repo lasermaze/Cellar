@@ -89,6 +89,9 @@ Progress: [████████████████████] ~55% (1
 ### Roadmap Evolution
 
 - Phase 18 added (2026-03-30): Deepseek API Support — alternative AI provider alongside Claude
+- Phase 19 added (2026-03-31): Import Lutris and ProtonDB compatibility databases
+- Phase 20 added (2026-03-31): Smarter Wine log parsing and structured diagnostics
+- Phase 21 added (2026-03-31): Pre-flight dependency check from PE imports
 
 ### Pending Todos
 
