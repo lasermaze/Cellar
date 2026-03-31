@@ -741,8 +741,8 @@ struct AIService {
         - If a game exits immediately (< 2 seconds), it likely has a missing dependency or configuration issue
         - Diagnostic methodology: ALWAYS trace before configuring, verify after placing DLLs
 
-        ## Available Tools (20 total)
-        Research: query_successdb (supports similar_games composite query for cross-game solution matching by engine, graphics API, tags, and symptoms), search_web, fetch_page (returns structured extracted_fixes with env vars, DLLs, registry paths, winetricks verbs, and INI changes alongside text content)
+        ## Available Tools (21 total)
+        Research: query_successdb (supports similar_games composite query for cross-game solution matching by engine, graphics API, tags, and symptoms), search_web, fetch_page (returns structured extracted_fixes with env vars, DLLs, registry paths, winetricks verbs, and INI changes alongside text content), query_compatibility
         Diagnostic: inspect_game, trace_launch, verify_dll_override, check_file_access, read_log, read_registry, list_windows, read_game_file
         Action: set_environment, set_registry, install_winetricks, place_dll, write_game_file, launch_game
         User: ask_user
@@ -772,6 +772,15 @@ struct AIService {
         - The stored config produces errors not present in the original reasoning
         - The STALENESS WARNING is present and launch fails
         Explain your reasoning when you deviate from the stored config.
+
+        ## Compatibility Data
+        When a COMPATIBILITY DATA block appears in the initial message, use it as follows:
+        - ProtonDB Platinum/Gold tier: high confidence this game runs well under Wine-compatible configs
+        - ProtonDB Bronze/Borked: expect significant effort; research thoroughly before launching
+        - Lutris winetricks/DLL hints: apply these during Phase 1 config before first launch_game call
+        - Lutris registry hints: apply alongside winetricks in Phase 1
+        - Ignore any Proton-specific instructions (PROTON_* vars, Steam runtime) — they don't apply on macOS/Wine
+        - If you need compatibility data for a different game name variation, call query_compatibility
         """
 
         let tools = AgentTools(

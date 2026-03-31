@@ -564,6 +564,22 @@ final class AgentTools {
                 "properties": .object([:]),
                 "required": .array([])
             ])
+        ),
+
+        // 20. query_compatibility — required game_name
+        ToolDefinition(
+            name: "query_compatibility",
+            description: "Query Lutris and ProtonDB community databases for Wine compatibility data on a game. Returns environment variables, DLL overrides, winetricks verbs, registry edits from Lutris installer scripts, and ProtonDB tier rating. Use this for on-demand lookups if compatibility data wasn't in the initial context or you need to check a different game name.",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "game_name": .object([
+                        "type": .string("string"),
+                        "description": .string("Game name to search for (e.g. 'Deus Ex', 'Cossacks European Wars')")
+                    ])
+                ]),
+                "required": .array([.string("game_name")])
+            ])
         )
     ]
 
@@ -592,6 +608,7 @@ final class AgentTools {
         case "search_web":        return searchWeb(input: input)
         case "fetch_page":        return fetchPage(input: input)
         case "list_windows":      return listWindows(input: input)
+        case "query_compatibility": return queryCompatibility(input: input)
         default:
             return jsonResult(["error": "Unknown tool: \(toolName)"])
         }
@@ -2340,6 +2357,21 @@ final class AgentTools {
         }
 
         return jsonResult(result)
+    }
+
+    // MARK: - Compatibility Lookup
+
+    private func queryCompatibility(input: JSONValue) -> String {
+        guard case .object(let obj) = input,
+              case .string(let gameName) = obj["game_name"] else {
+            return "Error: game_name parameter required"
+        }
+
+        guard let report = CompatibilityService.fetchReport(for: gameName) else {
+            return "No compatibility data found for '\(gameName)'. Lutris and ProtonDB had no matching entries."
+        }
+
+        return report.formatForAgent()
     }
 }
 
