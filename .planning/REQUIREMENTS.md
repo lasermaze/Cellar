@@ -104,8 +104,8 @@ Requirements for v1.2 Collective Agent Memory. Each maps to roadmap phases.
 
 ### Web Interface (v1.2)
 
-- [ ] **WEBM-01**: Web UI shows collective memory stats (games covered, total confirmations, recent contributions)
-- [ ] **WEBM-02**: Web UI shows per-game memory entries with environment details and confidence scores
+- [x] **WEBM-01**: Web UI shows collective memory stats (games covered, total confirmations, recent contributions)
+- [x] **WEBM-02**: Web UI shows per-game memory entries with environment details and confidence scores
 
 ### Deepseek API Support
 
@@ -236,8 +236,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WRIT-01 | Phase 16 | Complete |
 | WRIT-02 | Phase 16 | Complete |
 | WRIT-03 | Phase 16 | Complete |
-| WEBM-01 | Phase 17 | Pending |
-| WEBM-02 | Phase 17 | Pending |
+| WEBM-01 | Phase 17 | Complete |
+| WEBM-02 | Phase 17 | Complete |
 | DSPK-01 | Phase 18 | Complete |
 | DSPK-02 | Phase 18 | Complete |
 | DSPK-03 | Phase 18 | Complete |
