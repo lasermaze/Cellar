@@ -831,6 +831,9 @@ struct AIService {
             wineURL: wineURL
         )
 
+        // Fetch community compatibility data from Lutris + ProtonDB (silent skip on any failure)
+        let compatContext = CompatibilityService.fetchReport(for: entry.name)
+
         // Check for handoff from a previous incomplete session
         let previousSession = SessionHandoff.read(gameId: gameId)
         if previousSession != nil {
@@ -842,6 +845,9 @@ struct AIService {
         var contextParts: [String] = []
         if let memoryContext = memoryContext {
             contextParts.append(memoryContext)
+        }
+        if let compatReport = compatContext {
+            contextParts.append(compatReport.formatForAgent())
         }
         if let previousSession = previousSession {
             contextParts.append(previousSession.formatForAgent())
