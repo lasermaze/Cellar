@@ -737,6 +737,13 @@ struct AIService {
         ## Communication
         - Explain your reasoning as you go — what you found in research, what the trace revealed, why you're trying a specific fix
         - If you exhaust attempts, write a detailed summary including pitfalls discovered
+
+        ## Collective Memory
+        When a COLLECTIVE MEMORY block appears in the initial message, treat it as your first hypothesis.
+        Apply the stored config before attempting web research. Only fall back to full R-D-A research if:
+        - The stored config produces errors not present in the original reasoning
+        - The STALENESS WARNING is present and launch fails
+        Explain your reasoning when you deviate from the stored config.
         """
 
         let tools = AgentTools(
@@ -781,7 +788,20 @@ struct AIService {
             onOutput: onOutput
         )
 
-        let initialMessage = "Launch the game '\(entry.name)' (ID: \(gameId)). The executable is at: \(executablePath). Follow the Research-Diagnose-Adapt workflow: start by querying the success database, then inspect the game. Move quickly to a real launch_game call — research and at most one trace_launch before your first real launch."
+        // Fetch collective memory context (silent skip on any failure)
+        let memoryContext = CollectiveMemoryService.fetchBestEntry(
+            for: entry.name,
+            wineURL: wineURL
+        )
+
+        let launchInstruction = "Launch the game '\(entry.name)' (ID: \(gameId)). The executable is at: \(executablePath). Follow the Research-Diagnose-Adapt workflow: start by querying the success database, then inspect the game. Move quickly to a real launch_game call — research and at most one trace_launch before your first real launch."
+
+        let initialMessage: String
+        if let memoryContext = memoryContext {
+            initialMessage = memoryContext + "\n\n" + launchInstruction
+        } else {
+            initialMessage = launchInstruction
+        }
 
         let result = agentLoop.run(
             initialMessage: initialMessage,
