@@ -1,0 +1,49 @@
+#extend("base"):
+  #export("content"):
+    <section>
+      <p><a href="/memory">Back to Memory</a></p>
+      <h2>#(title)</h2>
+      #if(detail):
+        #if(count(detail.entries) > 0):
+          #for(entry in detail.entries):
+            <article>
+              <header>
+                <strong>#(entry.arch)</strong> &mdash; Wine #(entry.wineVersion), macOS #(entry.macosVersion)
+                #if(entry.wineFlavor != ""):
+                  (#(entry.wineFlavor))
+                #endif
+              </header>
+              <div class="game-grid">
+                <div>
+                  <small style="color: var(--pico-muted-color);">Confirmations</small>
+                  <p style="font-size: 1.5rem; margin: 0;">#(entry.confirmations)</p>
+                </div>
+                <div>
+                  <small style="color: var(--pico-muted-color);">Last Confirmed</small>
+                  <p>#(entry.lastConfirmed)</p>
+                </div>
+              </div>
+              #if(entry.engine != ""):
+                <p><small>Engine: #(entry.engine)</small>
+                #if(entry.graphicsApi != ""):
+                  <small> | Graphics: #(entry.graphicsApi)</small>
+                #endif
+                </p>
+              #endif
+              <details>
+                <summary>Agent Reasoning</summary>
+                <p>#(entry.reasoning)</p>
+              </details>
+            </article>
+          #endfor
+        #else:
+          <p>No entries found for this game.</p>
+        #endif
+      #else:
+        <article>
+          <p>Could not load memory entries for this game. The collective memory repo may be unreachable.</p>
+        </article>
+      #endif
+    </section>
+  #endexport
+#endextend

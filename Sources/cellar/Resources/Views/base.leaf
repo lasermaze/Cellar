@@ -56,6 +56,7 @@
             <ul><li><strong>Cellar</strong></li></ul>
             <ul>
                 <li><a href="/">Games</a></li>
+                <li><a href="/memory">Memory</a></li>
                 <li><a href="/settings">Settings</a></li>
             </ul>
         </nav>

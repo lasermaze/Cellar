@@ -1,0 +1,47 @@
+#extend("base"):
+  #export("content"):
+    <section>
+      <h2>Community Memory</h2>
+      #if(stats.isAvailable):
+        <div class="game-grid" style="margin-bottom: 1.5rem;">
+          <article>
+            <header><strong>Games Covered</strong></header>
+            <p style="font-size: 2rem; margin: 0;">#(stats.gameCount)</p>
+          </article>
+          <article>
+            <header><strong>Total Confirmations</strong></header>
+            <p style="font-size: 2rem; margin: 0;">#(stats.totalConfirmations)</p>
+          </article>
+        </div>
+
+        #if(count(stats.recentContributions) > 0):
+          <h3>Recent Contributions</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Game</th>
+                <th>Confirmations</th>
+                <th>Last Confirmed</th>
+              </tr>
+            </thead>
+            <tbody>
+              #for(item in stats.recentContributions):
+                <tr>
+                  <td><a href="/memory/#(item.gameSlug)">#(item.gameName)</a></td>
+                  <td>#(item.confirmations)</td>
+                  <td>#(item.lastConfirmed)</td>
+                </tr>
+              #endfor
+            </tbody>
+          </table>
+        #else:
+          <p>No contributions yet. Launch games with the AI agent to start building community memory.</p>
+        #endif
+      #else:
+        <article>
+          <p>Community memory is not available. Configure GitHub App credentials in <a href="/settings">Settings</a>.</p>
+        </article>
+      #endif
+    </section>
+  #endexport
+#endextend
