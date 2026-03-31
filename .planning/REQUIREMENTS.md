@@ -113,6 +113,12 @@ Requirements for v1.2 Collective Agent Memory. Each maps to roadmap phases.
 - [x] **DSPK-02**: Web settings page allows selecting the active AI provider and entering the Deepseek API key
 - [x] **DSPK-03**: When the configured provider's API key is missing, Cellar shows a clear error message naming the provider — not a generic "API key missing"
 
+### Compatibility Databases
+
+- [x] **COMPAT-01**: Agent queries Lutris API by game name with fuzzy matching and extracts actionable Wine config from installer scripts (env vars, DLL overrides, winetricks verbs, registry edits)
+- [x] **COMPAT-02**: Agent queries ProtonDB for tier rating (Platinum/Gold/Silver/Bronze/Borked) using Steam AppID discovered from Lutris, with Proton-specific flags filtered out before agent sees them
+- [x] **COMPAT-03**: Compatibility data is auto-injected into the agent's initial message before diagnosis, and a query_compatibility tool allows on-demand lookups during the agent loop
+
 ## v2 Requirements
 
 Deferred to future release. Tracked but not in current roadmap.
@@ -241,12 +247,16 @@ Which phases cover which requirements. Updated during roadmap creation.
 | DSPK-01 | Phase 18 | Complete |
 | DSPK-02 | Phase 18 | Complete |
 | DSPK-03 | Phase 18 | Complete |
+| COMPAT-01 | Phase 19 | Planned |
+| COMPAT-02 | Phase 19 | Planned |
+| COMPAT-03 | Phase 19 | Planned |
 
 **Coverage:**
 - v1.0 requirements: 15 total (all complete)
 - v1.1 requirements: 19 total (all complete)
-- v1.2 requirements: 16 total
-- Mapped to phases: 16
+- v1.2 requirements: 16 total (all complete)
+- Phase 19 requirements: 3 total
+- Mapped to phases: 19
 - Unmapped: 0 ✓
 
 ---
