@@ -39,5 +39,8 @@ enum WebApp {
 
         // Settings routes (API keys)
         try SettingsController.register(app)
+
+        // Memory routes (collective memory stats)
+        try MemoryController.register(app)
     }
 }
