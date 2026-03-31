@@ -81,28 +81,67 @@ struct CollectiveMemoryService {
             return nil
         }
 
-        // Step 8: Rank — highest confirmations, tiebreak by Wine version proximity
+        // Step 8: Score each entry by environment similarity
         let localMajor = majorVersion(from: localWineVersion) ?? 0
-        let ranked = archFiltered.sorted { a, b in
-            if a.confirmations != b.confirmations { return a.confirmations > b.confirmations }
-            let aMaj = majorVersion(from: a.environment.wineVersion) ?? 0
-            let bMaj = majorVersion(from: b.environment.wineVersion) ?? 0
-            return abs(aMaj - localMajor) < abs(bMaj - localMajor)
+        let localMacosMajor = macosMajorVersion()
+
+        let scored: [(entry: CollectiveMemoryEntry, score: Int)] = archFiltered.map { entry in
+            var score = 0
+
+            // Wine flavor match (40 pts) — GPTK vs vanilla is the hardest incompatibility
+            if entry.environment.wineFlavor == localFlavor {
+                score += 40
+            }
+
+            // Wine version proximity (30 pts max)
+            let entryWineMajor = majorVersion(from: entry.environment.wineVersion) ?? 0
+            let wineDist = abs(localMajor - entryWineMajor)
+            switch wineDist {
+            case 0: score += 30
+            case 1: score += 20
+            case 2: score += 10
+            default: break
+            }
+
+            // macOS version proximity (20 pts max)
+            let entryMacosMajor = majorVersion(from: entry.environment.macosVersion) ?? 0
+            let macosDist = abs(localMacosMajor - entryMacosMajor)
+            switch macosDist {
+            case 0: score += 20
+            case 1: score += 10
+            default: break
+            }
+
+            // Confirmations (10 pts max) — tiebreaker, not dominant
+            score += min(entry.confirmations, 5) * 2
+
+            return (entry: entry, score: score)
         }
+
+        let ranked = scored.sorted { $0.score > $1.score }
         let best = ranked[0]
 
-        // Step 9: Assess staleness and flavor mismatch
-        let entryMajor = majorVersion(from: best.environment.wineVersion) ?? 0
+        // Step 9: Assess staleness and flavor mismatch for warnings
+        let entryMajor = majorVersion(from: best.entry.environment.wineVersion) ?? 0
         let isStale = (localMajor - entryMajor) > 1
-        let flavorMismatch = best.environment.wineFlavor != localFlavor
+        let flavorMismatch = best.entry.environment.wineFlavor != localFlavor
 
-        // Step 10: Format and return context block
+        // Step 10: Pick fallback (second-best with a different config, if available)
+        let fallback: CollectiveMemoryEntry? = ranked.dropFirst().first(where: { candidate in
+            // Only include as fallback if it has a meaningfully different config
+            candidate.entry.environmentHash != best.entry.environmentHash
+        })?.entry
+
+        // Step 11: Format and return context block
         return formatMemoryContext(
-            best,
+            best.entry,
+            score: best.score,
             isStale: isStale,
             flavorMismatch: flavorMismatch,
             localWineVersion: localWineVersion,
-            localFlavor: localFlavor
+            localFlavor: localFlavor,
+            fallback: fallback,
+            totalEntries: archFiltered.count
         )
     }
 
@@ -161,7 +200,7 @@ struct CollectiveMemoryService {
         return "wine-stable"
     }
 
-    /// Extract the major version integer from a version string like "9.0" or "10.3".
+    /// Extract the major version integer from a version string like "9.0", "10.3", or "15.3.1".
     private static func majorVersion(from versionString: String) -> Int? {
         let noParens = versionString.split(separator: " ").first.map(String.init) ?? versionString
         let dotParts = noParens.split(separator: ".")
@@ -169,6 +208,11 @@ struct CollectiveMemoryService {
             return nil
         }
         return Int(first)
+    }
+
+    /// Returns the local macOS major version (e.g. 15 for macOS 15.3).
+    private static func macosMajorVersion() -> Int {
+        ProcessInfo.processInfo.operatingSystemVersion.majorVersion
     }
 
     /// Perform a synchronous HTTP fetch using DispatchSemaphore.
@@ -193,34 +237,9 @@ struct CollectiveMemoryService {
         return box.value
     }
 
-    /// Build the formatted collective memory context block for agent injection.
-    private static func formatMemoryContext(
-        _ entry: CollectiveMemoryEntry,
-        isStale: Bool,
-        flavorMismatch: Bool,
-        localWineVersion: String,
-        localFlavor: String
-    ) -> String {
+    /// Format a single entry's config block (shared between best and fallback).
+    private static func formatConfigBlock(_ entry: CollectiveMemoryEntry) -> [String] {
         var lines: [String] = []
-
-        lines.append("--- COLLECTIVE MEMORY ---")
-        lines.append("A community-verified configuration exists for this game. Try it first before researching from scratch.")
-        lines.append("")
-        lines.append("Confirmations: \(entry.confirmations) | Verified environment: \(entry.environment.arch), Wine \(entry.environment.wineVersion), macOS \(entry.environment.macosVersion)")
-
-        if flavorMismatch {
-            lines.append("[FLAVOR WARNING: Entry was verified with \(entry.environment.wineFlavor); local Wine flavor is \(localFlavor). Config may still apply.]")
-        }
-
-        if isStale {
-            let entryMajor = majorVersion(from: entry.environment.wineVersion) ?? 0
-            let localMajor = majorVersion(from: localWineVersion) ?? 0
-            let diff = localMajor - entryMajor
-            lines.append("[STALENESS WARNING: Entry confirmed on Wine \(entryMajor).x; current Wine is \(localMajor).x (\(diff) major versions ahead). Verify compatibility.]")
-        }
-
-        lines.append("")
-        lines.append("Working Config:")
 
         // Environment variables
         lines.append("  Environment variables:")
@@ -261,9 +280,61 @@ struct CollectiveMemoryService {
         let setupDepsStr = entry.config.setupDeps.isEmpty ? "(none)" : entry.config.setupDeps.joined(separator: ", ")
         lines.append("  Setup deps: \(setupDepsStr)")
 
+        return lines
+    }
+
+    /// Build the formatted collective memory context block for agent injection.
+    private static func formatMemoryContext(
+        _ entry: CollectiveMemoryEntry,
+        score: Int,
+        isStale: Bool,
+        flavorMismatch: Bool,
+        localWineVersion: String,
+        localFlavor: String,
+        fallback: CollectiveMemoryEntry?,
+        totalEntries: Int
+    ) -> String {
+        var lines: [String] = []
+
+        lines.append("--- COLLECTIVE MEMORY ---")
+        lines.append("A community-verified configuration exists for this game (\(totalEntries) config(s) on file for your arch). The best match for your system is shown first.")
+        lines.append("")
+        lines.append("## Best Match (score \(score)/100)")
+        lines.append("Confirmations: \(entry.confirmations) | Environment: \(entry.environment.arch), Wine \(entry.environment.wineVersion) (\(entry.environment.wineFlavor)), macOS \(entry.environment.macosVersion)")
+
+        if flavorMismatch {
+            lines.append("[FLAVOR WARNING: Entry was verified with \(entry.environment.wineFlavor); local Wine flavor is \(localFlavor). Config may still apply.]")
+        }
+
+        if isStale {
+            let entryMajor = majorVersion(from: entry.environment.wineVersion) ?? 0
+            let localMajor = majorVersion(from: localWineVersion) ?? 0
+            let diff = localMajor - entryMajor
+            lines.append("[STALENESS WARNING: Entry confirmed on Wine \(entryMajor).x; current Wine is \(localMajor).x (\(diff) major versions ahead). Verify compatibility.]")
+        }
+
+        lines.append("")
+        lines.append("Working Config:")
+        lines.append(contentsOf: formatConfigBlock(entry))
+
         lines.append("")
         lines.append("Agent's Reasoning (from prior session):")
         lines.append("  \"\(entry.reasoning)\"")
+
+        // Fallback entry — different config the agent can try if the best match fails
+        if let fallback = fallback {
+            lines.append("")
+            lines.append("## Fallback Config")
+            lines.append("Confirmations: \(fallback.confirmations) | Environment: \(fallback.environment.arch), Wine \(fallback.environment.wineVersion) (\(fallback.environment.wineFlavor)), macOS \(fallback.environment.macosVersion)")
+            lines.append("")
+            lines.append("Working Config:")
+            lines.append(contentsOf: formatConfigBlock(fallback))
+            if !fallback.reasoning.isEmpty {
+                lines.append("")
+                lines.append("Reasoning: \"\(fallback.reasoning)\"")
+            }
+        }
+
         lines.append("--- END COLLECTIVE MEMORY ---")
 
         return lines.joined(separator: "\n")

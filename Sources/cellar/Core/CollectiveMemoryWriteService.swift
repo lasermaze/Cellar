@@ -72,6 +72,48 @@ struct CollectiveMemoryWriteService {
         }
     }
 
+    /// Sync all local success records to collective memory.
+    /// The write service handles deduplication: same environmentHash increments
+    /// confirmations, different hash appends a new entry, new game creates the file.
+    /// Returns (synced, failed) counts.
+    static func syncAll(wineURL: URL) -> (synced: Int, failed: Int) {
+        let config = CellarConfig.load()
+        guard config.contributeMemory == true else {
+            return (0, 0)
+        }
+
+        let authResult = GitHubAuthService.shared.getToken()
+        guard case .token = authResult else {
+            return (0, 0)
+        }
+
+        let records = SuccessDatabase.loadAll()
+        guard !records.isEmpty else { return (0, 0) }
+
+        var synced = 0, failed = 0
+
+        for record in records {
+            // Snapshot log line count before push to detect success
+            let logFile = CellarPaths.logsDir.appendingPathComponent("memory-push.log")
+            let lineCountBefore = (try? String(contentsOf: logFile, encoding: .utf8))?
+                .components(separatedBy: "\n").count ?? 0
+
+            push(record: record, gameName: record.gameName, wineURL: wineURL)
+
+            // Check if push logged a success line
+            let logAfter = (try? String(contentsOf: logFile, encoding: .utf8)) ?? ""
+            let linesAfter = logAfter.components(separatedBy: "\n")
+            let newLines = linesAfter.dropFirst(max(0, lineCountBefore - 1))
+            if newLines.contains(where: { $0.contains("Push succeeded") }) {
+                synced += 1
+            } else {
+                failed += 1
+            }
+        }
+
+        return (synced: synced, failed: failed)
+    }
+
     // MARK: - Private: GitHub Contents API Flow
 
     /// GET + merge + PUT flow against GitHub Contents API.

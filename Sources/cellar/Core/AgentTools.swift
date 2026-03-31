@@ -40,6 +40,24 @@ final class AgentTools {
     let wineURL: URL
     let wineProcess: WineProcess
 
+    // MARK: - User Input Handler
+
+    /// Callback to ask the user a question. Returns their answer.
+    /// Default implementation uses readLine() (CLI). Override for web UI.
+    var askUserHandler: @Sendable (_ question: String, _ options: [String]?) -> String = { question, options in
+        print("\nAgent question: \(question)")
+        if let opts = options, !opts.isEmpty {
+            for (index, option) in opts.enumerated() {
+                print("  \(index + 1). \(option)")
+            }
+            print("Enter number or free text: ", terminator: "")
+        } else {
+            print("Your answer: ", terminator: "")
+        }
+        fflush(stdout)
+        return readLine() ?? ""
+    }
+
     // MARK: - Mutable State
 
     /// Wine environment variables accumulated across set_environment calls.
@@ -80,6 +98,26 @@ final class AgentTools {
         self.bottleURL = bottleURL
         self.wineURL = wineURL
         self.wineProcess = wineProcess
+    }
+
+    // MARK: - Session Handoff
+
+    /// Capture current session state for handoff to a future session.
+    func captureHandoff(stopReason: String, lastText: String, iterationsUsed: Int, costUSD: Double) -> SessionHandoff {
+        // Take last 1000 chars of agent text as status summary
+        let statusText = String(lastText.suffix(1000)).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return SessionHandoff(
+            gameId: gameId,
+            timestamp: ISO8601DateFormatter().string(from: Date()),
+            stopReason: stopReason,
+            iterationsUsed: iterationsUsed,
+            estimatedCostUSD: costUSD,
+            accumulatedEnv: accumulatedEnv,
+            installedDeps: Array(installedDeps),
+            launchCount: launchCount,
+            lastStatus: statusText
+        )
     }
 
     // MARK: - Tool Definitions
@@ -960,19 +998,7 @@ final class AgentTools {
         }
 
         let options = input["options"]?.asArray?.compactMap { $0.asString }
-
-        print("\nAgent question: \(question)")
-
-        if let opts = options, !opts.isEmpty {
-            for (index, option) in opts.enumerated() {
-                print("  \(index + 1). \(option)")
-            }
-            print("Enter number or free text: ", terminator: "")
-        } else {
-            print("Your answer: ", terminator: "")
-        }
-
-        let answer = readLine() ?? ""
+        let answer = askUserHandler(question, options)
         return jsonResult(["answer": answer])
     }
 
@@ -1297,8 +1323,8 @@ final class AgentTools {
 
         let stderrTail = String(result.stderr.suffix(4000))
 
-        // Determine if game likely ran successfully (ran long enough to reach menu)
-        let likelyRanSuccessfully = result.elapsed > 10.0 && !result.timedOut
+        // Determine if game ran long enough that the user interacted with it
+        let likelyRanSuccessfully = result.elapsed > 3.0
 
         var resultDict: [String: Any] = [
             "exit_code": Int(result.exitCode),
@@ -1317,10 +1343,10 @@ final class AgentTools {
         }
         if likelyRanSuccessfully {
             // Auto-prompt user directly — don't leave this to the agent
-            print("\n--- Game ran for \(Int(result.elapsed)) seconds ---")
-            print("Did the game work? (yes / no / describe any issues): ", terminator: "")
-            fflush(stdout)
-            let feedback = readLine() ?? ""
+            let feedback = askUserHandler(
+                "Game ran for \(Int(result.elapsed)) seconds. Did the game work? (yes / no / describe any issues)",
+                nil
+            )
             resultDict["user_feedback"] = feedback
             resultDict["user_was_asked"] = true
             resultDict["IMPORTANT"] = "The user was already asked about the game and responded: '\(feedback)'. Use their feedback to decide next steps. Do NOT call ask_user to re-ask the same question."

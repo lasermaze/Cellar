@@ -126,8 +126,8 @@ struct AgentLoop {
         var allText: [String] = []
 
         // Resilience state
-        var currentMaxTokens = maxTokens
-        let maxTokensCeiling = 32768
+        var currentMaxTokens = min(maxTokens, provider.maxOutputTokensLimit)
+        let maxTokensCeiling = provider.maxOutputTokensLimit
         var totalInputTokens = 0
         var totalOutputTokens = 0
         var hasAlertedAt50 = false
@@ -135,6 +135,11 @@ struct AgentLoop {
         var hasSentBudgetHalt = false
         var hasSentBudgetWarningMessage = false
         var consecutiveContinuations = 0
+
+        // Spin detection state — track recent action tool calls to detect repetitive patterns
+        let actionTools: Set<String> = ["set_environment", "set_registry", "install_winetricks", "place_dll", "write_game_file", "launch_game"]
+        var recentActionTools: [String] = []  // rolling window of last 8 action tool calls
+        var hasSentPivotNudge = false
 
         // Pricing from provider
         let pricing = provider.pricingPerToken()
@@ -278,18 +283,47 @@ struct AgentLoop {
                     let result = toolExecutor(call.name, call.input)
                     emit(.toolResult(name: call.name, truncated: String(result.prefix(200))))
                     results.append((id: call.id, content: result, isError: false))
+
+                    // Track action tools for spin detection
+                    if actionTools.contains(call.name) {
+                        recentActionTools.append(call.name)
+                        if recentActionTools.count > 8 { recentActionTools.removeFirst() }
+                    }
                 }
 
-                // Inject budget warning as a user message alongside tool results if threshold crossed
+                // Spin detection: check for repeating action patterns
+                // Look for A→B→A→B or A→A→A patterns in recent action tools
+                var needsPivotNudge = false
+                if !hasSentPivotNudge && recentActionTools.count >= 6 {
+                    // Check for 2-tool repeating cycle (e.g., set_environment → launch_game × 3)
+                    let last6 = Array(recentActionTools.suffix(6))
+                    let pair = [last6[0], last6[1]]
+                    if last6[2] == pair[0] && last6[3] == pair[1] && last6[4] == pair[0] && last6[5] == pair[1] {
+                        needsPivotNudge = true
+                    }
+                    // Check for same action tool called 4+ times in last 6
+                    let counts = Dictionary(grouping: last6, by: { $0 }).mapValues { $0.count }
+                    if let maxCount = counts.values.max(), maxCount >= 4 {
+                        needsPivotNudge = true
+                    }
+                }
+
+                // Inject budget warning or pivot nudge as user messages alongside tool results
+                provider.appendToolResults(results)
+
+                if needsPivotNudge && !hasSentPivotNudge {
+                    hasSentPivotNudge = true
+                    let nudgeMsg = "[PIVOT CHECK: You've been repeating similar configuration+launch cycles. Step back: what NEW evidence do you have that this approach will work? If the last 2+ launches had the same symptom, return to research — call search_web with a different query angle and fetch_page on at least 2 new results before launching again.]"
+                    provider.appendUserMessage(nudgeMsg)
+                    emit(.status("[Spin detected — pivot nudge injected]"))
+                }
+
                 if hasWarnedAt80 && !hasSentBudgetWarningMessage {
                     let cost = estimatedCost()
                     let pct = budgetCeiling > 0 ? Int(cost / budgetCeiling * 100) : 0
                     let warnMsg = "[BUDGET WARNING: \(pct)% of session budget used ($\(String(format: "%.2f", cost)) / $\(String(format: "%.2f", budgetCeiling))). Begin wrapping up - save progress and finalize results soon.]"
-                    provider.appendToolResults(results)
                     provider.appendUserMessage(warnMsg)
                     hasSentBudgetWarningMessage = true
-                } else {
-                    provider.appendToolResults(results)
                 }
 
             case .maxTokens:

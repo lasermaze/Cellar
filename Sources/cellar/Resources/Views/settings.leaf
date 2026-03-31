@@ -91,6 +91,20 @@
 
           <button type="submit" style="margin-top: 1rem;">Save</button>
         </form>
+
+        #if(contributeMemory):
+          #if(successCount > 0):
+            <form method="post" action="/settings/sync" style="margin-top: 1rem;">
+              <button type="submit" class="outline">Sync #(successCount) record(s) to collective memory</button>
+              <small style="color: var(--pico-muted-color);">
+                Push all local success records to collective memory. Already-synced records will have their confirmation count incremented.
+              </small>
+            </form>
+            #if(syncResult != ""):
+              <small style="color: var(--pico-ins-color); margin-top: 0.5rem; display: block;">#(syncResult)</small>
+            #endif
+          #endif
+        #endif
       </article>
     </section>
   #endexport

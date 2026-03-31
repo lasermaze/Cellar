@@ -103,6 +103,13 @@ struct CellarPaths {
         return logDir(for: gameId).appendingPathComponent("repair-report-\(formatter.string(from: timestamp)).txt")
     }
 
+    // Session handoff directory: ~/.cellar/sessions/
+    static let sessionsDir: URL = base.appendingPathComponent("sessions")
+
+    static func sessionFile(for gameId: String) -> URL {
+        sessionsDir.appendingPathComponent("\(gameId).json")
+    }
+
     /// Default collective memory repository identifier (owner/repo).
     static let defaultMemoryRepo = "cellar-community/memory"
 }

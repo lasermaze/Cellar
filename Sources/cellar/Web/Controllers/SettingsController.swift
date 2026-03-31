@@ -14,6 +14,7 @@ enum SettingsController {
             let aiProvider = env["AI_PROVIDER"] ?? ""
             let config = CellarConfig.load()
             let contributeMemory = config.contributeMemory ?? false
+            let successCount = SuccessDatabase.loadAll().count
             return try await req.view.render("settings", SettingsContext(
                 title: "Settings",
                 anthropicKey: maskKey(anthropicKey),
@@ -23,7 +24,9 @@ enum SettingsController {
                 hasOpenaiKey: !openaiKey.isEmpty,
                 hasDeepseekKey: !deepseekKey.isEmpty,
                 aiProvider: aiProvider,
-                contributeMemory: contributeMemory
+                contributeMemory: contributeMemory,
+                successCount: successCount,
+                syncResult: ""
             ))
         }
 
@@ -36,6 +39,44 @@ enum SettingsController {
             }
             try CellarConfig.save(config)
             return req.redirect(to: "/settings")
+        }
+
+        // POST /settings/sync — sync success records to collective memory
+        settings.post("sync") { req async throws -> Response in
+            let status = DependencyChecker().checkAll()
+            guard let wineURL = status.wine else {
+                throw Abort(.preconditionFailed, reason: "Wine is not installed")
+            }
+
+            let result = CollectiveMemoryWriteService.syncAll(wineURL: wineURL)
+
+            let env = loadEnvFile()
+            let anthropicKey = env["ANTHROPIC_API_KEY"] ?? ""
+            let openaiKey = env["OPENAI_API_KEY"] ?? ""
+            let deepseekKey = env["DEEPSEEK_API_KEY"] ?? ""
+            let aiProvider = env["AI_PROVIDER"] ?? ""
+            let config = CellarConfig.load()
+            let contributeMemory = config.contributeMemory ?? false
+            let successCount = SuccessDatabase.loadAll().count
+
+            var message = ""
+            if result.synced > 0 { message += "Synced \(result.synced) record(s)." }
+            if result.failed > 0 { message += " Failed: \(result.failed)." }
+            if result.synced == 0 && result.failed == 0 { message = "All records already synced." }
+
+            return try await req.view.render("settings", SettingsContext(
+                title: "Settings",
+                anthropicKey: maskKey(anthropicKey),
+                openaiKey: maskKey(openaiKey),
+                deepseekKey: maskKey(deepseekKey),
+                hasAnthropicKey: !anthropicKey.isEmpty,
+                hasOpenaiKey: !openaiKey.isEmpty,
+                hasDeepseekKey: !deepseekKey.isEmpty,
+                aiProvider: aiProvider,
+                contributeMemory: contributeMemory,
+                successCount: successCount,
+                syncResult: message
+            )).encodeResponse(for: req)
         }
 
         // POST /settings/keys — update API keys
@@ -130,6 +171,8 @@ enum SettingsController {
         let hasDeepseekKey: Bool
         let aiProvider: String  // current value: "claude", "deepseek", or "" (auto-detect)
         let contributeMemory: Bool
+        let successCount: Int
+        let syncResult: String
     }
 
     struct KeysInput: Content {

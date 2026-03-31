@@ -557,6 +557,16 @@ struct AIService {
         let systemPrompt = """
         You are a Wine compatibility expert for macOS. Your job is to get a Windows game running via Wine on macOS.
 
+        ## Research Minimum (before first real launch)
+        You MUST complete ALL of these before your first Phase 3 launch_game call:
+        - query_successdb for exact game match
+        - query_successdb with similar_games (engine + graphics_api from inspect_game)
+        - If no high-confidence match: search_web with at least one engine-enriched query
+        - fetch_page on at least 2 promising URLs — read extracted_fixes from each
+        - Write a 2-3 sentence synthesis: "Based on research, my plan is..."
+        Skip web research only if successdb returns an exact high-confidence match.
+        Spend research time proportional to uncertainty — unknown games need more research, not less.
+
         ## Three-Phase Workflow: Research -> Diagnose -> Adapt
 
         You can move between phases non-linearly based on evidence.
@@ -585,6 +595,24 @@ struct AIService {
         5. If user reports a specific issue (e.g. "no keyboard", "black screen"): use that feedback to guide your next fix, then loop back to Phase 2
         6. If game exited in under 10 seconds with no user interaction: likely a crash, proceed to diagnose without asking
         7. Wine ALWAYS produces stderr output and non-zero exit codes even when games work perfectly. Never assume failure from stderr or exit_code alone.
+
+        ## Dead End Detection — When to Pivot
+
+        After each failed launch, classify the failure:
+        - SAME symptom as last launch → your fix didn't address the root cause
+        - NEW symptom → progress, but new issue surfaced
+        - WORSE symptom → your fix broke something, revert it
+
+        **Pivot rules:**
+        - 2 launches with the SAME symptom → STOP adapting. Return to Phase 1. Search for a completely different approach (different engine config, different renderer, different DLL source).
+        - 3 launches with incremental tweaks to the same config area (e.g., registry values, env var variations) → you're fine-tuning a dead end. Step back and research whether the entire approach is wrong.
+        - If you revert a fix and the game still fails the same way → the fix was irrelevant. Remove it and investigate a different root cause.
+
+        **How to pivot:**
+        1. Summarize what you tried and why it failed
+        2. Call search_web with a DIFFERENT query angle (different symptoms, different engine keywords, different forum sources)
+        3. Call fetch_page on at least 2 new results
+        4. Form a NEW hypothesis before launching again
 
         ## Engine-Aware Methodology
 
@@ -794,14 +822,23 @@ struct AIService {
             wineURL: wineURL
         )
 
+        // Check for handoff from a previous incomplete session
+        let previousSession = SessionHandoff.read(gameId: gameId)
+        if previousSession != nil {
+            SessionHandoff.delete(gameId: gameId)  // consume on read
+        }
+
         let launchInstruction = "Launch the game '\(entry.name)' (ID: \(gameId)). The executable is at: \(executablePath). Follow the Research-Diagnose-Adapt workflow: start by querying the success database, then inspect the game. Move quickly to a real launch_game call — research and at most one trace_launch before your first real launch."
 
-        let initialMessage: String
+        var contextParts: [String] = []
         if let memoryContext = memoryContext {
-            initialMessage = memoryContext + "\n\n" + launchInstruction
-        } else {
-            initialMessage = launchInstruction
+            contextParts.append(memoryContext)
         }
+        if let previousSession = previousSession {
+            contextParts.append(previousSession.formatForAgent())
+        }
+        contextParts.append(launchInstruction)
+        let initialMessage = contextParts.joined(separator: "\n\n")
 
         let result = agentLoop.run(
             initialMessage: initialMessage,
@@ -823,19 +860,37 @@ struct AIService {
                     isWebContext: askUserHandler != nil
                 )
             }
+            // Clear any leftover handoff on success
+            SessionHandoff.delete(gameId: gameId)
             return .success(result.finalText)
         } else {
+            // Save session handoff so next launch can pick up where we left off
+            let stopReasonStr: String
             let reason: String
             switch result.stopReason {
             case .budgetExhausted:
+                stopReasonStr = "budget_exhausted"
                 reason = "[STOP:budget] The AI agent ran out of its $\(String(format: "%.2f", result.estimatedCostUSD)) spending budget before finishing."
             case .maxIterations:
+                stopReasonStr = "max_iterations"
                 reason = "[STOP:iterations] The AI agent used all \(result.iterationsUsed) iterations without finishing."
             case .apiError(let detail):
+                stopReasonStr = "api_error"
                 reason = "[STOP:api_error] The AI agent couldn't reach the API: \(detail)"
             case .completed:
+                stopReasonStr = "unknown"
                 reason = "[STOP:unknown]"
             }
+
+            let handoff = tools.captureHandoff(
+                stopReason: stopReasonStr,
+                lastText: result.finalText,
+                iterationsUsed: result.iterationsUsed,
+                costUSD: result.estimatedCostUSD
+            )
+            SessionHandoff.write(handoff)
+            print("Session state saved. Relaunch to continue where the agent left off.")
+
             return .failed(reason)
         }
     }

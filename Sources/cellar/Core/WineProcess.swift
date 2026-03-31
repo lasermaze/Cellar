@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 struct WineProcess {
     let wineBinary: URL
@@ -100,8 +101,54 @@ struct WineProcess {
 
         let staleTimeout: TimeInterval = 300  // 5 minutes — per CONTEXT.md decision
         var didTimeout = false
+        var noWindowChecks = 0  // consecutive checks with no game windows
+        let noWindowThreshold = 3  // require 3 consecutive checks (6 seconds) to confirm game exited
+        var gameWindowSeen = false  // track if we ever saw a game window
+
         while process.isRunning {
             Thread.sleep(forTimeInterval: 2.0)
+
+            // Check if game windows still exist — Wine child processes (wineserver,
+            // services.exe, winedevice.exe) keep the parent process alive after the
+            // game EXE exits, and they write to stderr which prevents stale timeout.
+            if let windowList = CGWindowListCopyWindowInfo(
+                [.optionOnScreenOnly, .excludeDesktopElements],
+                kCGNullWindowID
+            ) as? [[String: Any]] {
+                let wineNames: Set<String> = ["wine", "wine64", "wine-preloader",
+                    "wine64-preloader", "start.exe"]
+                let hasGameWindow = windowList.contains { window in
+                    guard let owner = window[kCGWindowOwnerName as String] as? String,
+                          wineNames.contains(owner.lowercased()) || owner.lowercased().contains("wine") else {
+                        return false
+                    }
+                    // Ignore tiny windows (< 100x100) — Wine helper windows, not game windows
+                    if let bounds = window[kCGWindowBounds as String] as? [String: Any],
+                       let w = (bounds["Width"] as? CGFloat) ?? (bounds["Width"] as? Double).map({ CGFloat($0) }),
+                       let h = (bounds["Height"] as? CGFloat) ?? (bounds["Height"] as? Double).map({ CGFloat($0) }),
+                       w >= 100 && h >= 100 {
+                        return true
+                    }
+                    return false
+                }
+
+                if hasGameWindow {
+                    gameWindowSeen = true
+                    noWindowChecks = 0
+                } else if gameWindowSeen {
+                    // Only start counting after we've seen a window — avoids
+                    // false positive during initial game startup
+                    noWindowChecks += 1
+                    if noWindowChecks >= noWindowThreshold {
+                        print("\nGame window closed — shutting down Wine services.")
+                        process.terminate()
+                        try? killWineserver()
+                        Thread.sleep(forTimeInterval: 1.0)
+                        break
+                    }
+                }
+            }
+
             if Date().timeIntervalSince(outputMonitor.lastOutputTime) > staleTimeout {
                 print("\nGame launch has produced no output for \(Int(staleTimeout / 60)) minutes — assuming hung.")
                 process.terminate()
