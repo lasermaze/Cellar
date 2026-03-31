@@ -192,7 +192,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18
 | 15. Read Path | v1.2 | 0/? | Not started | - |
 | 16. Write Path | v1.2 | 0/? | Not started | - |
 | 17. Web Memory UI | v1.2 | 0/? | Not started | - |
-| 18. Deepseek API Support | 2/2 | Complete   | 2026-03-31 | - |
+| 18. Deepseek API Support | 2/2 | Complete    | 2026-03-31 | - |
 
 ### Phase 18: Deepseek API Support
 **Goal**: Users can choose Deepseek as an alternative AI provider to Claude for recipe generation, log interpretation, and the full agent loop — with provider selection in config and the web settings UI

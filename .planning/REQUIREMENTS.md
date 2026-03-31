@@ -110,8 +110,8 @@ Requirements for v1.2 Collective Agent Memory. Each maps to roadmap phases.
 ### Deepseek API Support
 
 - [x] **DSPK-01**: When `AI_PROVIDER=deepseek` is set in config or .env, Cellar uses the Deepseek API for all AI operations (recipe generation, log interpretation, agent loop) instead of Claude
-- [ ] **DSPK-02**: Web settings page allows selecting the active AI provider and entering the Deepseek API key
-- [ ] **DSPK-03**: When the configured provider's API key is missing, Cellar shows a clear error message naming the provider — not a generic "API key missing"
+- [x] **DSPK-02**: Web settings page allows selecting the active AI provider and entering the Deepseek API key
+- [x] **DSPK-03**: When the configured provider's API key is missing, Cellar shows a clear error message naming the provider — not a generic "API key missing"
 
 ## v2 Requirements
 
@@ -239,8 +239,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WEBM-01 | Phase 17 | Pending |
 | WEBM-02 | Phase 17 | Pending |
 | DSPK-01 | Phase 18 | Complete |
-| DSPK-02 | Phase 18 | Pending |
-| DSPK-03 | Phase 18 | Pending |
+| DSPK-02 | Phase 18 | Complete |
+| DSPK-03 | Phase 18 | Complete |
 
 **Coverage:**
 - v1.0 requirements: 15 total (all complete)
