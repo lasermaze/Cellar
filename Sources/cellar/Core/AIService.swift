@@ -500,7 +500,8 @@ struct AIService {
         wineURL: URL,
         bottleURL: URL,
         wineProcess: WineProcess,
-        onOutput: (@Sendable (AgentEvent) -> Void)? = nil
+        onOutput: (@Sendable (AgentEvent) -> Void)? = nil,
+        askUserHandler: (@Sendable (_ question: String, _ options: [String]?) -> String)? = nil
     ) -> AIResult<String> {
         let provider = detectProvider()
         guard case .anthropic(let apiKey) = provider else {
@@ -701,6 +702,9 @@ struct AIService {
             wineURL: wineURL,
             wineProcess: wineProcess
         )
+        if let handler = askUserHandler {
+            tools.askUserHandler = handler
+        }
 
         let config = CellarConfig.load()
 
@@ -773,6 +777,9 @@ struct AIService {
             return try callAnthropic(apiKey: apiKey, systemPrompt: systemPrompt, userMessage: userMessage)
         case .openai(let apiKey):
             return try callOpenAI(apiKey: apiKey, systemPrompt: systemPrompt, userMessage: userMessage)
+        case .deepseek:
+            // Deepseek uses the agent loop (AgentLoopProvider) — not the simple API call path
+            throw AIServiceError.unavailable
         case .unavailable:
             throw AIServiceError.unavailable
         }

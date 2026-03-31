@@ -5,6 +5,7 @@ import Foundation
 enum AIProvider {
     case anthropic(apiKey: String)
     case openai(apiKey: String)
+    case deepseek(apiKey: String)
     case unavailable
 }
 
@@ -375,5 +376,112 @@ struct AnthropicToolResponse: Decodable {
         case content
         case stopReason = "stop_reason"
         case usage
+    }
+}
+
+// MARK: - OpenAI Tool-Use API Types (Deepseek)
+
+/// Tool definition in OpenAI/Deepseek format.
+struct OpenAIToolDef: Encodable {
+    let type: String
+    let function: FunctionDef
+
+    struct FunctionDef: Encodable {
+        let name: String
+        let description: String
+        let parameters: JSONValue
+    }
+}
+
+/// OpenAI-compatible API request with tool definitions (for Deepseek agent loop).
+struct OpenAIToolRequest: Encodable {
+    let model: String
+    let maxTokens: Int
+    let messages: [Message]
+    let tools: [OpenAIToolDef]?
+
+    enum CodingKeys: String, CodingKey {
+        case model
+        case maxTokens = "max_tokens"
+        case messages
+        case tools
+    }
+
+    /// A single conversation turn in OpenAI format.
+    /// Must be Codable (both Encodable and Decodable) because the provider stores
+    /// assistant messages from responses and re-encodes them in subsequent requests.
+    struct Message: Codable {
+        let role: String
+        let content: String?
+        let toolCalls: [ToolCall]?
+        let toolCallId: String?
+
+        enum CodingKeys: String, CodingKey {
+            case role
+            case content
+            case toolCalls = "tool_calls"
+            case toolCallId = "tool_call_id"
+        }
+    }
+
+    struct ToolCall: Codable {
+        let id: String
+        let type: String
+        let function: FunctionCall
+    }
+
+    struct FunctionCall: Codable {
+        let name: String
+        let arguments: String
+    }
+}
+
+/// OpenAI-compatible API response for Deepseek tool-use calls.
+struct OpenAIToolResponse: Decodable {
+    let choices: [Choice]
+    let usage: Usage?
+
+    struct Choice: Decodable {
+        let message: Message
+        let finishReason: String
+
+        enum CodingKeys: String, CodingKey {
+            case message
+            case finishReason = "finish_reason"
+        }
+    }
+
+    struct Message: Decodable {
+        let role: String
+        let content: String?
+        let toolCalls: [ToolCall]?
+
+        enum CodingKeys: String, CodingKey {
+            case role
+            case content
+            case toolCalls = "tool_calls"
+        }
+    }
+
+    struct ToolCall: Decodable {
+        let id: String
+        let type: String
+        let function: FunctionCall
+    }
+
+    struct FunctionCall: Decodable {
+        let name: String
+        /// JSON string (NOT a decoded object) — must be decoded separately via JSONDecoder.
+        let arguments: String
+    }
+
+    struct Usage: Decodable {
+        let promptTokens: Int
+        let completionTokens: Int
+
+        enum CodingKeys: String, CodingKey {
+            case promptTokens = "prompt_tokens"
+            case completionTokens = "completion_tokens"
+        }
     }
 }
