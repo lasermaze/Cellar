@@ -5,10 +5,14 @@ import Foundation
 struct CellarConfig: Codable {
     var budgetCeiling: Double
     var aiProvider: String?  // "claude" | "deepseek" | nil (auto-detect)
+    /// Opt-in to contribute working configs to collective memory.
+    /// nil = not asked yet, true = opted in, false = declined.
+    var contributeMemory: Bool?
 
     enum CodingKeys: String, CodingKey {
         case budgetCeiling = "budget"
         case aiProvider = "ai_provider"
+        case contributeMemory = "contribute_memory"
     }
 
     static let defaultBudgetCeiling: Double = 15.00
@@ -18,7 +22,7 @@ struct CellarConfig: Codable {
         // 1. CELLAR_BUDGET env var overrides everything
         if let envVal = ProcessInfo.processInfo.environment["CELLAR_BUDGET"],
            let val = Double(envVal), val > 0 {
-            return CellarConfig(budgetCeiling: val, aiProvider: nil)
+            return CellarConfig(budgetCeiling: val, aiProvider: nil, contributeMemory: nil)
         }
         // 2. Read ~/.cellar/config.json
         let configURL = CellarPaths.configFile
@@ -27,6 +31,18 @@ struct CellarConfig: Codable {
             return config
         }
         // 3. Default
-        return CellarConfig(budgetCeiling: defaultBudgetCeiling, aiProvider: nil)
+        return CellarConfig(budgetCeiling: defaultBudgetCeiling, aiProvider: nil, contributeMemory: nil)
+    }
+
+    /// Persist this config to ~/.cellar/config.json atomically.
+    static func save(_ config: CellarConfig) throws {
+        try FileManager.default.createDirectory(
+            at: CellarPaths.base,
+            withIntermediateDirectories: true
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        let data = try encoder.encode(config)
+        try data.write(to: CellarPaths.configFile, options: .atomic)
     }
 }
