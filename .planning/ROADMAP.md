@@ -38,7 +38,7 @@
 
 - [x] **Phase 13: GitHub App Authentication** — RS256 JWT generation, installation token exchange, automatic refresh before expiry (completed 2026-03-30)
 - [x] **Phase 14: Memory Entry Schema** — Lock the collective memory entry schema and establish the repo structure before any community writes (completed 2026-03-31)
-- [ ] **Phase 15: Read Path** — Agent queries collective memory before diagnosis; environment-aware fit assessment before applying any stored config
+- [x] **Phase 15: Read Path** — Agent queries collective memory before diagnosis; environment-aware fit assessment before applying any stored config (completed 2026-03-31)
 - [ ] **Phase 16: Write Path** — Agent pushes configs after confirmed success; confidence accumulation with deduplication; opt-in contribution prompt
 - [ ] **Phase 17: Web Memory UI** — Browser views for collective memory stats and per-game memory entries
 - [x] **Phase 18: Deepseek API Support** — Add Deepseek as an additional AI provider alongside Claude; users choose which provider for recipe generation, log interpretation, and the agent loop (completed 2026-03-31)
@@ -189,7 +189,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18
 | 12. Web Interface for Game Management | v1.1 | 4/4 | Complete | 2026-03-30 |
 | 13. GitHub App Authentication | 2/2 | Complete    | 2026-03-30 | - |
 | 14. Memory Entry Schema | 1/1 | Complete    | 2026-03-31 | - |
-| 15. Read Path | 0/2 | Planned    |  | - |
+| 15. Read Path | 2/2 | Complete   | 2026-03-31 | - |
 | 16. Write Path | v1.2 | 0/? | Not started | - |
 | 17. Web Memory UI | v1.2 | 0/? | Not started | - |
 | 18. Deepseek API Support | 2/2 | Complete    | 2026-03-31 | - |
@@ -202,7 +202,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18
   1. When `AI_PROVIDER=deepseek` is set in config or .env, Cellar uses the Deepseek API for all AI operations (recipe generation, log interpretation, agent loop) instead of Claude
   2. The web settings page allows selecting the active AI provider and entering the Deepseek API key
   3. When the configured provider's API key is missing, Cellar shows a clear error message naming the provider — not a generic "API key missing"
-**Plans:** 0/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 18-01-PLAN.md — Provider protocol + Anthropic and Deepseek implementations + OpenAI tool-use types

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-03-31T01:02:23.839Z"
+last_updated: "2026-03-31T02:17:03.883Z"
 progress:
-  total_phases: 15
-  completed_phases: 15
-  total_plans: 40
-  completed_plans: 40
+  total_phases: 16
+  completed_phases: 16
+  total_plans: 42
+  completed_plans: 42
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 ## Current Position
 
-Phase: 15 of 18 (Read Path) — IN PROGRESS
-Plan: 1 of 2 complete
-Status: Plan 15-01 complete — CollectiveMemoryService created. Plan 15-02 next (agent loop integration).
-Last activity: 2026-03-30 — Phase 15 Plan 01: CollectiveMemoryService fetch/filter/rank/format
+Phase: 15 of 18 (Read Path) — COMPLETE
+Plan: 2 of 2 complete
+Status: Phase 15 complete — CollectiveMemoryService + AIService integration done. Read path fully operational.
+Last activity: 2026-03-31 — Phase 15 Plan 02: AIService memory context injection
 
 Progress: [████████████████████] ~55% (13 of ~22 phases complete across all milestones)
 
@@ -50,6 +50,7 @@ Progress: [████████████████████] ~55% (1
 | Phase 13-github-app-authentication P02 | 2 | 2 tasks | 1 files |
 | Phase 18-deepseek-api-support P01 | 12 | 2 tasks | 3 files |
 | Phase 14-memory-entry-schema P01 | 3 | 2 tasks | 2 files |
+| Phase 15-read-path P02 | 5 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,8 @@ Progress: [████████████████████] ~55% (1
 - [Phase 14-memory-entry-schema]: Default synthesized Codable on CollectiveMemoryEntry types — unknown future JSON fields silently ignored without custom init(from:)
 - [Phase 14-memory-entry-schema]: slugify() uses unicodeScalars for locale-independent slug generation
 - [Phase 14-memory-entry-schema]: EnvironmentFingerprint canonicalString uses sorted keys for hash stability; CryptoKit (system framework) for SHA-256 with no new SPM dependency
+- [Phase 15-read-path]: Memory context injected as prefix to launchInstruction in initialMessage — agent sees community config before any tool calls
+- [Phase 15-read-path]: fetchBestEntry placed after AgentTools creation (wineURL available) but before initialMessage construction — no changes to AgentTools or AgentLoop
 
 ### Roadmap Evolution
 
@@ -91,5 +94,5 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-30
-Stopped at: Completed 18-02-PLAN.md — Full Deepseek integration: AgentLoop provider protocol wiring, AIService routing, settings UI. Phase 18 complete.
+Last session: 2026-03-31
+Stopped at: Completed 15-02-PLAN.md — AIService memory context injection. Phase 15 (read path) complete.

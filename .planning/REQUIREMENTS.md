@@ -92,9 +92,9 @@ Requirements for v1.2 Collective Agent Memory. Each maps to roadmap phases.
 
 ### Read Path
 
-- [ ] **READ-01**: Agent queries collective memory for the current game before starting diagnosis — if a matching entry exists, it's injected as context in the initial agent message
-- [ ] **READ-02**: Agent reasons about environment delta between stored entry and local environment before applying (not blind application)
-- [ ] **READ-03**: Agent flags entries as potentially stale when current Wine version is more than one major version ahead of last confirmation
+- [x] **READ-01**: Agent queries collective memory for the current game before starting diagnosis — if a matching entry exists, it's injected as context in the initial agent message
+- [x] **READ-02**: Agent reasons about environment delta between stored entry and local environment before applying (not blind application)
+- [x] **READ-03**: Agent flags entries as potentially stale when current Wine version is more than one major version ahead of last confirmation
 
 ### Write Path
 
@@ -230,9 +230,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCHM-01 | Phase 14 | Complete |
 | SCHM-02 | Phase 14 | Complete |
 | SCHM-03 | Phase 14 | Complete |
-| READ-01 | Phase 15 | Pending |
-| READ-02 | Phase 15 | Pending |
-| READ-03 | Phase 15 | Pending |
+| READ-01 | Phase 15 | Complete |
+| READ-02 | Phase 15 | Complete |
+| READ-03 | Phase 15 | Complete |
 | WRIT-01 | Phase 16 | Pending |
 | WRIT-02 | Phase 16 | Pending |
 | WRIT-03 | Phase 16 | Pending |
