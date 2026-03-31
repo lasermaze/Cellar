@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 ## Current Position
 
-Phase: 18 of 18 (Deepseek API Support) — IN PROGRESS
-Plan: 1 of 2 complete
-Status: Plan 01 complete — provider protocol + implementations ready for AgentLoop integration
-Last activity: 2026-03-31 — Phase 18 Plan 01: AgentLoopProvider + AnthropicAgentProvider + DeepseekAgentProvider
+Phase: 18 of 18 (Deepseek API Support) — COMPLETE
+Plan: 2 of 2 complete
+Status: Phase 18 complete — full Deepseek integration functional
+Last activity: 2026-03-30 — Phase 18 Plan 02: AgentLoop provider integration + settings UI
 
-Progress: [██████████░░░░░░░░░░] ~50% (12 of ~22 phases complete across all milestones)
+Progress: [████████████████████] ~55% (13 of ~22 phases complete across all milestones)
 
 ## Performance Metrics
 
@@ -68,6 +68,8 @@ Progress: [██████████░░░░░░░░░░] ~50% (1
 - [Phase 13-github-app-authentication]: JWT iat=now-60 (clock skew buffer) and exp=now+510 (8.5-min window under GitHub 10-min max) per GitHub recommendations
 - [Phase 18-deepseek-api-support]: deepseek-chat as default Deepseek model (deepseek-reasoner excluded — no function calling support)
 - [Phase 18-deepseek-api-support]: AgentLoopProvider protocol owns message array — AgentLoop never holds provider-specific message types
+- [Phase 18-02]: Provider created after systemPrompt is built (late binding) to avoid placeholder pattern
+- [Phase 18-02]: Budget warning injection uses appendUserMessage() after appendToolResults() for cross-provider clean abstraction
 
 ### Roadmap Evolution
 
@@ -85,5 +87,5 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-31
-Stopped at: Completed 18-01-PLAN.md — AgentLoopProvider protocol + AnthropicAgentProvider + DeepseekAgentProvider. Ready for Plan 02.
+Last session: 2026-03-30
+Stopped at: Completed 18-02-PLAN.md — Full Deepseek integration: AgentLoop provider protocol wiring, AIService routing, settings UI. Phase 18 complete.
