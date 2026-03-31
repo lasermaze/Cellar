@@ -189,7 +189,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18
 | 12. Web Interface for Game Management | v1.1 | 4/4 | Complete | 2026-03-30 |
 | 13. GitHub App Authentication | 2/2 | Complete    | 2026-03-30 | - |
 | 14. Memory Entry Schema | 1/1 | Complete    | 2026-03-31 | - |
-| 15. Read Path | 2/2 | Complete   | 2026-03-31 | - |
+| 15. Read Path | 2/2 | Complete    | 2026-03-31 | - |
 | 16. Write Path | v1.2 | 0/? | Not started | - |
 | 17. Web Memory UI | v1.2 | 0/? | Not started | - |
 | 18. Deepseek API Support | 2/2 | Complete    | 2026-03-31 | - |
