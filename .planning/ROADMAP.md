@@ -39,7 +39,7 @@
 - [x] **Phase 13: GitHub App Authentication** — RS256 JWT generation, installation token exchange, automatic refresh before expiry (completed 2026-03-30)
 - [x] **Phase 14: Memory Entry Schema** — Lock the collective memory entry schema and establish the repo structure before any community writes (completed 2026-03-31)
 - [x] **Phase 15: Read Path** — Agent queries collective memory before diagnosis; environment-aware fit assessment before applying any stored config (completed 2026-03-31)
-- [ ] **Phase 16: Write Path** — Agent pushes configs after confirmed success; confidence accumulation with deduplication; opt-in contribution prompt
+- [x] **Phase 16: Write Path** — Agent pushes configs after confirmed success; confidence accumulation with deduplication; opt-in contribution prompt (completed 2026-03-31)
 - [ ] **Phase 17: Web Memory UI** — Browser views for collective memory stats and per-game memory entries
 - [x] **Phase 18: Deepseek API Support** — Add Deepseek as an additional AI provider alongside Claude; users choose which provider for recipe generation, log interpretation, and the agent loop (completed 2026-03-31)
 
@@ -162,7 +162,7 @@ Plans:
   2. When a second agent on a different machine confirms the same config for the same game, the existing entry's confirmation count increments and no duplicate entry is created — deduplication is by environment hash
   3. On first run, the user sees a prompt asking whether to contribute working configs to the community; their choice is saved to config and not asked again; contribution can be toggled later
   4. When a push fails (network error, conflict), the failure is logged and the agent session completes normally — the user's success confirmation is not blocked or re-prompted
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 16-01-PLAN.md — CollectiveMemoryWriteService (GET+merge+PUT), CellarConfig contributeMemory, AIService post-loop hook with opt-in prompt
 - [ ] 16-02-PLAN.md — Web settings toggle for collective memory contribution
@@ -193,7 +193,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18
 | 13. GitHub App Authentication | 2/2 | Complete    | 2026-03-30 | - |
 | 14. Memory Entry Schema | 1/1 | Complete    | 2026-03-31 | - |
 | 15. Read Path | 2/2 | Complete    | 2026-03-31 | - |
-| 16. Write Path | 1/2 | In Progress|  | - |
+| 16. Write Path | 2/2 | Complete   | 2026-03-31 | - |
 | 17. Web Memory UI | v1.2 | 0/? | Not started | - |
 | 18. Deepseek API Support | 2/2 | Complete    | 2026-03-31 | - |
 

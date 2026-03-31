@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 ## Current Position
 
-Phase: 16 of 18 (Write Path) — IN PROGRESS
-Plan: 1 of 2 complete
-Status: Phase 16 Plan 01 complete — CollectiveMemoryWriteService + AIService contribution hook done.
-Last activity: 2026-03-30 — Phase 16 Plan 01: CollectiveMemoryWriteService and AIService contribution hook
+Phase: 16 of 18 (Write Path) — COMPLETE
+Plan: 2 of 2 complete
+Status: Phase 16 complete — CollectiveMemoryWriteService, AIService contribution hook, and web settings toggle done.
+Last activity: 2026-03-30 — Phase 16 Plan 02: Web settings collective memory toggle
 
 Progress: [████████████████████] ~55% (13 of ~22 phases complete across all milestones)
 
@@ -52,6 +52,7 @@ Progress: [████████████████████] ~55% (1
 | Phase 14-memory-entry-schema P01 | 3 | 2 tasks | 2 files |
 | Phase 15-read-path P02 | 5 | 1 tasks | 1 files |
 | Phase 16-write-path P01 | 3 | 2 tasks | 3 files |
+| Phase 16-write-path P02 | 1 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,7 @@ Progress: [████████████████████] ~55% (1
 - [Phase 15-read-path]: fetchBestEntry placed after AgentTools creation (wineURL available) but before initialMessage construction — no changes to AgentTools or AgentLoop
 - [Phase 16-write-path]: isWebContext flag passed to handleContributionIfNeeded since askUserHandler always has a default value in AgentTools
 - [Phase 16-write-path]: CollectiveMemoryWriteService uses GET+merge+PUT pattern with 409 retry; all failures logged to memory-push.log
+- [Phase 16-write-path P02]: Separate POST /settings/config from /settings/keys — config.json and .env have distinct persistence layers
 
 ### Roadmap Evolution
 
@@ -98,4 +100,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-30
-Stopped at: Completed 16-01-PLAN.md — CollectiveMemoryWriteService and AIService contribution hook. Phase 16 Plan 01 complete.
+Stopped at: Completed 16-02-PLAN.md — Web settings collective memory toggle. Phase 16 complete.
