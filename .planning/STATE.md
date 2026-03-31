@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 ## Current Position
 
-Phase: 18 of 18 (Deepseek API Support) — COMPLETE
-Plan: 2 of 2 complete
-Status: Phase 18 complete — full Deepseek integration functional
-Last activity: 2026-03-30 — Phase 18 Plan 02: AgentLoop provider integration + settings UI
+Phase: 15 of 18 (Read Path) — IN PROGRESS
+Plan: 1 of 2 complete
+Status: Plan 15-01 complete — CollectiveMemoryService created. Plan 15-02 next (agent loop integration).
+Last activity: 2026-03-30 — Phase 15 Plan 01: CollectiveMemoryService fetch/filter/rank/format
 
 Progress: [████████████████████] ~55% (13 of ~22 phases complete across all milestones)
 

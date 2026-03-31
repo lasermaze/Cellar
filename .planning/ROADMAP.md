@@ -189,7 +189,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18
 | 12. Web Interface for Game Management | v1.1 | 4/4 | Complete | 2026-03-30 |
 | 13. GitHub App Authentication | 2/2 | Complete    | 2026-03-30 | - |
 | 14. Memory Entry Schema | 1/1 | Complete    | 2026-03-31 | - |
-| 15. Read Path | v1.2 | 0/? | Not started | - |
+| 15. Read Path | 0/2 | Planned    |  | - |
 | 16. Write Path | v1.2 | 0/? | Not started | - |
 | 17. Web Memory UI | v1.2 | 0/? | Not started | - |
 | 18. Deepseek API Support | 2/2 | Complete    | 2026-03-31 | - |
@@ -202,7 +202,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18
   1. When `AI_PROVIDER=deepseek` is set in config or .env, Cellar uses the Deepseek API for all AI operations (recipe generation, log interpretation, agent loop) instead of Claude
   2. The web settings page allows selecting the active AI provider and entering the Deepseek API key
   3. When the configured provider's API key is missing, Cellar shows a clear error message naming the provider — not a generic "API key missing"
-**Plans:** 2/2 plans complete
+**Plans:** 0/2 plans executed
 
 Plans:
 - [ ] 18-01-PLAN.md — Provider protocol + Anthropic and Deepseek implementations + OpenAI tool-use types
