@@ -10,12 +10,17 @@ enum SettingsController {
             let env = loadEnvFile()
             let anthropicKey = env["ANTHROPIC_API_KEY"] ?? ""
             let openaiKey = env["OPENAI_API_KEY"] ?? ""
+            let deepseekKey = env["DEEPSEEK_API_KEY"] ?? ""
+            let aiProvider = env["AI_PROVIDER"] ?? ""
             return try await req.view.render("settings", SettingsContext(
                 title: "Settings",
                 anthropicKey: maskKey(anthropicKey),
                 openaiKey: maskKey(openaiKey),
+                deepseekKey: maskKey(deepseekKey),
                 hasAnthropicKey: !anthropicKey.isEmpty,
-                hasOpenaiKey: !openaiKey.isEmpty
+                hasOpenaiKey: !openaiKey.isEmpty,
+                hasDeepseekKey: !deepseekKey.isEmpty,
+                aiProvider: aiProvider
             ))
         }
 
@@ -35,6 +40,20 @@ enum SettingsController {
                 env["OPENAI_API_KEY"] = key
             } else if input.openaiKey?.isEmpty == true {
                 env.removeValue(forKey: "OPENAI_API_KEY")
+            }
+
+            if let key = input.deepseekKey, !key.isEmpty, !key.contains("••••") {
+                env["DEEPSEEK_API_KEY"] = key
+            } else if input.deepseekKey?.isEmpty == true {
+                env.removeValue(forKey: "DEEPSEEK_API_KEY")
+            }
+
+            if let providerValue = input.aiProvider {
+                if providerValue.isEmpty {
+                    env.removeValue(forKey: "AI_PROVIDER")  // auto-detect mode
+                } else {
+                    env["AI_PROVIDER"] = providerValue
+                }
             }
 
             try writeEnvFile(env)
@@ -91,12 +110,17 @@ enum SettingsController {
         let title: String
         let anthropicKey: String
         let openaiKey: String
+        let deepseekKey: String
         let hasAnthropicKey: Bool
         let hasOpenaiKey: Bool
+        let hasDeepseekKey: Bool
+        let aiProvider: String  // current value: "claude", "deepseek", or "" (auto-detect)
     }
 
     struct KeysInput: Content {
         let anthropicKey: String?
         let openaiKey: String?
+        let deepseekKey: String?
+        let aiProvider: String?
     }
 }

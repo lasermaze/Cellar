@@ -6,6 +6,16 @@
       <article>
         <header><strong>API Keys</strong></header>
         <form method="post" action="/settings/keys">
+          <label for="aiProvider">
+            AI Provider
+          </label>
+          <select name="aiProvider" id="aiProvider">
+            <option value="" #if(aiProvider == ""):selected#endif>Auto-detect</option>
+            <option value="claude" #if(aiProvider == "claude"):selected#endif>Claude (Anthropic)</option>
+            <option value="deepseek" #if(aiProvider == "deepseek"):selected#endif>Deepseek</option>
+          </select>
+          <small style="color: var(--pico-muted-color);">Auto-detect uses whichever API key is configured. Takes effect on next launch.</small>
+
           <label for="anthropicKey">
             Anthropic API Key
             #if(hasAnthropicKey):
@@ -35,6 +45,22 @@
             id="openaiKey"
             name="openaiKey"
             placeholder="#if(hasOpenaiKey): #(openaiKey) #else: sk-... #endif"
+            autocomplete="off"
+          >
+
+          <label for="deepseekKey">
+            Deepseek API Key
+            #if(hasDeepseekKey):
+              <small style="color: var(--pico-ins-color);"> (configured)</small>
+            #else:
+              <small style="color: var(--pico-muted-color);"> (not set)</small>
+            #endif
+          </label>
+          <input
+            type="password"
+            id="deepseekKey"
+            name="deepseekKey"
+            placeholder="#if(hasDeepseekKey): #(deepseekKey) #else: sk-... #endif"
             autocomplete="off"
           >
 
