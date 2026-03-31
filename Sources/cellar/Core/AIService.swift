@@ -814,6 +814,15 @@ struct AIService {
         print("Session cost: $\(costStr) (\(result.totalInputTokens) input + \(result.totalOutputTokens) output tokens, \(result.iterationsUsed) iterations)")
 
         if result.completed {
+            // Contribution hook: push working config to collective memory if user confirmed success
+            if tools.taskState == .savedAfterConfirm {
+                handleContributionIfNeeded(
+                    tools: tools,
+                    gameName: entry.name,
+                    wineURL: wineURL,
+                    isWebContext: askUserHandler != nil
+                )
+            }
             return .success(result.finalText)
         } else {
             let reason: String
@@ -844,6 +853,47 @@ struct AIService {
         // Create sentinel file atomically — harmless race condition on concurrent first runs
         let data = Data()
         try? data.write(to: sentinel, options: .withoutOverwriting)
+    }
+
+    // MARK: - Collective Memory Contribution
+
+    /// Handle opt-in prompt and push to collective memory after a successful agent session.
+    ///
+    /// - For CLI (no askUserHandler): shows a yes/no prompt on first push opportunity.
+    /// - For web (askUserHandler provided): skips the readLine prompt; pushes if already opted in.
+    /// - Saves the user's preference to CellarConfig.
+    private static func handleContributionIfNeeded(
+        tools: AgentTools,
+        gameName: String,
+        wineURL: URL,
+        isWebContext: Bool
+    ) {
+        guard tools.taskState == .savedAfterConfirm else { return }
+
+        var config = CellarConfig.load()
+
+        if config.contributeMemory == nil {
+            // Never asked — show prompt for CLI only (web uses settings toggle)
+            if !isWebContext {
+                print("\nShare this working config with the Cellar community?")
+                print("Other users will benefit when setting up this game. [y/N]: ", terminator: "")
+                fflush(stdout)
+                let input = readLine()?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() ?? ""
+                let opted = (input == "y" || input == "yes")
+                config.contributeMemory = opted
+                try? CellarConfig.save(config)
+                if !opted { return }
+            } else {
+                // Web context: user toggles via settings page; skip for now
+                return
+            }
+        }
+
+        guard config.contributeMemory == true else { return }
+
+        // Load the just-saved SuccessRecord and push
+        guard let record = SuccessDatabase.load(gameId: tools.gameId) else { return }
+        CollectiveMemoryWriteService.push(record: record, gameName: gameName, wineURL: wineURL)
     }
 
     // MARK: - Private Helpers
