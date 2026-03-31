@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-03-30T15:41:27.163Z"
+last_updated: "2026-03-31T00:23:06.955Z"
 progress:
-  total_phases: 13
+  total_phases: 15
   completed_phases: 13
-  total_plans: 37
-  completed_plans: 37
+  total_plans: 40
+  completed_plans: 38
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 ## Current Position
 
-Phase: 13 of 17 (GitHub App Authentication) — COMPLETE
-Plan: 2 of 2
-Status: Phase 13 complete — ready for Phase 14
-Last activity: 2026-03-30 — Phase 13 complete (Plans 01 + 02): GitHubModels + GitHubAuthService
+Phase: 18 of 18 (Deepseek API Support) — IN PROGRESS
+Plan: 1 of 2 complete
+Status: Plan 01 complete — provider protocol + implementations ready for AgentLoop integration
+Last activity: 2026-03-31 — Phase 18 Plan 01: AgentLoopProvider + AnthropicAgentProvider + DeepseekAgentProvider
 
 Progress: [██████████░░░░░░░░░░] ~50% (12 of ~22 phases complete across all milestones)
 
@@ -48,6 +48,7 @@ Progress: [██████████░░░░░░░░░░] ~50% (1
 *Updated after each plan completion*
 | Phase 13-github-app-authentication P01 | 1 | 2 tasks | 4 files |
 | Phase 13-github-app-authentication P02 | 2 | 2 tasks | 1 files |
+| Phase 18-deepseek-api-support P01 | 12 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,8 @@ Progress: [██████████░░░░░░░░░░] ~50% (1
 - [Phase 13-01]: CellarPaths.defaultMemoryRepo centralizes the collective memory repo slug
 - [Phase 13-github-app-authentication]: @unchecked Sendable on GitHubAuthService — NSLock provides external synchronization for Swift 6 mutable global state
 - [Phase 13-github-app-authentication]: JWT iat=now-60 (clock skew buffer) and exp=now+510 (8.5-min window under GitHub 10-min max) per GitHub recommendations
+- [Phase 18-deepseek-api-support]: deepseek-chat as default Deepseek model (deepseek-reasoner excluded — no function calling support)
+- [Phase 18-deepseek-api-support]: AgentLoopProvider protocol owns message array — AgentLoop never holds provider-specific message types
 
 ### Roadmap Evolution
 
@@ -82,5 +85,5 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-30
-Stopped at: Completed 13-02-PLAN.md — GitHubAuthService (RS256 JWT + installation token exchange + cache). Phase 13 complete. Ready for Phase 14.
+Last session: 2026-03-31
+Stopped at: Completed 18-01-PLAN.md — AgentLoopProvider protocol + AnthropicAgentProvider + DeepseekAgentProvider. Ready for Plan 02.
