@@ -212,3 +212,34 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18
 Plans:
 - [ ] 18-01-PLAN.md — Provider protocol + Anthropic and Deepseek implementations + OpenAI tool-use types
 - [ ] 18-02-PLAN.md — AgentLoop refactor to use provider, AIService routing, CellarConfig, settings UI
+
+### Phase 19: Import Lutris and ProtonDB compatibility databases
+
+**Goal:** Give the agent access to Lutris and ProtonDB community compatibility data so it can make better config decisions before and during diagnosis — a single unified lookup queries both sources, extracts actionable config hints, and injects them into the agent's context with a new on-demand tool available during diagnosis
+**Requirements**: COMPAT-01, COMPAT-02, COMPAT-03
+**Depends on:** Phase 18
+**Plans:** 1/2 plans executed
+
+Plans:
+- [ ] 19-01-PLAN.md — CompatibilityService data layer: Lutris + ProtonDB API fetch, cache, fuzzy name matching, Proton flag filtering, formatted context output
+- [ ] 19-02-PLAN.md — Agent integration: query_compatibility tool, system prompt guidance, pre-diagnosis context injection in AIService
+
+### Phase 20: Smarter Wine log parsing and structured diagnostics
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 19
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 20 to break down)
+
+### Phase 21: Pre-flight dependency check from PE imports
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 20
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 21 to break down)

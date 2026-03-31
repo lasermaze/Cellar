@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-03-31T03:37:48.499Z"
+last_updated: "2026-03-31T19:57:04.404Z"
 progress:
-  total_phases: 18
+  total_phases: 21
   completed_phases: 18
-  total_plans: 45
-  completed_plans: 45
+  total_plans: 47
+  completed_plans: 46
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 ## Current Position
 
-Phase: 17 of 18 (Web Memory UI) — COMPLETE
-Plan: 1 of 1 complete
-Status: Phase 17 complete — MemoryStatsService, MemoryController, memory.leaf, memory-game.leaf, and Memory nav link done.
-Last activity: 2026-03-30 — Phase 17 Plan 01: Web memory UI aggregate stats and per-game detail
+Phase: 19 of 21 (Import Lutris and ProtonDB Compatibility Databases) — In Progress
+Plan: 1 of 2 complete
+Status: Phase 19 Plan 01 complete — CompatibilityService data layer with Lutris + ProtonDB fetch, cache, filter, formatForAgent. Ready for agent integration (Plan 02).
+Last activity: 2026-03-31 — Phase 19 Plan 01: CompatibilityService data layer
 
 Progress: [████████████████████] ~55% (13 of ~22 phases complete across all milestones)
 
@@ -54,6 +54,7 @@ Progress: [████████████████████] ~55% (1
 | Phase 16-write-path P01 | 3 | 2 tasks | 3 files |
 | Phase 16-write-path P02 | 1 | 1 tasks | 2 files |
 | Phase 17-web-memory-ui P01 | 6 | 2 tasks | 6 files |
+| Phase 19-import-lutris-and-protondb-compatibility-databases P01 | 2 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,8 @@ Progress: [████████████████████] ~55% (1
 - [Phase 16-write-path P02]: Separate POST /settings/config from /settings/keys — config.json and .env have distinct persistence layers
 - [Phase 17-web-memory-ui]: MemoryStats.isAvailable: false when auth unavailable — template shows Settings guidance instead of error
 - [Phase 17-web-memory-ui]: fetchGameDetail(slug:) returns nil on any failure — MemoryController passes nil to template for graceful empty state
+- [Phase 19-import-lutris-and-protondb-compatibility-databases]: ExtractedEnvVar/DLL/Verb/Registry use context field (not source) — matched actual PageParser.swift struct fields
+- [Phase 19-01]: CompatibilityService.fetchReport returns nil for empty report — caller never receives useless data
 
 ### Roadmap Evolution
 
@@ -105,5 +108,5 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-30
-Stopped at: Completed 17-01-PLAN.md — Web memory UI with aggregate stats and per-game detail pages. Phase 17 complete.
+Last session: 2026-03-31
+Stopped at: Completed 19-01-PLAN.md — CompatibilityService data layer with Lutris + ProtonDB fetch, cache, filter, formatForAgent.
