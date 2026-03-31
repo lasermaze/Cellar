@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 ## Current Position
 
-Phase: 19 of 21 (Import Lutris and ProtonDB Compatibility Databases) — In Progress
-Plan: 1 of 2 complete
-Status: Phase 19 Plan 01 complete — CompatibilityService data layer with Lutris + ProtonDB fetch, cache, filter, formatForAgent. Ready for agent integration (Plan 02).
-Last activity: 2026-03-31 — Phase 19 Plan 01: CompatibilityService data layer
+Phase: 19 of 21 (Import Lutris and ProtonDB Compatibility Databases) — Complete
+Plan: 2 of 2 complete
+Status: Phase 19 complete — CompatibilityService data layer + agent integration (auto-inject + query_compatibility tool + system prompt guidance).
+Last activity: 2026-03-31 — Phase 19 Plan 02: Agent integration
 
 Progress: [████████████████████] ~55% (13 of ~22 phases complete across all milestones)
 
@@ -55,6 +55,7 @@ Progress: [████████████████████] ~55% (1
 | Phase 16-write-path P02 | 1 | 1 tasks | 2 files |
 | Phase 17-web-memory-ui P01 | 6 | 2 tasks | 6 files |
 | Phase 19-import-lutris-and-protondb-compatibility-databases P01 | 2 | 2 tasks | 2 files |
+| Phase 19-import-lutris-and-protondb-compatibility-databases P02 | 8 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,8 @@ Progress: [████████████████████] ~55% (1
 - [Phase 17-web-memory-ui]: fetchGameDetail(slug:) returns nil on any failure — MemoryController passes nil to template for graceful empty state
 - [Phase 19-import-lutris-and-protondb-compatibility-databases]: ExtractedEnvVar/DLL/Verb/Registry use context field (not source) — matched actual PageParser.swift struct fields
 - [Phase 19-01]: CompatibilityService.fetchReport returns nil for empty report — caller never receives useless data
+- [Phase 19-02]: Compatibility data position in contextParts: after collective memory (higher confidence), before session handoff and launch instruction
+- [Phase 19-02]: query_compatibility returns plain string on no-match (not JSON error) — keeps agent context human-readable
 
 ### Roadmap Evolution
 
@@ -109,4 +112,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-31
-Stopped at: Completed 19-01-PLAN.md — CompatibilityService data layer with Lutris + ProtonDB fetch, cache, filter, formatForAgent.
+Stopped at: Completed 19-02-PLAN.md — Agent integration: auto-inject compatibility data into initial message, query_compatibility tool, system prompt guidance.

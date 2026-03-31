@@ -218,7 +218,7 @@ Plans:
 **Goal:** Give the agent access to Lutris and ProtonDB community compatibility data so it can make better config decisions before and during diagnosis — a single unified lookup queries both sources, extracts actionable config hints, and injects them into the agent's context with a new on-demand tool available during diagnosis
 **Requirements**: COMPAT-01, COMPAT-02, COMPAT-03
 **Depends on:** Phase 18
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 19-01-PLAN.md — CompatibilityService data layer: Lutris + ProtonDB API fetch, cache, fuzzy name matching, Proton flag filtering, formatted context output
