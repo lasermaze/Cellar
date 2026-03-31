@@ -175,7 +175,9 @@ Plans:
   1. Navigating to `/memory` in the web UI shows aggregate stats: total games covered, total confirmations across all entries, and recent contributions
   2. Clicking a game in the memory view shows its individual entries with environment details (arch, Wine version, macOS version) and confidence scores (confirmation count)
   3. The memory views load without error when the collective memory repo is unreachable — they degrade to an empty state with an explanatory message, not a 500 error
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 17-01-PLAN.md — MemoryStatsService, MemoryController, memory.leaf + memory-game.leaf templates, nav link
 
 ## Progress
 
@@ -194,7 +196,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18
 | 14. Memory Entry Schema | 1/1 | Complete    | 2026-03-31 | - |
 | 15. Read Path | 2/2 | Complete    | 2026-03-31 | - |
 | 16. Write Path | 2/2 | Complete   | 2026-03-31 | - |
-| 17. Web Memory UI | v1.2 | 0/? | Not started | - |
+| 17. Web Memory UI | v1.2 | 0/1 | Not started | - |
 | 18. Deepseek API Support | 2/2 | Complete    | 2026-03-31 | - |
 
 ### Phase 18: Deepseek API Support
