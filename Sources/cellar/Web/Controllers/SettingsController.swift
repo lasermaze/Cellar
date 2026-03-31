@@ -12,6 +12,8 @@ enum SettingsController {
             let openaiKey = env["OPENAI_API_KEY"] ?? ""
             let deepseekKey = env["DEEPSEEK_API_KEY"] ?? ""
             let aiProvider = env["AI_PROVIDER"] ?? ""
+            let config = CellarConfig.load()
+            let contributeMemory = config.contributeMemory ?? false
             return try await req.view.render("settings", SettingsContext(
                 title: "Settings",
                 anthropicKey: maskKey(anthropicKey),
@@ -20,8 +22,20 @@ enum SettingsController {
                 hasAnthropicKey: !anthropicKey.isEmpty,
                 hasOpenaiKey: !openaiKey.isEmpty,
                 hasDeepseekKey: !deepseekKey.isEmpty,
-                aiProvider: aiProvider
+                aiProvider: aiProvider,
+                contributeMemory: contributeMemory
             ))
+        }
+
+        // POST /settings/config — update config.json fields
+        settings.post("config") { req async throws -> Response in
+            let input = try req.content.decode(ConfigInput.self)
+            var config = CellarConfig.load()
+            if let contribute = input.contributeMemory {
+                config.contributeMemory = contribute
+            }
+            try CellarConfig.save(config)
+            return req.redirect(to: "/settings")
         }
 
         // POST /settings/keys — update API keys
@@ -115,6 +129,7 @@ enum SettingsController {
         let hasOpenaiKey: Bool
         let hasDeepseekKey: Bool
         let aiProvider: String  // current value: "claude", "deepseek", or "" (auto-detect)
+        let contributeMemory: Bool
     }
 
     struct KeysInput: Content {
@@ -122,5 +137,9 @@ enum SettingsController {
         let openaiKey: String?
         let deepseekKey: String?
         let aiProvider: String?
+    }
+
+    struct ConfigInput: Content {
+        let contributeMemory: Bool?
     }
 }

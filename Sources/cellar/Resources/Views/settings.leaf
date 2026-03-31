@@ -71,6 +71,27 @@
           <button type="submit" style="margin-top: 1rem;">Save Keys</button>
         </form>
       </article>
+
+      <article>
+        <header><strong>Community</strong></header>
+        <form method="post" action="/settings/config">
+          <input type="hidden" name="contributeMemory" value="false">
+          <label>
+            <input
+              type="checkbox"
+              name="contributeMemory"
+              value="true"
+              #if(contributeMemory): checked #endif
+            >
+            Share working configs with the Cellar community
+          </label>
+          <small style="color: var(--pico-muted-color);">
+            When enabled, successfully verified game configs are automatically shared to help other users.
+          </small>
+
+          <button type="submit" style="margin-top: 1rem;">Save</button>
+        </form>
+      </article>
     </section>
   #endexport
 #endextend
