@@ -40,7 +40,7 @@
 - [x] **Phase 14: Memory Entry Schema** — Lock the collective memory entry schema and establish the repo structure before any community writes (completed 2026-03-31)
 - [x] **Phase 15: Read Path** — Agent queries collective memory before diagnosis; environment-aware fit assessment before applying any stored config (completed 2026-03-31)
 - [x] **Phase 16: Write Path** — Agent pushes configs after confirmed success; confidence accumulation with deduplication; opt-in contribution prompt (completed 2026-03-31)
-- [ ] **Phase 17: Web Memory UI** — Browser views for collective memory stats and per-game memory entries
+- [x] **Phase 17: Web Memory UI** — Browser views for collective memory stats and per-game memory entries (completed 2026-03-31)
 - [x] **Phase 18: Deepseek API Support** — Add Deepseek as an additional AI provider alongside Claude; users choose which provider for recipe generation, log interpretation, and the agent loop (completed 2026-03-31)
 
 ## Phase Details
@@ -175,7 +175,7 @@ Plans:
   1. Navigating to `/memory` in the web UI shows aggregate stats: total games covered, total confirmations across all entries, and recent contributions
   2. Clicking a game in the memory view shows its individual entries with environment details (arch, Wine version, macOS version) and confidence scores (confirmation count)
   3. The memory views load without error when the collective memory repo is unreachable — they degrade to an empty state with an explanatory message, not a 500 error
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 - [ ] 17-01-PLAN.md — MemoryStatsService, MemoryController, memory.leaf + memory-game.leaf templates, nav link
 
@@ -196,7 +196,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18
 | 14. Memory Entry Schema | 1/1 | Complete    | 2026-03-31 | - |
 | 15. Read Path | 2/2 | Complete    | 2026-03-31 | - |
 | 16. Write Path | 2/2 | Complete   | 2026-03-31 | - |
-| 17. Web Memory UI | v1.2 | 0/1 | Not started | - |
+| 17. Web Memory UI | 1/1 | Complete   | 2026-03-31 | - |
 | 18. Deepseek API Support | 2/2 | Complete    | 2026-03-31 | - |
 
 ### Phase 18: Deepseek API Support
