@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-03-31T00:34:05.884Z"
+last_updated: "2026-03-31T00:59:38.335Z"
 progress:
   total_phases: 15
-  completed_phases: 14
+  completed_phases: 15
   total_plans: 40
-  completed_plans: 39
+  completed_plans: 40
 ---
 
 # Project State
@@ -49,6 +49,7 @@ Progress: [████████████████████] ~55% (1
 | Phase 13-github-app-authentication P01 | 1 | 2 tasks | 4 files |
 | Phase 13-github-app-authentication P02 | 2 | 2 tasks | 1 files |
 | Phase 18-deepseek-api-support P01 | 12 | 2 tasks | 3 files |
+| Phase 14-memory-entry-schema P01 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -70,6 +71,9 @@ Progress: [████████████████████] ~55% (1
 - [Phase 18-deepseek-api-support]: AgentLoopProvider protocol owns message array — AgentLoop never holds provider-specific message types
 - [Phase 18-02]: Provider created after systemPrompt is built (late binding) to avoid placeholder pattern
 - [Phase 18-02]: Budget warning injection uses appendUserMessage() after appendToolResults() for cross-provider clean abstraction
+- [Phase 14-memory-entry-schema]: Default synthesized Codable on CollectiveMemoryEntry types — unknown future JSON fields silently ignored without custom init(from:)
+- [Phase 14-memory-entry-schema]: slugify() uses unicodeScalars for locale-independent slug generation
+- [Phase 14-memory-entry-schema]: EnvironmentFingerprint canonicalString uses sorted keys for hash stability; CryptoKit (system framework) for SHA-256 with no new SPM dependency
 
 ### Roadmap Evolution
 

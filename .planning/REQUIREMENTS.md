@@ -86,9 +86,9 @@ Requirements for v1.2 Collective Agent Memory. Each maps to roadmap phases.
 
 ### Schema
 
-- [ ] **SCHM-01**: Collective memory entry stores working config, agent reasoning chain, and environment fingerprint (Wine version, macOS version, CPU arch, wine flavor)
-- [ ] **SCHM-02**: Each game has one JSON file in the collective memory repo (`entries/{game-id}.json`), containing an array of entries from different agents/environments
-- [ ] **SCHM-03**: Entry includes schema version field for forward-compatible evolution
+- [x] **SCHM-01**: Collective memory entry stores working config, agent reasoning chain, and environment fingerprint (Wine version, macOS version, CPU arch, wine flavor)
+- [x] **SCHM-02**: Each game has one JSON file in the collective memory repo (`entries/{game-id}.json`), containing an array of entries from different agents/environments
+- [x] **SCHM-03**: Entry includes schema version field for forward-compatible evolution
 
 ### Read Path
 
@@ -227,9 +227,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | WEB-05 | Phase 12 | Complete |
 | AUTH-01 | Phase 13 | Complete |
 | AUTH-02 | Phase 13 | Complete |
-| SCHM-01 | Phase 14 | Pending |
-| SCHM-02 | Phase 14 | Pending |
-| SCHM-03 | Phase 14 | Pending |
+| SCHM-01 | Phase 14 | Complete |
+| SCHM-02 | Phase 14 | Complete |
+| SCHM-03 | Phase 14 | Complete |
 | READ-01 | Phase 15 | Pending |
 | READ-02 | Phase 15 | Pending |
 | READ-03 | Phase 15 | Pending |

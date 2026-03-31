@@ -37,7 +37,7 @@
 **Milestone Goal:** Build a shared knowledge layer so that when any Cellar agent solves a game, every other agent benefits — an agent-first collective memory backed by a Git repo.
 
 - [x] **Phase 13: GitHub App Authentication** — RS256 JWT generation, installation token exchange, automatic refresh before expiry (completed 2026-03-30)
-- [ ] **Phase 14: Memory Entry Schema** — Lock the collective memory entry schema and establish the repo structure before any community writes
+- [x] **Phase 14: Memory Entry Schema** — Lock the collective memory entry schema and establish the repo structure before any community writes (completed 2026-03-31)
 - [ ] **Phase 15: Read Path** — Agent queries collective memory before diagnosis; environment-aware fit assessment before applying any stored config
 - [ ] **Phase 16: Write Path** — Agent pushes configs after confirmed success; confidence accumulation with deduplication; opt-in contribution prompt
 - [ ] **Phase 17: Web Memory UI** — Browser views for collective memory stats and per-game memory entries
@@ -137,7 +137,7 @@ Plans:
   1. A `CollectiveMemoryEntry` value round-trips through JSON encode/decode with all fields intact — working config, reasoning chain, environment fingerprint (arch, Wine version, macOS version, Wine flavor), and schema version
   2. The collective memory repo contains an `entries/` directory where each game has one file at `entries/{game-id}.json` holding an array of entries from different agents
   3. A JSON file with unknown fields (simulating a future schema version) decodes without error — unknown fields are ignored and optional fields default gracefully
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] 14-01-PLAN.md — Schema types (CollectiveMemoryEntry, WorkingConfig, EnvironmentFingerprint), slugify(), environment hash, round-trip + forward-compat tests
@@ -188,7 +188,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18
 | 11. Smarter Research | v1.1 | 3/3 | Complete | 2026-03-29 |
 | 12. Web Interface for Game Management | v1.1 | 4/4 | Complete | 2026-03-30 |
 | 13. GitHub App Authentication | 2/2 | Complete    | 2026-03-30 | - |
-| 14. Memory Entry Schema | v1.2 | 0/? | Not started | - |
+| 14. Memory Entry Schema | 1/1 | Complete   | 2026-03-31 | - |
 | 15. Read Path | v1.2 | 0/? | Not started | - |
 | 16. Write Path | v1.2 | 0/? | Not started | - |
 | 17. Web Memory UI | v1.2 | 0/? | Not started | - |
