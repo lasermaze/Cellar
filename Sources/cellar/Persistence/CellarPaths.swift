@@ -96,6 +96,16 @@ struct CellarPaths {
         researchCacheDir.appendingPathComponent("\(gameId).json")
     }
 
+    // Lutris compatibility cache directory: ~/.cellar/research/lutris/
+    static var lutrisCompatCacheDir: URL {
+        researchCacheDir.appendingPathComponent("lutris")
+    }
+
+    // ProtonDB compatibility cache directory: ~/.cellar/research/protondb/
+    static var protondbCompatCacheDir: URL {
+        researchCacheDir.appendingPathComponent("protondb")
+    }
+
     static func repairReportFile(for gameId: String, timestamp: Date) -> URL {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd'T'HH-mm-ss"
