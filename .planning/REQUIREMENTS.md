@@ -98,9 +98,9 @@ Requirements for v1.2 Collective Agent Memory. Each maps to roadmap phases.
 
 ### Write Path
 
-- [ ] **WRIT-01**: After user-confirmed successful launch, agent automatically pushes config + reasoning + environment to collective memory repo via GitHub Contents API
-- [ ] **WRIT-02**: Confidence counter increments when a different agent confirms the same config works (deduplicated by environment hash)
-- [ ] **WRIT-03**: User is prompted on first run to opt into collective memory contribution; preference saved in config
+- [x] **WRIT-01**: After user-confirmed successful launch, agent automatically pushes config + reasoning + environment to collective memory repo via GitHub Contents API
+- [x] **WRIT-02**: Confidence counter increments when a different agent confirms the same config works (deduplicated by environment hash)
+- [x] **WRIT-03**: User is prompted on first run to opt into collective memory contribution; preference saved in config
 
 ### Web Interface (v1.2)
 
@@ -233,9 +233,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | READ-01 | Phase 15 | Complete |
 | READ-02 | Phase 15 | Complete |
 | READ-03 | Phase 15 | Complete |
-| WRIT-01 | Phase 16 | Pending |
-| WRIT-02 | Phase 16 | Pending |
-| WRIT-03 | Phase 16 | Pending |
+| WRIT-01 | Phase 16 | Complete |
+| WRIT-02 | Phase 16 | Complete |
+| WRIT-03 | Phase 16 | Complete |
 | WEBM-01 | Phase 17 | Pending |
 | WEBM-02 | Phase 17 | Pending |
 | DSPK-01 | Phase 18 | Complete |

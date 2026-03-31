@@ -162,7 +162,7 @@ Plans:
   2. When a second agent on a different machine confirms the same config for the same game, the existing entry's confirmation count increments and no duplicate entry is created — deduplication is by environment hash
   3. On first run, the user sees a prompt asking whether to contribute working configs to the community; their choice is saved to config and not asked again; contribution can be toggled later
   4. When a push fails (network error, conflict), the failure is logged and the agent session completes normally — the user's success confirmation is not blocked or re-prompted
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
 - [ ] 16-01-PLAN.md — CollectiveMemoryWriteService (GET+merge+PUT), CellarConfig contributeMemory, AIService post-loop hook with opt-in prompt
 - [ ] 16-02-PLAN.md — Web settings toggle for collective memory contribution
@@ -193,7 +193,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18
 | 13. GitHub App Authentication | 2/2 | Complete    | 2026-03-30 | - |
 | 14. Memory Entry Schema | 1/1 | Complete    | 2026-03-31 | - |
 | 15. Read Path | 2/2 | Complete    | 2026-03-31 | - |
-| 16. Write Path | v1.2 | 0/2 | Planning complete | - |
+| 16. Write Path | 1/2 | In Progress|  | - |
 | 17. Web Memory UI | v1.2 | 0/? | Not started | - |
 | 18. Deepseek API Support | 2/2 | Complete    | 2026-03-31 | - |
 
