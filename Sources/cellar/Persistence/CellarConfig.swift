@@ -4,9 +4,11 @@ import Foundation
 /// Priority: CELLAR_BUDGET env var > config.json > default ($5.00).
 struct CellarConfig: Codable {
     var budgetCeiling: Double
+    var aiProvider: String?  // "claude" | "deepseek" | nil (auto-detect)
 
     enum CodingKeys: String, CodingKey {
         case budgetCeiling = "budget"
+        case aiProvider = "ai_provider"
     }
 
     static let defaultBudgetCeiling: Double = 15.00
@@ -16,7 +18,7 @@ struct CellarConfig: Codable {
         // 1. CELLAR_BUDGET env var overrides everything
         if let envVal = ProcessInfo.processInfo.environment["CELLAR_BUDGET"],
            let val = Double(envVal), val > 0 {
-            return CellarConfig(budgetCeiling: val)
+            return CellarConfig(budgetCeiling: val, aiProvider: nil)
         }
         // 2. Read ~/.cellar/config.json
         let configURL = CellarPaths.configFile
@@ -25,6 +27,6 @@ struct CellarConfig: Codable {
             return config
         }
         // 3. Default
-        return CellarConfig(budgetCeiling: defaultBudgetCeiling)
+        return CellarConfig(budgetCeiling: defaultBudgetCeiling, aiProvider: nil)
     }
 }

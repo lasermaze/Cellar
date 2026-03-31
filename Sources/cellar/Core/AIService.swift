@@ -5,16 +5,28 @@ struct AIService {
     // MARK: - Provider Detection
 
     /// Detect which AI provider is configured via environment variables or ~/.cellar/.env file.
-    /// Prefers Anthropic (Claude) if both keys are present.
+    /// Respects AI_PROVIDER config/env var. Auto-detects from available keys if not set.
     static func detectProvider() -> AIProvider {
         let env = loadEnvironment()
-        if let key = env["ANTHROPIC_API_KEY"], !key.isEmpty {
-            return .anthropic(apiKey: key)
+        let configProvider = CellarConfig.load().aiProvider ?? env["AI_PROVIDER"]
+
+        switch configProvider?.lowercased() {
+        case "deepseek":
+            if let key = env["DEEPSEEK_API_KEY"], !key.isEmpty { return .deepseek(apiKey: key) }
+            return .unavailable  // Deepseek requested but no key
+        case "claude", "anthropic":
+            if let key = env["ANTHROPIC_API_KEY"], !key.isEmpty { return .anthropic(apiKey: key) }
+            return .unavailable  // Claude requested but no key
+        default:
+            // Auto-detect: check which keys are present
+            let hasAnthropic = env["ANTHROPIC_API_KEY"].map { !$0.isEmpty } ?? false
+            let hasDeepseek = env["DEEPSEEK_API_KEY"].map { !$0.isEmpty } ?? false
+            if hasAnthropic { return .anthropic(apiKey: env["ANTHROPIC_API_KEY"]!) }
+            if hasDeepseek { return .deepseek(apiKey: env["DEEPSEEK_API_KEY"]!) }
+            // Legacy: check OpenAI key
+            if let key = env["OPENAI_API_KEY"], !key.isEmpty { return .openai(apiKey: key) }
+            return .unavailable
         }
-        if let key = env["OPENAI_API_KEY"], !key.isEmpty {
-            return .openai(apiKey: key)
-        }
-        return .unavailable
     }
 
     /// Load environment: process env vars take precedence, then fall back to ~/.cellar/.env file.
@@ -100,6 +112,13 @@ struct AIService {
     static func diagnose(stderr: String, gameId: String) -> AIResult<AIDiagnosis> {
         let provider = detectProvider()
         if case .unavailable = provider {
+            let env = loadEnvironment()
+            let requested = CellarConfig.load().aiProvider ?? env["AI_PROVIDER"]
+            if requested?.lowercased() == "deepseek" {
+                return .failed("Deepseek API key not configured. Set DEEPSEEK_API_KEY in ~/.cellar/.env or environment.")
+            } else if requested != nil {
+                return .failed("Anthropic API key not configured. Set ANTHROPIC_API_KEY in ~/.cellar/.env or environment.")
+            }
             return .unavailable
         }
         return _diagnose(stderr: stderr, gameId: gameId, provider: provider)
@@ -175,6 +194,13 @@ struct AIService {
     static func generateRecipe(gameName: String, gameId: String, installedFiles: [URL]) -> AIResult<Recipe> {
         let provider = detectProvider()
         if case .unavailable = provider {
+            let env = loadEnvironment()
+            let requested = CellarConfig.load().aiProvider ?? env["AI_PROVIDER"]
+            if requested?.lowercased() == "deepseek" {
+                return .failed("Deepseek API key not configured. Set DEEPSEEK_API_KEY in ~/.cellar/.env or environment.")
+            } else if requested != nil {
+                return .failed("Anthropic API key not configured. Set ANTHROPIC_API_KEY in ~/.cellar/.env or environment.")
+            }
             return .unavailable
         }
         return _generateRecipe(gameName: gameName, gameId: gameId, installedFiles: installedFiles, provider: provider)
@@ -294,6 +320,13 @@ struct AIService {
     ) -> AIResult<AIVariantResult> {
         let provider = detectProvider()
         if case .unavailable = provider {
+            let env = loadEnvironment()
+            let requested = CellarConfig.load().aiProvider ?? env["AI_PROVIDER"]
+            if requested?.lowercased() == "deepseek" {
+                return .failed("Deepseek API key not configured. Set DEEPSEEK_API_KEY in ~/.cellar/.env or environment.")
+            } else if requested != nil {
+                return .failed("Anthropic API key not configured. Set ANTHROPIC_API_KEY in ~/.cellar/.env or environment.")
+            }
             return .unavailable
         }
         return _generateVariants(
@@ -486,11 +519,11 @@ struct AIService {
 
     /// Run the agentic Wine expert loop for a game launch session.
     ///
-    /// Requires an Anthropic API key — OpenAI is not supported for the agent loop
-    /// because the tool-use API differs significantly.
+    /// Supports Anthropic (Claude) and Deepseek providers. OpenAI is not supported for the
+    /// agent loop because the tool-use API differs significantly.
     ///
     /// Returns:
-    ///   - .unavailable if no Anthropic key is configured (or OpenAI-only)
+    ///   - .unavailable if no supported key is configured (or OpenAI-only)
     ///   - .success(summary) when the agent loop completes
     ///   - .failed(message) if an error is thrown during the session
     static func runAgentLoop(
@@ -503,10 +536,22 @@ struct AIService {
         onOutput: (@Sendable (AgentEvent) -> Void)? = nil,
         askUserHandler: (@Sendable (_ question: String, _ options: [String]?) -> String)? = nil
     ) -> AIResult<String> {
+        // Validate provider before building prompts
         let provider = detectProvider()
-        guard case .anthropic(let apiKey) = provider else {
-            // OpenAI or unavailable — agent loop is Anthropic-only
+        switch provider {
+        case .unavailable:
+            let env = loadEnvironment()
+            let requested = CellarConfig.load().aiProvider ?? env["AI_PROVIDER"]
+            if requested?.lowercased() == "deepseek" {
+                return .failed("Deepseek API key not configured. Set DEEPSEEK_API_KEY in ~/.cellar/.env or environment.")
+            } else if requested != nil {
+                return .failed("Anthropic API key not configured. Set ANTHROPIC_API_KEY in ~/.cellar/.env or environment.")
+            }
             return .unavailable
+        case .openai:
+            return .unavailable
+        default:
+            break
         }
 
         let systemPrompt = """
@@ -708,11 +753,28 @@ struct AIService {
 
         let config = CellarConfig.load()
 
-        let agentLoop = AgentLoop(
-            apiKey: apiKey,
-            tools: AgentTools.toolDefinitions,
-            systemPrompt: systemPrompt,
-            model: "claude-sonnet-4-6",
+        // Create provider with fully built systemPrompt
+        let agentProvider: AgentLoopProvider
+        switch provider {
+        case .anthropic(let apiKey):
+            agentProvider = AnthropicAgentProvider(
+                apiKey: apiKey,
+                model: "claude-sonnet-4-6",
+                tools: AgentTools.toolDefinitions,
+                systemPrompt: systemPrompt
+            )
+        case .deepseek(let apiKey):
+            agentProvider = DeepseekAgentProvider(
+                apiKey: apiKey,
+                tools: AgentTools.toolDefinitions,
+                systemPrompt: systemPrompt
+            )
+        default:
+            return .unavailable
+        }
+
+        var agentLoop = AgentLoop(
+            provider: agentProvider,
             maxIterations: 50,
             maxTokens: 16384,
             budgetCeiling: config.budgetCeiling,
@@ -777,12 +839,39 @@ struct AIService {
             return try callAnthropic(apiKey: apiKey, systemPrompt: systemPrompt, userMessage: userMessage)
         case .openai(let apiKey):
             return try callOpenAI(apiKey: apiKey, systemPrompt: systemPrompt, userMessage: userMessage)
-        case .deepseek:
-            // Deepseek uses the agent loop (AgentLoopProvider) — not the simple API call path
-            throw AIServiceError.unavailable
+        case .deepseek(let apiKey):
+            return try callDeepseek(apiKey: apiKey, systemPrompt: systemPrompt, userMessage: userMessage)
         case .unavailable:
             throw AIServiceError.unavailable
         }
+    }
+
+    private static func callDeepseek(apiKey: String, systemPrompt: String, userMessage: String) throws -> String {
+        let requestBody = OpenAIRequest(
+            model: "deepseek-chat",
+            messages: [
+                OpenAIRequest.Message(role: "system", content: systemPrompt),
+                OpenAIRequest.Message(role: "user", content: userMessage)
+            ],
+            responseFormat: OpenAIRequest.ResponseFormat(type: "json_object")
+        )
+
+        let encoder = JSONEncoder()
+        let bodyData = try encoder.encode(requestBody)
+
+        var request = URLRequest(url: URL(string: "https://api.deepseek.com/v1/chat/completions")!)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.httpBody = bodyData
+
+        let responseData = try callAPI(request: request)
+        let response = try JSONDecoder().decode(OpenAIResponse.self, from: responseData)
+
+        guard let content = response.firstContent else {
+            throw AIServiceError.decodingError("Deepseek response had no content")
+        }
+        return content
     }
 
     private static func callAnthropic(apiKey: String, systemPrompt: String, userMessage: String) throws -> String {
