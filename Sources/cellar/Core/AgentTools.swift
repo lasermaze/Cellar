@@ -772,22 +772,25 @@ final class AgentTools {
             ]
         }
 
-        // PE imports: scan exe file bytes for DLL name strings (no external tools)
+        // PE imports: scan first 64KB of exe for DLL name strings (PE headers live here)
         var peImports: [String] = []
-        if let exeData = try? Data(contentsOf: URL(fileURLWithPath: executablePath), options: .mappedIfSafe) {
-            // Search for common DLL import names in the PE import table
-            if let exeString = String(data: exeData, encoding: .ascii) {
-                let pattern = try? NSRegularExpression(pattern: #"\b(\w+\.dll)\b"#, options: .caseInsensitive)
-                let matches = pattern?.matches(in: exeString, range: NSRange(exeString.startIndex..., in: exeString)) ?? []
+        if let handle = try? FileHandle(forReadingFrom: URL(fileURLWithPath: executablePath)) {
+            let headerData = handle.readData(ofLength: 65536)
+            try? handle.close()
+            // Convert to ASCII, replacing non-printable bytes with spaces
+            let bytes = headerData.map { ($0 >= 0x20 && $0 < 0x7F) ? $0 : UInt8(0x20) }
+            let headerString = String(bytes: bytes, encoding: .ascii) ?? ""
+            if !headerString.isEmpty {
+                let pattern = try? NSRegularExpression(pattern: #"(\w+\.dll)"#, options: .caseInsensitive)
+                let matches = pattern?.matches(in: headerString, range: NSRange(headerString.startIndex..., in: headerString)) ?? []
                 var seen = Set<String>()
+                let knownPrefixes = ["kernel32", "user32", "gdi32", "advapi32", "shell32", "ole32", "oleaut32",
+                                   "msvcrt", "ntdll", "ws2_32", "winmm", "ddraw", "d3d", "dsound", "dinput",
+                                   "opengl32", "version", "comctl32", "comdlg32", "imm32", "setupapi",
+                                   "winspool", "msvcp", "vcruntime", "ucrtbase", "xinput", "wsock32"]
                 for match in matches {
-                    if let range = Range(match.range(at: 1), in: exeString) {
-                        let dll = String(exeString[range]).lowercased()
-                        // Filter to known system DLLs (skip random strings that end in .dll)
-                        let knownPrefixes = ["kernel32", "user32", "gdi32", "advapi32", "shell32", "ole32", "oleaut32",
-                                           "msvcrt", "ntdll", "ws2_32", "winmm", "ddraw", "d3d", "dsound", "dinput",
-                                           "opengl32", "version", "comctl32", "comdlg32", "imm32", "setupapi",
-                                           "winspool", "msvcp", "vcruntime", "ucrtbase", "xinput", "wsock32"]
+                    if let range = Range(match.range(at: 1), in: headerString) {
+                        let dll = String(headerString[range]).lowercased()
                         if knownPrefixes.contains(where: { dll.hasPrefix($0) }) && seen.insert(dll).inserted {
                             peImports.append(dll)
                         }
