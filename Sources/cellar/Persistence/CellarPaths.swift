@@ -121,7 +121,7 @@ struct CellarPaths {
     }
 
     /// Default collective memory repository identifier (owner/repo).
-    static let defaultMemoryRepo = "cellar-community/memory"
+    static let defaultMemoryRepo = "lasermaze/cellar-memory"
 
     // Diagnostics directory: ~/.cellar/diagnostics/
     static let diagnosticsDir: URL = base.appendingPathComponent("diagnostics")
