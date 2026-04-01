@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
-status: active
-last_updated: "2026-03-31T20:22:00Z"
+status: unknown
+last_updated: "2026-04-01T01:34:34.259Z"
 progress:
   total_phases: 21
-  completed_phases: 19
-  total_plans: 47
-  completed_plans: 47
+  completed_phases: 20
+  total_plans: 49
+  completed_plans: 49
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 ## Current Position
 
-Phase: 20 of 21 (Smarter Wine log parsing and structured diagnostics) — In Progress
-Plan: 1 of 2 complete
-Status: Phase 20 Plan 01 complete — WineDiagnostics data model, DiagnosticRecord persistence, expanded WineErrorParser with 8+ subsystems, causal chains, success signals, noise filtering.
-Last activity: 2026-03-31 — Phase 20 Plan 01: Structured diagnostics data model
+Phase: 20 of 21 (Smarter Wine log parsing and structured diagnostics) — Complete
+Plan: 2 of 2 complete
+Status: Phase 20 complete — Structured diagnostics wired into all agent tools (launchGame, traceLaunch, readLog), cross-launch diff tracking with action recording, DiagnosticRecord disk persistence, previous-session injection in AIService, updated system prompt.
+Last activity: 2026-03-31 — Phase 20 Plan 02: Wire diagnostics into agent tools
 
 Progress: [████████████████████] ~57% (14 of ~22 phases complete across all milestones)
 
@@ -57,6 +57,7 @@ Progress: [████████████████████] ~57% (1
 | Phase 19-import-lutris-and-protondb-compatibility-databases P01 | 2 | 2 tasks | 2 files |
 | Phase 19-import-lutris-and-protondb-compatibility-databases P02 | 8 | 2 tasks | 2 files |
 | Phase 20-smarter-wine-log-parsing-and-structured-diagnostics P01 | 15 | 2 tasks | 6 files |
+| Phase 20-smarter-wine-log-parsing-and-structured-diagnostics P02 | 10 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,8 @@ Progress: [████████████████████] ~57% (1
 - [Phase 20-01]: parseLegacy() wraps parse() for backward compat — callers using [WineError] array migrate without logic changes
 - [Phase 20-01]: Causal chains detected in a post-pass after all lines parsed — avoids ordering sensitivity
 - [Phase 20-01]: filteredLog() derives subsystem membership from WineDiagnostics fields, not re-parsing stderr
+- [Phase 20-02]: Action tracking appended in execute() dispatch after tool call returns — single instrumentation point covers all tools without modifying each handler
+- [Phase 20-02]: DiagnosticRecord injected into initial message only when previousSession is nil — avoids doubling context when SessionHandoff already provides last-session summary
 
 ### Roadmap Evolution
 
