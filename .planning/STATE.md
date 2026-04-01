@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
-status: unknown
-last_updated: "2026-03-31T20:15:51.960Z"
+status: active
+last_updated: "2026-03-31T20:22:00Z"
 progress:
   total_phases: 21
   completed_phases: 19
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Any user can go from "I have these old game files" to "the game launches and works" without manually configuring Wine.
-**Current focus:** Phase 14 — Collective Memory Read Path (next)
+**Current focus:** Phase 20 — Smarter Wine log parsing and structured diagnostics
 
 ## Current Position
 
-Phase: 19 of 21 (Import Lutris and ProtonDB Compatibility Databases) — Complete
-Plan: 2 of 2 complete
-Status: Phase 19 complete — CompatibilityService data layer + agent integration (auto-inject + query_compatibility tool + system prompt guidance).
-Last activity: 2026-03-31 — Phase 19 Plan 02: Agent integration
+Phase: 20 of 21 (Smarter Wine log parsing and structured diagnostics) — In Progress
+Plan: 1 of 2 complete
+Status: Phase 20 Plan 01 complete — WineDiagnostics data model, DiagnosticRecord persistence, expanded WineErrorParser with 8+ subsystems, causal chains, success signals, noise filtering.
+Last activity: 2026-03-31 — Phase 20 Plan 01: Structured diagnostics data model
 
-Progress: [████████████████████] ~55% (13 of ~22 phases complete across all milestones)
+Progress: [████████████████████] ~57% (14 of ~22 phases complete across all milestones)
 
 ## Performance Metrics
 
@@ -56,6 +56,7 @@ Progress: [████████████████████] ~55% (1
 | Phase 17-web-memory-ui P01 | 6 | 2 tasks | 6 files |
 | Phase 19-import-lutris-and-protondb-compatibility-databases P01 | 2 | 2 tasks | 2 files |
 | Phase 19-import-lutris-and-protondb-compatibility-databases P02 | 8 | 2 tasks | 2 files |
+| Phase 20-smarter-wine-log-parsing-and-structured-diagnostics P01 | 15 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,9 @@ Progress: [████████████████████] ~55% (1
 - [Phase 19-01]: CompatibilityService.fetchReport returns nil for empty report — caller never receives useless data
 - [Phase 19-02]: Compatibility data position in contextParts: after collective memory (higher confidence), before session handoff and launch instruction
 - [Phase 19-02]: query_compatibility returns plain string on no-match (not JSON error) — keeps agent context human-readable
+- [Phase 20-01]: parseLegacy() wraps parse() for backward compat — callers using [WineError] array migrate without logic changes
+- [Phase 20-01]: Causal chains detected in a post-pass after all lines parsed — avoids ordering sensitivity
+- [Phase 20-01]: filteredLog() derives subsystem membership from WineDiagnostics fields, not re-parsing stderr
 
 ### Roadmap Evolution
 
@@ -112,4 +116,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-03-31
-Stopped at: Completed 19-02-PLAN.md — Agent integration: auto-inject compatibility data into initial message, query_compatibility tool, system prompt guidance.
+Stopped at: Completed 20-01-PLAN.md — WineDiagnostics data model, DiagnosticRecord persistence, expanded WineErrorParser with 8+ subsystems, causal chains, success signals, noise filtering.

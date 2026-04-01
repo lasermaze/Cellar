@@ -229,7 +229,7 @@ Plans:
 **Goal:** Upgrade Wine log parsing from a flat 5-pattern array to a structured, subsystem-grouped diagnostic engine with positive success signals, causal chain detection, noise filtering, and cross-launch trend tracking — so the agent sees organized signal instead of raw noise and can evaluate whether its fixes are working
 **Requirements**: DIAG-01, DIAG-02, DIAG-03, DIAG-04
 **Depends on:** Phase 19
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 20-01-PLAN.md — Parser expansion: WineDiagnostics types, 4 new subsystems, success signals, causal chains, noise filtering
