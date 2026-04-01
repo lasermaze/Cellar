@@ -8,6 +8,10 @@ enum WineErrorCategory {
     case graphics
     case configuration
     case unknown
+    case audio
+    case input
+    case font
+    case memory
 }
 
 // MARK: - Suggested Fix

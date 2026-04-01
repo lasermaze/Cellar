@@ -122,4 +122,15 @@ struct CellarPaths {
 
     /// Default collective memory repository identifier (owner/repo).
     static let defaultMemoryRepo = "cellar-community/memory"
+
+    // Diagnostics directory: ~/.cellar/diagnostics/
+    static let diagnosticsDir: URL = base.appendingPathComponent("diagnostics")
+
+    static func diagnosticsDir(for gameId: String) -> URL {
+        diagnosticsDir.appendingPathComponent(gameId)
+    }
+
+    static func diagnosticFile(for gameId: String) -> URL {
+        diagnosticsDir(for: gameId).appendingPathComponent("latest.json")
+    }
 }
