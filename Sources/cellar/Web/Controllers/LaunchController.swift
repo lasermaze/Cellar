@@ -6,17 +6,26 @@ import NIOCore
 private actor LaunchGuard {
     static let shared = LaunchGuard()
     private var activeLaunch: String? = nil
+    private var acquiredAt: Date? = nil
 
     func tryAcquire(gameId: String) throws -> Bool {
+        // Auto-release stale guards (>10 min — handles stuck agents)
+        if activeLaunch != nil, let acquired = acquiredAt,
+           Date().timeIntervalSince(acquired) > 600 {
+            activeLaunch = nil
+            acquiredAt = nil
+        }
         if let active = activeLaunch {
             throw Abort(.conflict, reason: "Game '\(active)' is currently launching")
         }
         activeLaunch = gameId
+        acquiredAt = Date()
         return true
     }
 
     func release() {
         activeLaunch = nil
+        acquiredAt = nil
     }
 }
 
@@ -105,8 +114,23 @@ enum LaunchController {
                 throw Abort(.badRequest)
             }
 
-            // Enforce single active launch
-            _ = try await LaunchGuard.shared.tryAcquire(gameId: gameId)
+            // Enforce single active launch — return SSE error instead of 409 to prevent reconnect storm
+            do {
+                _ = try await LaunchGuard.shared.tryAcquire(gameId: gameId)
+            } catch {
+                let body = Response.Body(stream: { writer in
+                    Task.detached {
+                        sendSSE(writer: writer, event: "error",
+                                data: "<div class='error'>Another launch is already in progress. Go back and try again.</div>")
+                        sendSSE(writer: writer, event: "complete", data: "<div></div>")
+                        _ = writer.write(.end)
+                    }
+                })
+                let response = Response(status: .ok, body: body)
+                response.headers.replaceOrAdd(name: .contentType, value: "text/event-stream")
+                response.headers.replaceOrAdd(name: .cacheControl, value: "no-cache")
+                return response
+            }
 
             let useAgent = (req.query[String.self, at: "agent"] ?? "false") == "true"
 
@@ -149,6 +173,8 @@ enum LaunchController {
             if let tools = ActiveAgents.shared.get(gameId: gameId) {
                 tools.shouldAbort = true
             }
+            // Force-release the guard even if agent is stuck in a synchronous call
+            await LaunchGuard.shared.release()
             var headers = HTTPHeaders()
             headers.add(name: .contentType, value: "text/html")
             return Response(status: .ok, headers: headers, body: .init(string: "<span style='color: var(--error);'>Agent stopped</span>"))
