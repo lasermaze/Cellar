@@ -74,6 +74,13 @@ final class AgentTools {
     enum TaskState { case working, userConfirmedOk, savedAfterConfirm, exhausted }
     var taskState: TaskState = .working
 
+    /// Actions applied since the last launch (for changes_since_last tracking).
+    private var pendingActions: [String] = []
+    /// Actions that were pending at the time of the last launch.
+    private var lastAppliedActions: [String] = []
+    /// Previous launch diagnostics for computing changes between launches.
+    private var previousDiagnostics: WineDiagnostics? = nil
+
     /// Whether the agent is allowed to stop via end_turn.
     var isTaskComplete: Bool {
         switch taskState {
@@ -587,31 +594,60 @@ final class AgentTools {
 
     /// Dispatch a tool call by name. Returns a JSON string result. Never throws.
     func execute(toolName: String, input: JSONValue) -> String {
+        let result: String
         switch toolName {
-        case "inspect_game":      return inspectGame(input: input)
-        case "read_log":          return readLog(input: input)
-        case "read_registry":     return readRegistry(input: input)
-        case "ask_user":          return askUser(input: input)
-        case "set_environment":   return setEnvironment(input: input)
-        case "set_registry":      return setRegistry(input: input)
-        case "install_winetricks": return installWinetricks(input: input)
-        case "place_dll":         return placeDLL(input: input)
-        case "launch_game":       return launchGame(input: input)
-        case "save_recipe":       return saveRecipe(input: input)
-        case "write_game_file":   return writeGameFile(input: input)
-        case "read_game_file":    return readGameFile(input: input)
-        case "query_successdb":   return querySuccessdb(input: input)
-        case "save_success":      return saveSuccess(input: input)
-        case "trace_launch":      return traceLaunch(input: input)
-        case "check_file_access": return checkFileAccess(input: input)
-        case "verify_dll_override": return verifyDllOverride(input: input)
-        case "search_web":        return searchWeb(input: input)
-        case "fetch_page":        return fetchPage(input: input)
-        case "list_windows":      return listWindows(input: input)
-        case "query_compatibility": return queryCompatibility(input: input)
+        case "inspect_game":      result = inspectGame(input: input)
+        case "read_log":          result = readLog(input: input)
+        case "read_registry":     result = readRegistry(input: input)
+        case "ask_user":          result = askUser(input: input)
+        case "set_environment":   result = setEnvironment(input: input)
+        case "set_registry":      result = setRegistry(input: input)
+        case "install_winetricks": result = installWinetricks(input: input)
+        case "place_dll":         result = placeDLL(input: input)
+        case "launch_game":       result = launchGame(input: input)
+        case "save_recipe":       result = saveRecipe(input: input)
+        case "write_game_file":   result = writeGameFile(input: input)
+        case "read_game_file":    result = readGameFile(input: input)
+        case "query_successdb":   result = querySuccessdb(input: input)
+        case "save_success":      result = saveSuccess(input: input)
+        case "trace_launch":      result = traceLaunch(input: input)
+        case "check_file_access": result = checkFileAccess(input: input)
+        case "verify_dll_override": result = verifyDllOverride(input: input)
+        case "search_web":        result = searchWeb(input: input)
+        case "fetch_page":        result = fetchPage(input: input)
+        case "list_windows":      result = listWindows(input: input)
+        case "query_compatibility": result = queryCompatibility(input: input)
         default:
             return jsonResult(["error": "Unknown tool: \(toolName)"])
         }
+
+        // Track action tools in pendingActions for changes_since_last diff
+        switch toolName {
+        case "set_environment":
+            if let key = input["key"]?.asString, let value = input["value"]?.asString {
+                pendingActions.append("set_environment(\(key)=\(value))")
+            }
+        case "set_registry":
+            if let keyPath = input["key_path"]?.asString, let name = input["value_name"]?.asString {
+                pendingActions.append("set_registry(\(keyPath), \(name))")
+            }
+        case "install_winetricks":
+            if let verb = input["verb"]?.asString {
+                pendingActions.append("install_winetricks(\(verb))")
+            }
+        case "place_dll":
+            if let dllName = input["dll_name"]?.asString {
+                pendingActions.append("place_dll(\(dllName))")
+            }
+        case "write_game_file":
+            if let path = input["relative_path"]?.asString {
+                pendingActions.append("write_game_file(\(path))")
+            }
+        default:
+            break
+        }
+
+        return result
     }
 
     // MARK: - JSON Helper
@@ -886,8 +922,13 @@ final class AgentTools {
             return jsonResult(["error": "Could not read log file: \(error.localizedDescription)", "log_file": url.path])
         }
 
-        let tail = String(content.suffix(8000))
-        return jsonResult(["log_content": tail, "log_file": url.path])
+        let diagnostics = WineErrorParser.parse(content)
+        let filtered = WineErrorParser.filteredLog(content, diagnostics: diagnostics)
+        return jsonResult([
+            "diagnostics": diagnostics.asDictionary(),
+            "filtered_log": String(filtered.suffix(8000)),
+            "log_file": url.path
+        ])
     }
 
     // MARK: 3. read_registry
@@ -1304,18 +1345,22 @@ final class AgentTools {
         // Store last log file for read_log
         lastLogFile = logFile
 
-        // Parse errors from stderr
-        let parsedErrors = WineErrorParser.parseLegacy(result.stderr)
-        let errorDicts: [[String: String]] = parsedErrors.map { wineError in
-            var dict: [String: String] = [
-                "category": "\(wineError.category)",
-                "detail": wineError.detail
-            ]
-            if let fix = wineError.suggestedFix {
-                dict["suggested_fix"] = describeFix(fix)
-            }
-            return dict
-        }
+        // Parse structured diagnostics from stderr
+        let diagnostics = WineErrorParser.parse(result.stderr)
+
+        // Swap pending actions for diff tracking
+        lastAppliedActions = pendingActions
+        pendingActions = []
+
+        // Compute changes since last launch
+        let changesDiff = computeChangesDiff(current: diagnostics, previousDiagnostics: previousDiagnostics, lastActions: lastAppliedActions)
+
+        // Store current diagnostics for next comparison
+        previousDiagnostics = diagnostics
+
+        // Persist to disk for cross-session tracking
+        let record = DiagnosticRecord.from(diagnostics: diagnostics, gameId: gameId, lastActions: lastAppliedActions)
+        DiagnosticRecord.write(record)
 
         // Parse +loaddll lines from stderr for DLL load analysis
         let stderrLines = result.stderr.components(separatedBy: "\n")
@@ -1348,7 +1393,8 @@ final class AgentTools {
             "elapsed_seconds": result.elapsed,
             "timed_out": result.timedOut,
             "stderr_tail": stderrTail,
-            "detected_errors": errorDicts,
+            "diagnostics": diagnostics.asDictionary(),
+            "changes_since_last": changesDiff,
             "loaded_dlls": loadedDLLs,
             "dialogs": parsedDialogs,
             "log_file": logFile.path,
@@ -1378,7 +1424,7 @@ final class AgentTools {
             }
         } else if !isDiagnostic && !result.timedOut && result.elapsed < 10.0 {
             // Fast crash — task is definitely not complete
-            resultDict["IMPORTANT"] = "Game crashed in \(String(format: "%.1f", result.elapsed))s. This is NOT a success. Diagnose the crash using read_log and detected_errors, then fix and relaunch."
+            resultDict["IMPORTANT"] = "Game crashed in \(String(format: "%.1f", result.elapsed))s. This is NOT a success. Diagnose the crash using read_log and diagnostics, then fix and relaunch."
             if taskState == .userConfirmedOk {
                 taskState = .working  // Regression
             }
@@ -1397,6 +1443,31 @@ final class AgentTools {
         case .setRegistry(let key, let name, let data): return "set_registry(\(key), \(name)=\(data))"
         case .compound(let fixes): return fixes.map { describeFix($0) }.joined(separator: " + ")
         }
+    }
+
+    /// Compute a diff between current and previous diagnostics for changes_since_last.
+    private func computeChangesDiff(
+        current: WineDiagnostics,
+        previousDiagnostics: WineDiagnostics?,
+        lastActions: [String]
+    ) -> [String: Any] {
+        guard let previous = previousDiagnostics else {
+            return ["note": "First launch — no previous data for comparison"]
+        }
+
+        // Use (category, detail) as identity for comparison
+        let currentErrors = Set(current.allErrors().map { "\($0.category):\($0.detail)" })
+        let previousErrors = Set(previous.allErrors().map { "\($0.category):\($0.detail)" })
+        let currentSuccesses = Set(current.allSuccesses().map { "\($0.subsystem):\($0.detail)" })
+        let previousSuccesses = Set(previous.allSuccesses().map { "\($0.subsystem):\($0.detail)" })
+
+        return [
+            "last_actions": lastActions,
+            "new_errors": Array(currentErrors.subtracting(previousErrors)).sorted(),
+            "resolved_errors": Array(previousErrors.subtracting(currentErrors)).sorted(),
+            "persistent_errors": Array(currentErrors.intersection(previousErrors)).sorted(),
+            "new_successes": Array(currentSuccesses.subtracting(previousSuccesses)).sorted()
+        ]
     }
 
     // MARK: 10. save_recipe
@@ -1607,13 +1678,25 @@ final class AgentTools {
         // Parse +msgbox lines for dialog detection
         let parsedDialogs = AgentTools.parseMsgboxDialogs(from: lines)
 
-        // Extract Wine error lines (err: prefix)
-        let errors = lines.filter { $0.contains("err:") }.prefix(50).map { String($0) }
+        // Parse structured diagnostics from stderr
+        let diagnostics = WineErrorParser.parse(stderr)
+
+        // Swap pending actions for diff tracking
+        lastAppliedActions = pendingActions
+        pendingActions = []
+
+        let changesDiff = computeChangesDiff(current: diagnostics, previousDiagnostics: previousDiagnostics, lastActions: lastAppliedActions)
+        previousDiagnostics = diagnostics
+
+        // Persist to disk for cross-session tracking
+        let record = DiagnosticRecord.from(diagnostics: diagnostics, gameId: gameId, lastActions: lastAppliedActions)
+        DiagnosticRecord.write(record)
 
         return jsonResult([
             "loaded_dlls": loadedDLLs,
             "dialogs": parsedDialogs,
-            "errors": Array(errors),
+            "diagnostics": diagnostics.asDictionary(),
+            "changes_since_last": changesDiff,
             "timeout_applied": true,
             "raw_line_count": lines.count
         ])
