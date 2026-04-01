@@ -1305,7 +1305,7 @@ final class AgentTools {
         lastLogFile = logFile
 
         // Parse errors from stderr
-        let parsedErrors = WineErrorParser.parse(result.stderr)
+        let parsedErrors = WineErrorParser.parseLegacy(result.stderr)
         let errorDicts: [[String: String]] = parsedErrors.map { wineError in
             var dict: [String: String] = [
                 "category": "\(wineError.category)",

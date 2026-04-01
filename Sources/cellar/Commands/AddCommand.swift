@@ -81,7 +81,7 @@ struct AddCommand: ParsableCommand {
 
         // 9. Reactive dep install: if installer failed, diagnose and retry
         if installerResult.exitCode != 0 && !forceProactiveDeps {
-            let errors = WineErrorParser.parse(installerResult.stderr)
+            let errors = WineErrorParser.parseLegacy(installerResult.stderr)
             var installed = false
 
             // Try diagnosed fix first
