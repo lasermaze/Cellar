@@ -693,34 +693,36 @@ final class AgentTools {
     // MARK: 1. inspect_game
 
     private func inspectGame(input: JSONValue) -> String {
+        print("[inspect_game] START for \(gameId)")
         let gameDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
 
-        // Run /usr/bin/file to get PE type
+        // Detect PE type by reading the exe header bytes directly (no external process)
+        print("[inspect_game] detecting PE type...")
         var exeType = "unknown"
-        let fileProcess = Process()
-        fileProcess.executableURL = URL(fileURLWithPath: "/usr/bin/file")
-        fileProcess.arguments = [executablePath]
-        let filePipe = Pipe()
-        fileProcess.standardOutput = filePipe
-        fileProcess.standardError = Pipe()
-        do {
-            try fileProcess.run()
-            fileProcess.waitUntilExit()
-            let data = filePipe.fileHandleForReading.readDataToEndOfFile()
-            if let output = String(data: data, encoding: .utf8) {
-                if output.contains("PE32+") {
-                    exeType = "PE32+ (64-bit)"
-                } else if output.contains("PE32") {
-                    exeType = "PE32 (32-bit)"
-                } else {
-                    exeType = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let handle = try? FileHandle(forReadingFrom: URL(fileURLWithPath: executablePath)) {
+            let header = handle.readData(ofLength: 512)
+            try? handle.close()
+            // Check for MZ header + PE signature
+            if header.count >= 2 && header[0] == 0x4D && header[1] == 0x5A {  // "MZ"
+                // PE offset is at bytes 60-63 (little-endian)
+                if header.count >= 64 {
+                    let peOffset = Int(header[60]) | (Int(header[61]) << 8)
+                    if peOffset + 6 <= header.count,
+                       header[peOffset] == 0x50, header[peOffset+1] == 0x45 {  // "PE\0\0"
+                        let machine = UInt16(header[peOffset+4]) | (UInt16(header[peOffset+5]) << 8)
+                        if machine == 0x8664 {
+                            exeType = "PE32+ (64-bit)"
+                        } else {
+                            exeType = "PE32 (32-bit)"
+                        }
+                    }
                 }
             }
-        } catch {
-            exeType = "error: \(error.localizedDescription)"
         }
+        print("[inspect_game] PE type: \(exeType)")
 
         // List files in game directory (top-level only)
+        print("[inspect_game] listing game files...")
         var gameFiles: [String] = []
         if let contents = try? FileManager.default.contentsOfDirectory(
             at: gameDir,
@@ -747,6 +749,7 @@ final class AgentTools {
         let bottleExists = FileManager.default.fileExists(atPath: bottleURL.path)
 
         // List DLLs in system32
+        print("[inspect_game] listing system32 DLLs...")
         var system32DLLs: [String] = []
         let system32Dir = bottleURL
             .appendingPathComponent("drive_c")
@@ -772,6 +775,7 @@ final class AgentTools {
             ]
         }
 
+        print("[inspect_game] scanning PE imports...")
         // PE imports: scan first 64KB of exe for DLL name strings (PE headers live here)
         var peImports: [String] = []
         if let handle = try? FileHandle(forReadingFrom: URL(fileURLWithPath: executablePath)) {
@@ -800,6 +804,7 @@ final class AgentTools {
             }
         }
 
+        print("[inspect_game] checking bottle type...")
         // Bottle type detection: check for syswow64 directory
         let syswow64Dir = bottleURL
             .appendingPathComponent("drive_c")
@@ -807,6 +812,7 @@ final class AgentTools {
             .appendingPathComponent("syswow64")
         let bottleType = FileManager.default.fileExists(atPath: syswow64Dir.path) ? "wow64" : "standard"
 
+        print("[inspect_game] listing data files...")
         // Data files listing: common config/data extensions (up to 50)
         let dataExtensions: Set<String> = ["dat", "ini", "cfg", "txt", "xml", "json"]
         var dataFiles: [String] = []
@@ -838,6 +844,7 @@ final class AgentTools {
             }
         }
 
+        print("[inspect_game] extracting binary strings for engine detection...")
         // Binary string extraction for engine detection
         let binaryStrings = Self.extractBinaryStrings(executablePath)
 
@@ -876,31 +883,40 @@ final class AgentTools {
             result["graphics_api"] = api
         }
 
+        print("[inspect_game] DONE")
         return jsonResult(result)
     }
 
-    /// Extract printable strings from a binary using /usr/bin/strings.
-    /// Returns up to 5000 lines of strings with minimum 10-char length.
-    /// Returns empty array on failure (non-fatal).
+    /// Extract printable strings from binary data in-process (no external tools).
+    /// Reads first 256KB, finds runs of 10+ printable ASCII chars.
+    /// Returns up to 2000 strings.
     private static func extractBinaryStrings(_ path: String) -> [String] {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/strings")
-        process.arguments = ["-n", "10", path]
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
+        guard let handle = try? FileHandle(forReadingFrom: URL(fileURLWithPath: path)) else { return [] }
+        let data = handle.readData(ofLength: 262144)  // 256KB — enough for engine signatures
+        try? handle.close()
 
-        do {
-            try process.run()
-            process.waitUntilExit()
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            guard let output = String(data: data, encoding: .utf8) else { return [] }
-            let lines = output.components(separatedBy: "\n")
-            // Cap at 5000 lines to avoid performance issues on large executables
-            return Array(lines.prefix(5000))
-        } catch {
-            return []
+        var results: [String] = []
+        var current: [UInt8] = []
+        for byte in data {
+            if byte >= 0x20 && byte < 0x7F {
+                current.append(byte)
+            } else {
+                if current.count >= 10 {
+                    if let s = String(bytes: current, encoding: .ascii) {
+                        results.append(s)
+                        if results.count >= 2000 { break }
+                    }
+                }
+                current.removeAll()
+            }
         }
+        // Flush last run
+        if current.count >= 10 && results.count < 2000 {
+            if let s = String(bytes: current, encoding: .ascii) {
+                results.append(s)
+            }
+        }
+        return results
     }
 
     // MARK: 2. read_log
