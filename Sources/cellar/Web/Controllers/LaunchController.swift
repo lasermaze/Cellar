@@ -247,15 +247,17 @@ enum LaunchController {
         wineURL: URL, bottleURL: URL, writer: BodyStreamWriter
     ) async throws {
         sendSSE(writer: writer, event: "status",
-                data: "<div>Direct launch -- applying recipe...</div>")
+                data: "<div>Direct launch -- applying config...</div>")
 
         let wineProcess = WineProcess(wineBinary: wineURL, winePrefix: bottleURL)
         let engine = RecipeEngine()
+        var launchEnv: [String: String] = [:]
 
         // Load and apply bundled recipe
         if let recipe = try? RecipeEngine.findBundledRecipe(for: gameId) {
             do {
-                _ = try engine.apply(recipe: recipe, wineProcess: wineProcess)
+                let recipeEnv = try engine.apply(recipe: recipe, wineProcess: wineProcess)
+                launchEnv.merge(recipeEnv) { _, new in new }
                 sendSSE(writer: writer, event: "log",
                         data: "<div>Recipe applied: \(escapeHTML(recipe.name))</div>")
             } catch {
@@ -264,13 +266,14 @@ enum LaunchController {
             }
         }
 
-        // Check for user recipe
+        // Load and apply user recipe
         let userRecipeURL = CellarPaths.userRecipeFile(for: gameId)
         if FileManager.default.fileExists(atPath: userRecipeURL.path),
            let data = try? Data(contentsOf: userRecipeURL),
            let recipe = try? JSONDecoder().decode(Recipe.self, from: data) {
             do {
-                _ = try engine.apply(recipe: recipe, wineProcess: wineProcess)
+                let recipeEnv = try engine.apply(recipe: recipe, wineProcess: wineProcess)
+                launchEnv.merge(recipeEnv) { _, new in new }
                 sendSSE(writer: writer, event: "log",
                         data: "<div>User recipe applied</div>")
             } catch {
@@ -279,10 +282,28 @@ enum LaunchController {
             }
         }
 
+        // Load success database — agent's proven working config takes priority
+        if let record = SuccessDatabase.load(gameId: gameId) {
+            launchEnv.merge(record.environment) { _, new in new }
+            sendSSE(writer: writer, event: "log",
+                    data: "<div>Success config applied: \(record.environment.count) env var(s)</div>")
+        } else if let recipeId = game.recipeId, let record = SuccessDatabase.load(gameId: recipeId) {
+            // Try recipe ID as fallback (game ID may differ from success DB key)
+            launchEnv.merge(record.environment) { _, new in new }
+            sendSSE(writer: writer, event: "log",
+                    data: "<div>Success config applied (via recipe ID): \(record.environment.count) env var(s)</div>")
+        }
+
+        if !launchEnv.isEmpty {
+            sendSSE(writer: writer, event: "log",
+                    data: "<div>Environment: \(launchEnv.map { "\($0.key)=\($0.value)" }.sorted().joined(separator: ", "))</div>")
+        }
+
         sendSSE(writer: writer, event: "status",
                 data: "<div>Launching game...</div>")
 
         // Run Wine process on a detached thread (WineProcess uses synchronous Process APIs)
+        let capturedEnv = launchEnv
         let result = await withCheckedContinuation { (continuation: CheckedContinuation<WineResult, Never>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
@@ -294,7 +315,7 @@ enum LaunchController {
                     let wineResult = try wineProcess.run(
                         binary: executablePath,
                         arguments: [],
-                        environment: [:],
+                        environment: capturedEnv,
                         logFile: logFile
                     )
                     continuation.resume(returning: wineResult)
