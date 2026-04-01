@@ -226,13 +226,14 @@ Plans:
 
 ### Phase 20: Smarter Wine log parsing and structured diagnostics
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Upgrade Wine log parsing from a flat 5-pattern array to a structured, subsystem-grouped diagnostic engine with positive success signals, causal chain detection, noise filtering, and cross-launch trend tracking — so the agent sees organized signal instead of raw noise and can evaluate whether its fixes are working
+**Requirements**: DIAG-01, DIAG-02, DIAG-03, DIAG-04
 **Depends on:** Phase 19
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 20 to break down)
+- [ ] 20-01-PLAN.md — Parser expansion: WineDiagnostics types, 4 new subsystems, success signals, causal chains, noise filtering
+- [ ] 20-02-PLAN.md — Integration: wire diagnostics into launchGame/traceLaunch/readLog, cross-launch tracking, previous-session injection, system prompt update
 
 ### Phase 21: Pre-flight dependency check from PE imports
 
