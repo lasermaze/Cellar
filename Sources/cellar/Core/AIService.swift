@@ -534,7 +534,8 @@ struct AIService {
         bottleURL: URL,
         wineProcess: WineProcess,
         onOutput: (@Sendable (AgentEvent) -> Void)? = nil,
-        askUserHandler: (@Sendable (_ question: String, _ options: [String]?) -> String)? = nil
+        askUserHandler: (@Sendable (_ question: String, _ options: [String]?) -> String)? = nil,
+        onToolsCreated: ((AgentTools) -> Void)? = nil
     ) -> AIResult<String> {
         // Validate provider before building prompts
         let provider = detectProvider()
@@ -819,6 +820,7 @@ struct AIService {
         if let handler = askUserHandler {
             tools.askUserHandler = handler
         }
+        onToolsCreated?(tools)
 
         let config = CellarConfig.load()
 
@@ -889,7 +891,22 @@ struct AIService {
         let result = agentLoop.run(
             initialMessage: initialMessage,
             toolExecutor: { name, input in tools.execute(toolName: name, input: input) },
-            canStop: { tools.isTaskComplete }
+            canStop: { tools.isTaskComplete },
+            shouldAbort: {
+                if tools.shouldAbort { return true }
+                if tools.userForceConfirmed && tools.taskState != .savedAfterConfirm {
+                    // User confirmed game works — save before aborting
+                    tools.taskState = .userConfirmedOk
+                    let saveInput: JSONValue = .object([
+                        "game_name": .string(entry.name),
+                        "resolution_narrative": .string("User confirmed game is working from web UI.")
+                    ])
+                    _ = tools.execute(toolName: "save_success", input: saveInput)
+                    tools.taskState = .savedAfterConfirm
+                    return true
+                }
+                return tools.userForceConfirmed
+            }
         )
 
         // Always print cost summary

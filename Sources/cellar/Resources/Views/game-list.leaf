@@ -5,7 +5,8 @@
     #endfor
   </div>
 #else:
-  <article>
-    <p>No games added yet. Click "Add Game" to get started.</p>
-  </article>
+  <div class="empty-state">
+    <p>No games added yet.</p>
+    <a href="/games/add" class="btn btn-primary">Add your first game</a>
+  </div>
 #endif

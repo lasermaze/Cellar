@@ -1,27 +1,46 @@
 #extend("base"):
   #export("content"):
     <section>
-      <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div class="header-row">
         <h2>Launching: #(gameName)</h2>
-        <a href="/" role="button" class="secondary outline">Back to Library</a>
+        <a href="/" class="btn btn-secondary">Back to Library</a>
       </div>
 
       <div hx-ext="sse" sse-connect="#(streamURL)">
         <!-- Status bar -->
-        <article id="status-bar">
+        <div class="status-bar">
           <div id="status" sse-swap="status" hx-swap="innerHTML">
             Connecting...
           </div>
-        </article>
+        </div>
 
-        <!-- Iteration and cost info (agent mode) -->
+        <!-- Iteration, cost, and control buttons (agent mode) -->
         #if(useAgent):
-          <div style="display: flex; gap: 1rem;">
-            <div id="iteration" sse-swap="iteration" hx-swap="innerHTML">
-              <small>Waiting for agent...</small>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div class="info-bar" style="margin-bottom: 0;">
+              <div id="iteration" sse-swap="iteration" hx-swap="innerHTML">
+                Waiting for agent...
+              </div>
+              <div id="cost" sse-swap="cost" hx-swap="innerHTML">
+                Cost: $0.00
+              </div>
             </div>
-            <div id="cost" sse-swap="cost" hx-swap="innerHTML">
-              <small>Cost: $0.00</small>
+            <div id="agent-controls" style="display: flex; gap: 0.5rem;">
+              <button
+                hx-post="/games/#(gameId)/launch/confirm"
+                hx-swap="innerHTML"
+                hx-target="#agent-controls"
+                onclick="closeSSE()"
+                class="btn btn-primary btn-sm"
+              >Game Works ✓</button>
+              <button
+                hx-post="/games/#(gameId)/launch/stop"
+                hx-swap="innerHTML"
+                hx-target="#agent-controls"
+                onclick="closeSSE()"
+                class="btn btn-ghost btn-sm"
+                style="color: var(--error);"
+              >Stop Agent</button>
             </div>
           </div>
         #endif
@@ -30,8 +49,8 @@
         #if(useAgent):
           <details open>
             <summary>Tool Calls</summary>
-            <div id="tools" sse-swap="tool" hx-swap="beforeend"
-                 style="max-height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.85em;">
+            <div id="tools" sse-swap="tool" hx-swap="beforeend" class="log-viewer"
+                 style="max-height: 200px;">
             </div>
           </details>
         #endif
@@ -39,14 +58,13 @@
         <!-- Log output -->
         <details open>
           <summary>Log Output</summary>
-          <div id="log" sse-swap="log" hx-swap="beforeend"
-               style="max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 0.85em; background: var(--pico-code-background-color); padding: 1rem; border-radius: var(--pico-border-radius);">
+          <div id="log" sse-swap="log" hx-swap="beforeend" class="log-viewer">
           </div>
         </details>
 
         <!-- Agent prompt modal -->
         <dialog id="prompt-dialog">
-          <article style="min-width: 320px; max-width: 480px;">
+          <article>
             <div id="prompt" sse-swap="prompt" hx-swap="innerHTML">
             </div>
           </article>
@@ -54,7 +72,7 @@
 
         <!-- Error display -->
         <div id="errors" sse-swap="error" hx-swap="beforeend"
-             style="color: var(--pico-del-color);">
+             style="color: var(--error);">
         </div>
 
         <!-- Completion -->
@@ -64,10 +82,19 @@
     </section>
 
     <script>
-      document.body.addEventListener('sse:complete', function() {
-        var el = document.querySelector('[sse-connect]');
-        if (el) el.removeAttribute('sse-connect');
+      // Capture native EventSource when HTMX opens it
+      var sseSource = null;
+      document.body.addEventListener('htmx:sseOpen', function(e) {
+        sseSource = e.detail.source;
       });
+      function closeSSE() {
+        if (sseSource) { sseSource.close(); sseSource = null; }
+        var el = document.querySelector('[sse-connect]');
+        if (el) { el.removeAttribute('sse-connect'); el.removeAttribute('hx-ext'); }
+        var controls = document.getElementById('agent-controls');
+        if (controls) controls.style.display = 'none';
+      }
+      document.body.addEventListener('sse:complete', closeSSE);
 
       // Open modal when agent sends a prompt
       var promptEl = document.getElementById('prompt');
@@ -87,17 +114,5 @@
         }
       });
     </script>
-
-    <style>
-      .tool-call { color: var(--pico-primary); }
-      .agent-text { color: var(--pico-secondary); }
-      .tool-result { color: var(--pico-muted-color); font-size: 0.8em; }
-      .error { color: var(--pico-del-color); font-weight: bold; }
-      .success { color: var(--pico-ins-color); font-weight: bold; }
-      .warning { color: var(--pico-mark-background-color); }
-      .cost { font-family: monospace; }
-      .iteration { font-weight: bold; }
-      .log-line { white-space: pre-wrap; word-break: break-all; }
-    </style>
   #endexport
 #endextend

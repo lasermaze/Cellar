@@ -1,67 +1,422 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>#(title) - Cellar</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/htmx-ext-sse@2.2.4"></script>
     <style>
+        :root {
+            --bg: #F5F0E8;
+            --bg-card: #EDE7DB;
+            --bg-card-hover: #E5DDD0;
+            --text: #1A1A1A;
+            --text-secondary: #6B6560;
+            --text-muted: #9B9590;
+            --accent: #1A1A1A;
+            --accent-hover: #333;
+            --border: #DDD6CA;
+            --success: #2D7A3A;
+            --warning: #B8860B;
+            --error: #C53030;
+            --radius: 12px;
+            --radius-sm: 8px;
+            --font: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Nav */
+        nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 1.25rem 2rem;
+        }
+        nav .logo {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--text);
+            text-decoration: none;
+        }
+        nav .links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+        nav .links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: color 0.15s;
+        }
+        nav .links a:hover { color: var(--text); }
+
+        /* Main */
+        main {
+            max-width: 1120px;
+            margin: 0 auto;
+            padding: 1rem 2rem 3rem;
+        }
+
+        /* Typography */
+        h2 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            margin-bottom: 1.5rem;
+        }
+        h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin-bottom: 1rem;
+        }
+        h4 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+        p { line-height: 1.6; }
+        small { font-size: 0.8rem; }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            transition: background 0.15s;
+        }
+        .card:hover { background: var(--bg-card-hover); }
+
+        /* Game grid */
         .game-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 1.25rem;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1rem;
         }
         .game-card {
             display: flex;
             flex-direction: column;
-            border: 1px solid var(--pico-muted-border-color);
-            border-radius: var(--pico-border-radius);
-            padding: 1.25rem;
-            background: var(--pico-card-background-color);
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            min-height: 220px;
+            transition: background 0.15s;
         }
+        .game-card:hover { background: var(--bg-card-hover); }
         .game-card h4 {
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
             word-break: break-word;
             line-height: 1.3;
         }
         .game-card .meta {
-            color: var(--pico-muted-color);
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            margin-bottom: 0.25rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-weight: 500;
+        }
+        .game-card .meta-value {
+            font-size: 0.9rem;
+            color: var(--text);
+            margin-bottom: 0.75rem;
+        }
+        .game-card .meta-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-top: 1px solid var(--border);
             font-size: 0.85rem;
-            margin-bottom: 0.15rem;
+        }
+        .game-card .meta-row .label {
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-secondary);
         }
         .game-card .actions {
             display: flex;
             align-items: center;
             gap: 0.5rem;
             margin-top: auto;
-            padding-top: 1rem;
+            padding-top: 1.25rem;
+            flex-wrap: wrap;
         }
-        .game-card .actions a,
-        .game-card .actions button {
-            margin-bottom: 0;
-            padding: 0.35rem 0.7rem;
+        .game-card .actions .spacer { flex: 1; }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.5rem 1rem;
             font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.15s, color 0.15s;
+            font-family: var(--font);
+            line-height: 1.4;
             white-space: nowrap;
         }
-        .game-card .actions .spacer {
-            flex: 1;
+        .btn-primary {
+            background: var(--accent);
+            color: #fff;
+        }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-secondary {
+            background: transparent;
+            color: var(--text);
+            border: 1.5px solid var(--border);
+        }
+        .btn-secondary:hover { border-color: var(--text-secondary); }
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+            padding: 0.35rem 0.6rem;
+        }
+        .btn-ghost:hover { color: var(--error); }
+        .btn-sm { padding: 0.35rem 0.7rem; font-size: 0.75rem; }
+        .btn .arrow { font-size: 1rem; }
+
+        /* Status badges */
+        .badge {
+            display: inline-block;
+            padding: 0.15rem 0.6rem;
+            border-radius: 100px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .badge-success { background: #D4EDDA; color: var(--success); }
+        .badge-warning { background: #FFF3CD; color: var(--warning); }
+        .badge-default { background: var(--border); color: var(--text-secondary); }
+
+        /* Stat cards */
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        .stat-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+        }
+        .stat-card .stat-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+        .stat-card .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.03em;
+        }
+
+        /* Forms */
+        input[type="text"],
+        input[type="password"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 0.6rem 0.8rem;
+            border: 1.5px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 0.9rem;
+            font-family: var(--font);
+            transition: border-color 0.15s;
+            outline: none;
+        }
+        input:focus, select:focus { border-color: var(--text-secondary); }
+        label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 500;
+            margin-bottom: 0.35rem;
+            color: var(--text-secondary);
+        }
+        .form-group { margin-bottom: 1.25rem; }
+        .form-hint {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-top: 0.3rem;
+        }
+
+        /* Checkbox */
+        input[type="checkbox"] {
+            margin-right: 0.5rem;
+            accent-color: var(--accent);
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        th {
+            text-align: left;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            font-weight: 600;
+            color: var(--text-secondary);
+            padding: 0.75rem 1rem;
+            border-bottom: 1.5px solid var(--border);
+        }
+        td {
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+        a { color: var(--text); }
+
+        /* Section card */
+        .section-card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 1.75rem;
+            margin-bottom: 1.25rem;
+        }
+        .section-card header {
+            font-weight: 600;
+            font-size: 0.95rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        /* Log viewer */
+        .log-viewer {
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'SF Mono', 'Menlo', 'Consolas', monospace;
+            font-size: 0.8rem;
+            background: #1A1A1A;
+            color: #E0DCD4;
+            padding: 1rem;
+            border-radius: var(--radius-sm);
+            line-height: 1.6;
+        }
+        .log-viewer .error { color: #F87171; font-weight: 600; }
+        .log-viewer .success { color: #4ADE80; font-weight: 600; }
+        .log-viewer .warning { color: #FBBF24; }
+        .log-viewer .tool-call { color: #60A5FA; }
+        .log-viewer .agent-text { color: #E0DCD4; }
+        .log-viewer .tool-result { color: #9B9590; font-size: 0.75rem; }
+        .log-viewer .cost { font-family: 'SF Mono', monospace; }
+        .log-viewer .log-line { white-space: pre-wrap; word-break: break-all; }
+
+        /* Dialog */
+        dialog {
+            border: none;
+            border-radius: var(--radius);
+            padding: 0;
+            background: var(--bg);
+            max-width: 480px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+        }
+        dialog::backdrop { background: rgba(0,0,0,0.4); }
+        dialog article {
+            padding: 2rem;
+        }
+        dialog h3 {
+            margin-bottom: 0.75rem;
+        }
+        dialog input[type="text"] {
+            margin-top: 0.5rem;
+        }
+        dialog footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            margin-top: 1.25rem;
+        }
+
+        /* Details/Summary */
+        details {
+            margin-bottom: 1rem;
+        }
+        summary {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0.5rem 0;
+        }
+
+        /* Header row */
+        .header-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        .header-row h2 { margin-bottom: 0; }
+
+        /* Empty state */
+        .empty-state {
+            text-align: center;
+            padding: 3rem 1rem;
+            color: var(--text-secondary);
+        }
+        .empty-state p { margin-bottom: 1rem; }
+
+        /* Status bar for SSE pages */
+        .status-bar {
+            background: var(--bg-card);
+            border-radius: var(--radius-sm);
+            padding: 0.75rem 1rem;
+            margin-bottom: 1rem;
+            font-size: 0.9rem;
+        }
+
+        /* Iteration/cost bar */
+        .info-bar {
+            display: flex;
+            gap: 1.5rem;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            margin-bottom: 1rem;
         }
     </style>
 </head>
 <body>
-    <header class="container">
-        <nav>
-            <ul><li><strong>Cellar</strong></li></ul>
-            <ul>
-                <li><a href="/">Games</a></li>
-                <li><a href="/memory">Memory</a></li>
-                <li><a href="/settings">Settings</a></li>
-            </ul>
-        </nav>
-    </header>
-    <main class="container">
+    <nav>
+        <a href="/" class="logo">Cellar</a>
+        <ul class="links">
+            <li><a href="/">Games</a></li>
+            <li><a href="/memory">Memory</a></li>
+            <li><a href="/settings">Settings</a></li>
+        </ul>
+    </nav>
+    <main>
         #import("content")
     </main>
 </body>

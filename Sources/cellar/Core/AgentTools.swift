@@ -40,6 +40,15 @@ final class AgentTools {
     let wineURL: URL
     let wineProcess: WineProcess
 
+    // MARK: - Web Control Flags
+
+    /// Set to true to force-stop the agent loop at the next iteration.
+    var shouldAbort = false
+
+    /// Set to true when user manually confirms game is working from web UI.
+    /// Triggers save_success + stop on next tool execution.
+    var userForceConfirmed = false
+
     // MARK: - User Input Handler
 
     /// Callback to ask the user a question. Returns their answer.
@@ -594,6 +603,23 @@ final class AgentTools {
 
     /// Dispatch a tool call by name. Returns a JSON string result. Never throws.
     func execute(toolName: String, input: JSONValue) -> String {
+        // Check web control flags before executing any tool
+        if shouldAbort {
+            return "{\"error\": \"Agent stopped by user.\", \"STOP\": true}"
+        }
+        if userForceConfirmed && toolName != "save_success" && toolName != "save_recipe" {
+            // User confirmed game works — force save and stop
+            taskState = .userConfirmedOk
+            let saveInput: JSONValue = .object([
+                "game_name": .string(entry.name),
+                "resolution_narrative": .string("User confirmed game is working from web UI.")
+            ])
+            _ = saveSuccess(input: saveInput)
+            // Force savedAfterConfirm regardless of save result (save may fail on permissions)
+            taskState = .savedAfterConfirm
+            return "{\"user_override\": \"User confirmed game is working from web UI. Config saved. Stop now.\", \"STOP\": true}"
+        }
+
         let result: String
         switch toolName {
         case "inspect_game":      result = inspectGame(input: input)

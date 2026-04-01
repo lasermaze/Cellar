@@ -2,18 +2,21 @@
   #export("content"):
     <section>
       <h2>Add Game</h2>
-      <form hx-post="/games" hx-target="body">
-        <label>
-          Installer Path
-          <input type="text" name="installPath"
-                 placeholder="/path/to/game/setup.exe"
-                 required>
-        </label>
-        <div style="display: flex; gap: 0.5rem;">
-          <button type="submit">Add Game</button>
-          <a href="/" role="button" class="secondary outline">Cancel</a>
-        </div>
-      </form>
+      <div class="section-card" style="max-width: 560px;">
+        <form hx-post="/games" hx-target="body">
+          <div class="form-group">
+            <label for="installPath">Installer Path</label>
+            <input type="text" id="installPath" name="installPath"
+                   placeholder="/path/to/game/setup.exe"
+                   required>
+            <div class="form-hint">Path to the Windows game installer (.exe)</div>
+          </div>
+          <div style="display: flex; gap: 0.75rem;">
+            <button type="submit" class="btn btn-primary">Add Game <span class="arrow">→</span></button>
+            <a href="/" class="btn btn-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
     </section>
   #endexport
 #endextend

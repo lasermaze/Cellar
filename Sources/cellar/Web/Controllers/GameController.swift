@@ -112,6 +112,47 @@ enum GameController {
             let gameData = try await loadGameViewData()
             return try await req.view.render("game-list", GameListContext(games: gameData))
         }
+
+        // POST /games/:gameId/sync-memory -- push success record to collective memory
+        app.post("games", ":gameId", "sync-memory") { req async throws -> Response in
+            guard let gameId = req.parameters.get("gameId") else {
+                throw Abort(.badRequest)
+            }
+            guard let game = try await GameService.shared.findGame(id: gameId) else {
+                throw Abort(.notFound)
+            }
+            // Try game ID first, then recipe ID (IDs may differ from installer filename vs recipe name)
+            let record: SuccessRecord
+            if let r = SuccessDatabase.load(gameId: gameId) {
+                record = r
+            } else if let recipeId = game.recipeId, let r = SuccessDatabase.load(gameId: recipeId) {
+                record = r
+            } else {
+                throw Abort(.badRequest, reason: "No success record for this game")
+            }
+            guard let wineURL = LaunchService.resolveWine() else {
+                throw Abort(.serviceUnavailable, reason: "Wine not found")
+            }
+
+            // Enable contribution if not already
+            var config = CellarConfig.load()
+            if config.contributeMemory != true {
+                config.contributeMemory = true
+                try? CellarConfig.save(config)
+            }
+
+            // Push on background queue (blocking network call)
+            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+                DispatchQueue.global(qos: .userInitiated).async {
+                    CollectiveMemoryWriteService.push(record: record, gameName: game.name, wineURL: wineURL)
+                    continuation.resume()
+                }
+            }
+
+            var headers = HTTPHeaders()
+            headers.add(name: .contentType, value: "text/html")
+            return Response(status: .ok, headers: headers, body: .init(string: "<small>Synced!</small>"))
+        }
     }
 
     // MARK: - Helpers
@@ -124,7 +165,8 @@ enum GameController {
                 name: game.name,
                 status: game.lastResult.map { $0.reachedMenu ? "Working" : "Needs Attention" } ?? "Ready",
                 lastPlayed: game.lastLaunched.map { formatDate($0) } ?? "Never",
-                canDirectLaunch: LaunchService.canDirectLaunch(gameId: game.id)
+                canDirectLaunch: LaunchService.canDirectLaunch(gameId: game.id),
+                hasSuccessRecord: SuccessDatabase.load(gameId: game.id) != nil
             )
         }
     }
@@ -152,6 +194,7 @@ enum GameController {
         let status: String
         let lastPlayed: String
         let canDirectLaunch: Bool
+        let hasSuccessRecord: Bool
     }
 
     struct AddGameInput: Content {

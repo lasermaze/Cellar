@@ -3,109 +3,103 @@
     <section>
       <h2>Settings</h2>
 
-      <article>
-        <header><strong>API Keys</strong></header>
+      <div class="section-card">
+        <header>API Keys</header>
         <form method="post" action="/settings/keys">
-          <label for="aiProvider">
-            AI Provider
-          </label>
-          <select name="aiProvider" id="aiProvider">
-            <option value="" #if(aiProvider == ""):selected#endif>Auto-detect</option>
-            <option value="claude" #if(aiProvider == "claude"):selected#endif>Claude (Anthropic)</option>
-            <option value="deepseek" #if(aiProvider == "deepseek"):selected#endif>Deepseek</option>
-          </select>
-          <small style="color: var(--pico-muted-color);">Auto-detect uses whichever API key is configured. Takes effect on next launch.</small>
+          <div class="form-group">
+            <label for="aiProvider">AI Provider</label>
+            <select name="aiProvider" id="aiProvider">
+              <option value="" #if(aiProvider == ""):selected#endif>Auto-detect</option>
+              <option value="claude" #if(aiProvider == "claude"):selected#endif>Claude (Anthropic)</option>
+              <option value="deepseek" #if(aiProvider == "deepseek"):selected#endif>Deepseek</option>
+            </select>
+            <div class="form-hint">Auto-detect uses whichever API key is configured. Takes effect on next launch.</div>
+          </div>
 
-          <label for="anthropicKey">
-            Anthropic API Key
-            #if(hasAnthropicKey):
-              <small style="color: var(--pico-ins-color);"> (configured)</small>
-            #else:
-              <small style="color: var(--pico-muted-color);"> (not set)</small>
-            #endif
-          </label>
-          <input
-            type="password"
-            id="anthropicKey"
-            name="anthropicKey"
-            placeholder="#if(hasAnthropicKey): #(anthropicKey) #else: sk-ant-... #endif"
-            autocomplete="off"
-          >
+          <div class="form-group">
+            <label for="anthropicKey">
+              Anthropic API Key
+              #if(hasAnthropicKey):
+                <span style="color: var(--success);"> (configured)</span>
+              #endif
+            </label>
+            <input
+              type="password"
+              id="anthropicKey"
+              name="anthropicKey"
+              placeholder="#if(hasAnthropicKey): #(anthropicKey) #else: sk-ant-... #endif"
+              autocomplete="off"
+            >
+          </div>
 
-          <label for="openaiKey">
-            OpenAI API Key
-            #if(hasOpenaiKey):
-              <small style="color: var(--pico-ins-color);"> (configured)</small>
-            #else:
-              <small style="color: var(--pico-muted-color);"> (not set)</small>
-            #endif
-          </label>
-          <input
-            type="password"
-            id="openaiKey"
-            name="openaiKey"
-            placeholder="#if(hasOpenaiKey): #(openaiKey) #else: sk-... #endif"
-            autocomplete="off"
-          >
+          <div class="form-group">
+            <label for="openaiKey">
+              OpenAI API Key
+              #if(hasOpenaiKey):
+                <span style="color: var(--success);"> (configured)</span>
+              #endif
+            </label>
+            <input
+              type="password"
+              id="openaiKey"
+              name="openaiKey"
+              placeholder="#if(hasOpenaiKey): #(openaiKey) #else: sk-... #endif"
+              autocomplete="off"
+            >
+          </div>
 
-          <label for="deepseekKey">
-            Deepseek API Key
-            #if(hasDeepseekKey):
-              <small style="color: var(--pico-ins-color);"> (configured)</small>
-            #else:
-              <small style="color: var(--pico-muted-color);"> (not set)</small>
-            #endif
-          </label>
-          <input
-            type="password"
-            id="deepseekKey"
-            name="deepseekKey"
-            placeholder="#if(hasDeepseekKey): #(deepseekKey) #else: sk-... #endif"
-            autocomplete="off"
-          >
+          <div class="form-group">
+            <label for="deepseekKey">
+              Deepseek API Key
+              #if(hasDeepseekKey):
+                <span style="color: var(--success);"> (configured)</span>
+              #endif
+            </label>
+            <input
+              type="password"
+              id="deepseekKey"
+              name="deepseekKey"
+              placeholder="#if(hasDeepseekKey): #(deepseekKey) #else: sk-... #endif"
+              autocomplete="off"
+            >
+          </div>
 
-          <small style="color: var(--pico-muted-color);">
-            Leave a field empty to keep the current key. Clear the field and submit to remove a key.
-          </small>
-
-          <button type="submit" style="margin-top: 1rem;">Save Keys</button>
+          <div class="form-hint" style="margin-bottom: 1rem;">Leave a field empty to keep the current key.</div>
+          <button type="submit" class="btn btn-primary">Save Keys</button>
         </form>
-      </article>
+      </div>
 
-      <article>
-        <header><strong>Community</strong></header>
+      <div class="section-card">
+        <header>Community</header>
         <form method="post" action="/settings/config">
           <input type="hidden" name="contributeMemory" value="false">
-          <label>
-            <input
-              type="checkbox"
-              name="contributeMemory"
-              value="true"
-              #if(contributeMemory): checked #endif
-            >
-            Share working configs with the Cellar community
-          </label>
-          <small style="color: var(--pico-muted-color);">
-            When enabled, successfully verified game configs are automatically shared to help other users.
-          </small>
-
-          <button type="submit" style="margin-top: 1rem;">Save</button>
+          <div class="form-group">
+            <label style="display: flex; align-items: center; color: var(--text);">
+              <input
+                type="checkbox"
+                name="contributeMemory"
+                value="true"
+                #if(contributeMemory): checked #endif
+              >
+              Share working configs with the Cellar community
+            </label>
+            <div class="form-hint">When enabled, successfully verified game configs are automatically shared to help other users.</div>
+          </div>
+          <button type="submit" class="btn btn-primary">Save</button>
         </form>
 
         #if(contributeMemory):
           #if(successCount > 0):
-            <form method="post" action="/settings/sync" style="margin-top: 1rem;">
-              <button type="submit" class="outline">Sync #(successCount) record(s) to collective memory</button>
-              <small style="color: var(--pico-muted-color);">
-                Push all local success records to collective memory. Already-synced records will have their confirmation count incremented.
-              </small>
+            <form method="post" action="/settings/sync" style="margin-top: 1.25rem; padding-top: 1.25rem; border-top: 1px solid var(--border);">
+              <button type="submit" class="btn btn-secondary">Sync #(successCount) record(s) to collective memory</button>
+              <div class="form-hint" style="margin-top: 0.5rem;">Push all local success records to collective memory.</div>
             </form>
             #if(syncResult != ""):
-              <small style="color: var(--pico-ins-color); margin-top: 0.5rem; display: block;">#(syncResult)</small>
+              <div style="color: var(--success); font-size: 0.85rem; margin-top: 0.5rem;">#(syncResult)</div>
             #endif
           #endif
         #endif
-      </article>
+      </div>
     </section>
   #endexport
 #endextend

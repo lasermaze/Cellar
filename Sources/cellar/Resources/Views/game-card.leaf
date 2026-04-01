@@ -1,20 +1,41 @@
 <div class="game-card">
   <h4>#(game.name)</h4>
-  <p class="meta">Status: #(game.status)</p>
-  <p class="meta">Last played: #(game.lastPlayed)</p>
+
+  <div class="meta-row">
+    <span class="label">Status</span>
+    #if(game.status == "Working"):
+      <span class="badge badge-success">#(game.status)</span>
+    #elseif(game.status == "Needs Attention"):
+      <span class="badge badge-warning">#(game.status)</span>
+    #else:
+      <span class="badge badge-default">#(game.status)</span>
+    #endif
+  </div>
+  <div class="meta-row">
+    <span class="label">Last played</span>
+    <span>#(game.lastPlayed)</span>
+  </div>
+
   <div class="actions">
     #if(game.canDirectLaunch):
-      <a href="/games/#(game.id)/launch" role="button" class="secondary">Launch</a>
-      <a href="/games/#(game.id)/launch?agent=true" role="button" class="outline">Launch with AI</a>
+      <a href="/games/#(game.id)/launch" class="btn btn-secondary btn-sm">Launch</a>
+      <a href="/games/#(game.id)/launch?agent=true" class="btn btn-primary btn-sm">Launch with AI <span class="arrow">→</span></a>
     #else:
-      <a href="/games/#(game.id)/launch?agent=true" role="button">Launch with AI</a>
+      <a href="/games/#(game.id)/launch?agent=true" class="btn btn-primary btn-sm">Launch with AI <span class="arrow">→</span></a>
+    #endif
+    #if(game.status == "Working"):
+      <button
+        hx-post="/games/#(game.id)/sync-memory"
+        hx-swap="outerHTML"
+        class="btn btn-secondary btn-sm"
+      >Sync to Memory</button>
     #endif
     <span class="spacer"></span>
     <button
       hx-delete="/games/#(game.id)?cleanBottle=true"
       hx-target="#game-list"
       hx-confirm="Delete #(game.name) and its Wine bottle?"
-      class="secondary outline"
+      class="btn btn-ghost btn-sm"
     >Delete</button>
   </div>
 </div>

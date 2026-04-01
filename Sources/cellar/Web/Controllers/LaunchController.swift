@@ -54,6 +54,31 @@ private final class PendingUserResponse: @unchecked Sendable {
     }
 }
 
+/// Thread-safe store for active AgentTools instances, allowing web routes to control them.
+private final class ActiveAgents: @unchecked Sendable {
+    static let shared = ActiveAgents()
+    private let lock = NSLock()
+    private var agents: [String: AgentTools] = [:]
+
+    func register(gameId: String, tools: AgentTools) {
+        lock.lock()
+        agents[gameId] = tools
+        lock.unlock()
+    }
+
+    func get(gameId: String) -> AgentTools? {
+        lock.lock()
+        defer { lock.unlock() }
+        return agents[gameId]
+    }
+
+    func remove(gameId: String) {
+        lock.lock()
+        agents.removeValue(forKey: gameId)
+        lock.unlock()
+    }
+}
+
 enum LaunchController {
 
     static func register(_ app: Application) throws {
@@ -114,6 +139,32 @@ enum LaunchController {
             response.headers.replaceOrAdd(name: .cacheControl, value: "no-cache")
             response.headers.replaceOrAdd(name: .connection, value: "keep-alive")
             return response
+        }
+
+        // POST /games/:gameId/launch/stop -- force stop agent
+        app.post("games", ":gameId", "launch", "stop") { req async throws -> Response in
+            guard let gameId = req.parameters.get("gameId") else {
+                throw Abort(.badRequest)
+            }
+            if let tools = ActiveAgents.shared.get(gameId: gameId) {
+                tools.shouldAbort = true
+            }
+            var headers = HTTPHeaders()
+            headers.add(name: .contentType, value: "text/html")
+            return Response(status: .ok, headers: headers, body: .init(string: "<span style='color: var(--error);'>Agent stopped</span>"))
+        }
+
+        // POST /games/:gameId/launch/confirm -- user confirms game is working
+        app.post("games", ":gameId", "launch", "confirm") { req async throws -> Response in
+            guard let gameId = req.parameters.get("gameId") else {
+                throw Abort(.badRequest)
+            }
+            if let tools = ActiveAgents.shared.get(gameId: gameId) {
+                tools.userForceConfirmed = true
+            }
+            var headers = HTTPHeaders()
+            headers.add(name: .contentType, value: "text/html")
+            return Response(status: .ok, headers: headers, body: .init(string: "<span style='color: var(--success);'>Confirmed! Saving config...</span>"))
         }
 
         // POST /games/:gameId/launch/respond -- user answers agent prompt
@@ -334,8 +385,12 @@ enum LaunchController {
                     bottleURL: bottleURL,
                     wineProcess: wineProcess,
                     onOutput: onOutput,
-                    askUserHandler: webAskUser
+                    askUserHandler: webAskUser,
+                    onToolsCreated: { tools in
+                        ActiveAgents.shared.register(gameId: gameId, tools: tools)
+                    }
                 )
+                ActiveAgents.shared.remove(gameId: gameId)
                 continuation.resume(returning: aiResult)
             }
         }

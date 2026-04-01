@@ -3,44 +3,48 @@
     <section>
       <h2>Community Memory</h2>
       #if(stats.isAvailable):
-        <div class="game-grid" style="margin-bottom: 1.5rem;">
-          <article>
-            <header><strong>Games Covered</strong></header>
-            <p style="font-size: 2rem; margin: 0;">#(stats.gameCount)</p>
-          </article>
-          <article>
-            <header><strong>Total Confirmations</strong></header>
-            <p style="font-size: 2rem; margin: 0;">#(stats.totalConfirmations)</p>
-          </article>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <div class="stat-label">Games Covered</div>
+            <div class="stat-value">#(stats.gameCount)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Total Confirmations</div>
+            <div class="stat-value">#(stats.totalConfirmations)</div>
+          </div>
         </div>
 
         #if(count(stats.recentContributions) > 0):
           <h3>Recent Contributions</h3>
-          <table>
-            <thead>
-              <tr>
-                <th>Game</th>
-                <th>Confirmations</th>
-                <th>Last Confirmed</th>
-              </tr>
-            </thead>
-            <tbody>
-              #for(item in stats.recentContributions):
+          <div class="section-card" style="padding: 0;">
+            <table>
+              <thead>
                 <tr>
-                  <td><a href="/memory/#(item.gameSlug)">#(item.gameName)</a></td>
-                  <td>#(item.confirmations)</td>
-                  <td>#(item.lastConfirmed)</td>
+                  <th>Game</th>
+                  <th>Confirmations</th>
+                  <th>Last Confirmed</th>
                 </tr>
-              #endfor
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                #for(item in stats.recentContributions):
+                  <tr>
+                    <td><a href="/memory/#(item.gameSlug)">#(item.gameName)</a></td>
+                    <td>#(item.confirmations)</td>
+                    <td>#(item.lastConfirmed)</td>
+                  </tr>
+                #endfor
+              </tbody>
+            </table>
+          </div>
         #else:
-          <p>No contributions yet. Launch games with the AI agent to start building community memory.</p>
+          <div class="empty-state">
+            <p>No contributions yet. Launch games with the AI agent to start building community memory.</p>
+          </div>
         #endif
       #else:
-        <article>
+        <div class="section-card">
           <p>Community memory is not available. Configure GitHub App credentials in <a href="/settings">Settings</a>.</p>
-        </article>
+        </div>
       #endif
     </section>
   #endexport

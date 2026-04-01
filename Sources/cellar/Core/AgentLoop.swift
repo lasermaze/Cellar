@@ -120,7 +120,8 @@ struct AgentLoop {
     mutating func run(
         initialMessage: String,
         toolExecutor: (String, JSONValue) -> String,
-        canStop: (() -> Bool)? = nil
+        canStop: (() -> Bool)? = nil,
+        shouldAbort: (() -> Bool)? = nil
     ) -> AgentLoopResult {
         var iterationCount = 0
         var allText: [String] = []
@@ -170,6 +171,12 @@ struct AgentLoop {
 
         // Step 2: Main loop
         while iterationCount < maxIterations {
+            // Check user abort before making API call
+            if shouldAbort?() == true {
+                emit(.status("[Agent aborted by user]"))
+                return makeResult(text: allText.joined(separator: "\n"), iterations: iterationCount, completed: true, stopReason: .completed)
+            }
+
             iterationCount += 1
 
             // Step 2a: Call provider API with retry
@@ -278,11 +285,17 @@ struct AgentLoop {
 
                 // Execute each tool call and collect results
                 var results: [(id: String, content: String, isError: Bool)] = []
+                var userStopped = false
                 for call in response.toolCalls {
                     emit(.toolCall(name: call.name))
                     let result = toolExecutor(call.name, call.input)
                     emit(.toolResult(name: call.name, truncated: String(result.prefix(200))))
                     results.append((id: call.id, content: result, isError: false))
+
+                    if result.contains("\"STOP\": true") || result.contains("\"STOP\":true") {
+                        userStopped = true
+                        break
+                    }
 
                     // Track action tools for spin detection
                     if actionTools.contains(call.name) {
@@ -306,6 +319,12 @@ struct AgentLoop {
                     if let maxCount = counts.values.max(), maxCount >= 4 {
                         needsPivotNudge = true
                     }
+                }
+
+                // Check if user force-stopped the agent
+                if userStopped {
+                    emit(.status("[User stopped agent]"))
+                    return makeResult(text: allText.joined(separator: "\n"), iterations: iterationCount, completed: true, stopReason: .completed)
                 }
 
                 // Inject budget warning or pivot nudge as user messages alongside tool results
