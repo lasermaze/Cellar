@@ -658,7 +658,7 @@ struct AIService {
         | Exit Behavior | dialogs Array | list_windows | Diagnosis |
         |---------------|---------------|--------------|-----------|
         | Quick exit (< 5s) | Has entries | N/A | Dialog blocked then dismissed/crashed — read dialog text for cause |
-        | Quick exit (< 5s) | Empty | N/A | Crash or missing dependency — check stderr_tail and detected_errors |
+        | Quick exit (< 5s) | Empty | N/A | Crash or missing dependency — check stderr_tail and diagnostics |
         | Still running | Has entries | Small window (<640x480) | Dialog waiting for user input — game is stuck |
         | Still running | Empty | Small window (<640x480) | Possible dialog without msgbox (custom window) — investigate |
         | Still running | Empty | Large window (>=640x480) | Game running normally |
@@ -680,6 +680,31 @@ struct AIService {
         1. The engine detection in inspect_game may have missed the game, OR
         2. The pre-configuration was incomplete
         Apply the fix now, save it to the recipe, and note the gap for save_success.
+
+        ## Structured Diagnostics
+
+        launch_game and trace_launch return a `diagnostics` object grouped by subsystem:
+        - `diagnostics.summary`: Human-readable summary ("2 errors (graphics, audio), 1 success (input), 847 fixme lines filtered")
+        - `diagnostics.{subsystem}`: Each has `errors` and `successes` arrays (subsystems: graphics, audio, input, font, memory, configuration, missing_dll, crash)
+        - `diagnostics.causal_chains`: Root-cause analysis linking missing DLLs to downstream failures
+        - Each error has `detail` and optional `suggested_fix` — follow the suggested fix first
+
+        ### Cross-Launch Changes
+
+        launch_game and trace_launch also return `changes_since_last`:
+        - `last_actions`: What you applied since the previous launch (set_environment, install_winetricks, etc.)
+        - `new_errors`: Errors that appeared since last launch
+        - `resolved_errors`: Errors that disappeared (your fix worked!)
+        - `persistent_errors`: Errors still present (try a different approach)
+        - `new_successes`: New positive signals
+
+        Use this to evaluate whether your last action helped, hurt, or had no effect. If an error is persistent after 2 attempts, escalate to web research.
+
+        ### read_log Output
+
+        read_log returns `diagnostics` (same structure) plus `filtered_log` (stderr with noise removed). The filtered_log keeps all err:/warn: lines from subsystems with detected errors, removing only:
+        - fixme: lines from subsystems WITHOUT errors (noise)
+        - Known-harmless macOS warnings (screen saver, heap info, printer, etc.)
 
         ## Research Quality
 
@@ -851,6 +876,12 @@ struct AIService {
         }
         if let previousSession = previousSession {
             contextParts.append(previousSession.formatForAgent())
+        }
+        // Inject previous-session diagnostics ONLY if no SessionHandoff exists.
+        // (SessionHandoff already contains last session context; avoid doubling.)
+        if previousSession == nil,
+           let diagRecord = DiagnosticRecord.readLatest(gameId: gameId) {
+            contextParts.append(diagRecord.formatForAgent())
         }
         contextParts.append(launchInstruction)
         let initialMessage = contextParts.joined(separator: "\n\n")
