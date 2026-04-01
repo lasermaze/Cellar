@@ -32,6 +32,7 @@ protocol AgentLoopProvider {
     mutating func appendUserMessage(_ text: String)
     mutating func appendAssistantResponse(_ response: AgentLoopProviderResponse)
     mutating func appendToolResults(_ results: [(id: String, content: String, isError: Bool)])
+    var maxOutputTokensLimit: Int { get }
     mutating func callWithRetry(maxTokens: Int, emit: (AgentEvent) -> Void) throws -> AgentLoopProviderResponse
 }
 
@@ -85,6 +86,7 @@ struct AnthropicAgentProvider: AgentLoopProvider {
 
     let apiKey: String
     let modelName: String
+    let maxOutputTokensLimit: Int = 8192
     private let tools: [ToolDefinition]
     private let systemPrompt: String
     private var messages: [AnthropicToolRequest.Message] = []
@@ -236,6 +238,7 @@ struct DeepseekAgentProvider: AgentLoopProvider {
 
     let apiKey: String
     let modelName: String
+    let maxOutputTokensLimit: Int = 8192
     private let openAITools: [OpenAIToolDef]
     private var messages: [OpenAIToolRequest.Message] = []
 

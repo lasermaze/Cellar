@@ -1,0 +1,49 @@
+#extend("base"):
+  #export("content"):
+    <section>
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h2>Installing: #(gameName)</h2>
+        <a href="/" role="button" class="secondary outline">Back to Library</a>
+      </div>
+
+      <div hx-ext="sse" sse-connect="#(streamURL)">
+        <!-- Status bar -->
+        <article id="status-bar">
+          <div id="status" sse-swap="status" hx-swap="innerHTML">
+            Connecting...
+          </div>
+        </article>
+
+        <!-- Log output -->
+        <details open>
+          <summary>Install Log</summary>
+          <div id="log" sse-swap="log" hx-swap="beforeend"
+               style="max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 0.85em; background: var(--pico-code-background-color); padding: 1rem; border-radius: var(--pico-border-radius);">
+          </div>
+        </details>
+
+        <!-- Error display -->
+        <div id="errors" sse-swap="error" hx-swap="beforeend"
+             style="color: var(--pico-del-color);">
+        </div>
+
+        <!-- Completion -->
+        <div id="complete" sse-swap="complete" hx-swap="innerHTML">
+        </div>
+      </div>
+    </section>
+
+    <script>
+      document.body.addEventListener('sse:complete', function() {
+        var el = document.querySelector('[sse-connect]');
+        if (el) el.removeAttribute('sse-connect');
+      });
+    </script>
+
+    <style>
+      .error { color: var(--pico-del-color); font-weight: bold; }
+      .success { color: var(--pico-ins-color); font-weight: bold; }
+      .log-line { white-space: pre-wrap; word-break: break-all; }
+    </style>
+  #endexport
+#endextend

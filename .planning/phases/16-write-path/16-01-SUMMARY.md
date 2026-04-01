@@ -106,6 +106,15 @@ None — no external service configuration required. GitHub auth was handled in 
 - Phase 17 (web memory UI) can now add a settings toggle for `contributeMemory` via SettingsController — the field is persisted in CellarConfig.
 - The opt-in state (`contributeMemory`) is readable from web settings and can be toggled without touching the write service.
 
+## Self-Check: PASSED
+
+- FOUND: Sources/cellar/Core/CollectiveMemoryWriteService.swift
+- FOUND: Sources/cellar/Persistence/CellarConfig.swift (modified)
+- FOUND: Sources/cellar/Core/AIService.swift (modified)
+- FOUND: .planning/phases/16-write-path/16-01-SUMMARY.md
+- FOUND: commit 1f13e6c (Task 1)
+- FOUND: commit ed098c5 (Task 2)
+
 ---
 *Phase: 16-write-path*
 *Completed: 2026-03-30*

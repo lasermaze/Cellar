@@ -985,8 +985,9 @@ struct AIService {
                 try? CellarConfig.save(config)
                 if !opted { return }
             } else {
-                // Web context: user toggles via settings page; skip for now
-                return
+                // Web context: auto-opt-in on first success; user can disable in Settings
+                config.contributeMemory = true
+                try? CellarConfig.save(config)
             }
         }
 

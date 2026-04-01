@@ -20,6 +20,40 @@ private actor LaunchGuard {
     }
 }
 
+/// Thread-safe pending user response store for web-based agent prompts.
+/// Agent blocks on DispatchSemaphore; browser POSTs answer which signals the semaphore.
+private final class PendingUserResponse: @unchecked Sendable {
+    static let shared = PendingUserResponse()
+    private let lock = NSLock()
+    private var responses: [String: String] = [:]       // gameId -> answer
+    private var semaphores: [String: DispatchSemaphore] = [:]  // gameId -> semaphore
+
+    /// Called from agent thread (blocks until browser responds)
+    func waitForResponse(gameId: String) -> String {
+        let sem = DispatchSemaphore(value: 0)
+        lock.lock()
+        semaphores[gameId] = sem
+        lock.unlock()
+
+        sem.wait()
+
+        lock.lock()
+        let answer = responses.removeValue(forKey: gameId) ?? ""
+        semaphores.removeValue(forKey: gameId)
+        lock.unlock()
+        return answer
+    }
+
+    /// Called from web route when user submits answer
+    func submitResponse(gameId: String, answer: String) {
+        lock.lock()
+        responses[gameId] = answer
+        let sem = semaphores[gameId]
+        lock.unlock()
+        sem?.signal()
+    }
+}
+
 enum LaunchController {
 
     static func register(_ app: Application) throws {
@@ -80,6 +114,19 @@ enum LaunchController {
             response.headers.replaceOrAdd(name: .cacheControl, value: "no-cache")
             response.headers.replaceOrAdd(name: .connection, value: "keep-alive")
             return response
+        }
+
+        // POST /games/:gameId/launch/respond -- user answers agent prompt
+        app.post("games", ":gameId", "launch", "respond") { req async throws -> Response in
+            guard let gameId = req.parameters.get("gameId") else {
+                throw Abort(.badRequest)
+            }
+            struct UserAnswer: Content {
+                let answer: String
+            }
+            let input = try req.content.decode(UserAnswer.self)
+            PendingUserResponse.shared.submitResponse(gameId: gameId, answer: input.answer)
+            return Response(status: .ok)
         }
     }
 
@@ -255,6 +302,30 @@ enum LaunchController {
                     }
                 }
 
+                let capturedGameId = gameId
+                let capturedWriter = sseWriter
+                let webAskUser: @Sendable (_ question: String, _ options: [String]?) -> String = { question, options in
+                    // Send prompt to browser via SSE — rendered inside a <dialog> modal
+                    var html = "<header><h3>Agent Question</h3></header>"
+                    html += "<p>\(escapeHTML(question))</p>"
+                    html += "<form hx-post='/games/\(capturedGameId)/launch/respond' hx-swap='none'>"
+                    if let opts = options, !opts.isEmpty {
+                        for opt in opts {
+                            html += "<label style='display: block; margin-bottom: 0.5rem;'>"
+                            html += "<input type='radio' name='answer' value='\(escapeHTML(opt))'> \(escapeHTML(opt))"
+                            html += "</label>"
+                        }
+                        html += "<hr>"
+                    }
+                    html += "<input type='text' name='answer' placeholder='Type your answer...'>"
+                    html += "<footer style='display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;'>"
+                    html += "<button type='submit'>Submit</button>"
+                    html += "</footer></form>"
+                    sendSSE(writer: capturedWriter, event: "prompt", data: html)
+                    // Block until browser responds
+                    return PendingUserResponse.shared.waitForResponse(gameId: capturedGameId)
+                }
+
                 let aiResult = AIService.runAgentLoop(
                     gameId: gameId,
                     entry: game,
@@ -262,7 +333,8 @@ enum LaunchController {
                     wineURL: wineURL,
                     bottleURL: bottleURL,
                     wineProcess: wineProcess,
-                    onOutput: onOutput
+                    onOutput: onOutput,
+                    askUserHandler: webAskUser
                 )
                 continuation.resume(returning: aiResult)
             }

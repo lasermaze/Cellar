@@ -44,6 +44,14 @@
           </div>
         </details>
 
+        <!-- Agent prompt modal -->
+        <dialog id="prompt-dialog">
+          <article style="min-width: 320px; max-width: 480px;">
+            <div id="prompt" sse-swap="prompt" hx-swap="innerHTML">
+            </div>
+          </article>
+        </dialog>
+
         <!-- Error display -->
         <div id="errors" sse-swap="error" hx-swap="beforeend"
              style="color: var(--pico-del-color);">
@@ -54,6 +62,31 @@
         </div>
       </div>
     </section>
+
+    <script>
+      document.body.addEventListener('sse:complete', function() {
+        var el = document.querySelector('[sse-connect]');
+        if (el) el.removeAttribute('sse-connect');
+      });
+
+      // Open modal when agent sends a prompt
+      var promptEl = document.getElementById('prompt');
+      var dialog = document.getElementById('prompt-dialog');
+      new MutationObserver(function() {
+        if (promptEl.children.length > 0 && !dialog.open) {
+          dialog.showModal();
+        }
+      }).observe(promptEl, { childList: true });
+
+      // Close modal after form submit
+      document.body.addEventListener('htmx:afterRequest', function(e) {
+        if (e.detail.pathInfo && e.detail.pathInfo.requestPath &&
+            e.detail.pathInfo.requestPath.includes('/launch/respond')) {
+          dialog.close();
+          promptEl.innerHTML = '';
+        }
+      });
+    </script>
 
     <style>
       .tool-call { color: var(--pico-primary); }
