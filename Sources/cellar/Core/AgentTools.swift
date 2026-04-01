@@ -772,52 +772,28 @@ final class AgentTools {
             ]
         }
 
-        // PE imports via objdump -p (with 5s timeout to avoid hangs)
+        // PE imports: scan exe file bytes for DLL name strings (no external tools)
         var peImports: [String] = []
-        if FileManager.default.fileExists(atPath: "/usr/bin/objdump") {
-            let objdumpProcess = Process()
-            objdumpProcess.executableURL = URL(fileURLWithPath: "/usr/bin/objdump")
-            objdumpProcess.arguments = ["-p", executablePath]
-            let objdumpPipe = Pipe()
-            objdumpProcess.standardOutput = objdumpPipe
-            objdumpProcess.standardError = Pipe()
-            do {
-                try objdumpProcess.run()
-                // Read data in background to avoid pipe deadlock
-                var objdumpData = Data()
-                let readQueue = DispatchQueue(label: "objdump-read")
-                let readDone = DispatchSemaphore(value: 0)
-                readQueue.async {
-                    objdumpData = objdumpPipe.fileHandleForReading.readDataToEndOfFile()
-                    readDone.signal()
-                }
-                // Wait max 5 seconds
-                if readDone.wait(timeout: .now() + 5) == .timedOut {
-                    objdumpProcess.terminate()
-                } else if let output = String(data: objdumpData, encoding: .utf8) {
-                    // Primary format: "DLL Name: kernel32.dll"
-                    let dllNameLines = output.components(separatedBy: "\n")
-                        .filter { $0.contains("DLL Name:") }
-                    for line in dllNameLines {
-                        if let colonRange = line.range(of: "DLL Name:") {
-                            let name = String(line[colonRange.upperBound...]).trimmingCharacters(in: .whitespaces)
-                            if !name.isEmpty {
-                                peImports.append(name)
-                            }
+        if let exeData = try? Data(contentsOf: URL(fileURLWithPath: executablePath), options: .mappedIfSafe) {
+            // Search for common DLL import names in the PE import table
+            if let exeString = String(data: exeData, encoding: .ascii) {
+                let pattern = try? NSRegularExpression(pattern: #"\b(\w+\.dll)\b"#, options: .caseInsensitive)
+                let matches = pattern?.matches(in: exeString, range: NSRange(exeString.startIndex..., in: exeString)) ?? []
+                var seen = Set<String>()
+                for match in matches {
+                    if let range = Range(match.range(at: 1), in: exeString) {
+                        let dll = String(exeString[range]).lowercased()
+                        // Filter to known system DLLs (skip random strings that end in .dll)
+                        let knownPrefixes = ["kernel32", "user32", "gdi32", "advapi32", "shell32", "ole32", "oleaut32",
+                                           "msvcrt", "ntdll", "ws2_32", "winmm", "ddraw", "d3d", "dsound", "dinput",
+                                           "opengl32", "version", "comctl32", "comdlg32", "imm32", "setupapi",
+                                           "winspool", "msvcp", "vcruntime", "ucrtbase", "xinput", "wsock32"]
+                        if knownPrefixes.contains(where: { dll.hasPrefix($0) }) && seen.insert(dll).inserted {
+                            peImports.append(dll)
                         }
                     }
-                    // Fallback: scan for .dll references if no DLL Name: lines found
-                    if peImports.isEmpty {
-                        let dllRefs = output.components(separatedBy: "\n")
-                            .compactMap { line -> String? in
-                                guard let range = line.range(of: #"\b\w+\.dll\b"#, options: [.regularExpression, .caseInsensitive]) else { return nil }
-                                return String(line[range])
-                            }
-                        peImports = Array(Set(dllRefs)).sorted()
-                    }
                 }
-            } catch {
-                // objdump failure is non-fatal — return empty array
+                peImports.sort()
             }
         }
 
