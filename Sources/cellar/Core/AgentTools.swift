@@ -772,42 +772,53 @@ final class AgentTools {
             ]
         }
 
-        // PE imports via objdump -p
+        // PE imports via objdump -p (with 5s timeout to avoid hangs)
         var peImports: [String] = []
-        let objdumpProcess = Process()
-        objdumpProcess.executableURL = URL(fileURLWithPath: "/usr/bin/objdump")
-        objdumpProcess.arguments = ["-p", executablePath]
-        let objdumpPipe = Pipe()
-        objdumpProcess.standardOutput = objdumpPipe
-        objdumpProcess.standardError = Pipe()
-        do {
-            try objdumpProcess.run()
-            objdumpProcess.waitUntilExit()
-            let objdumpData = objdumpPipe.fileHandleForReading.readDataToEndOfFile()
-            if let output = String(data: objdumpData, encoding: .utf8) {
-                // Primary format: "DLL Name: kernel32.dll"
-                let dllNameLines = output.components(separatedBy: "\n")
-                    .filter { $0.contains("DLL Name:") }
-                for line in dllNameLines {
-                    if let colonRange = line.range(of: "DLL Name:") {
-                        let name = String(line[colonRange.upperBound...]).trimmingCharacters(in: .whitespaces)
-                        if !name.isEmpty {
-                            peImports.append(name)
+        if FileManager.default.fileExists(atPath: "/usr/bin/objdump") {
+            let objdumpProcess = Process()
+            objdumpProcess.executableURL = URL(fileURLWithPath: "/usr/bin/objdump")
+            objdumpProcess.arguments = ["-p", executablePath]
+            let objdumpPipe = Pipe()
+            objdumpProcess.standardOutput = objdumpPipe
+            objdumpProcess.standardError = Pipe()
+            do {
+                try objdumpProcess.run()
+                // Read data in background to avoid pipe deadlock
+                var objdumpData = Data()
+                let readQueue = DispatchQueue(label: "objdump-read")
+                let readDone = DispatchSemaphore(value: 0)
+                readQueue.async {
+                    objdumpData = objdumpPipe.fileHandleForReading.readDataToEndOfFile()
+                    readDone.signal()
+                }
+                // Wait max 5 seconds
+                if readDone.wait(timeout: .now() + 5) == .timedOut {
+                    objdumpProcess.terminate()
+                } else if let output = String(data: objdumpData, encoding: .utf8) {
+                    // Primary format: "DLL Name: kernel32.dll"
+                    let dllNameLines = output.components(separatedBy: "\n")
+                        .filter { $0.contains("DLL Name:") }
+                    for line in dllNameLines {
+                        if let colonRange = line.range(of: "DLL Name:") {
+                            let name = String(line[colonRange.upperBound...]).trimmingCharacters(in: .whitespaces)
+                            if !name.isEmpty {
+                                peImports.append(name)
+                            }
                         }
                     }
+                    // Fallback: scan for .dll references if no DLL Name: lines found
+                    if peImports.isEmpty {
+                        let dllRefs = output.components(separatedBy: "\n")
+                            .compactMap { line -> String? in
+                                guard let range = line.range(of: #"\b\w+\.dll\b"#, options: [.regularExpression, .caseInsensitive]) else { return nil }
+                                return String(line[range])
+                            }
+                        peImports = Array(Set(dllRefs)).sorted()
+                    }
                 }
-                // Fallback: scan for .dll references if no DLL Name: lines found
-                if peImports.isEmpty {
-                    let dllRefs = output.components(separatedBy: "\n")
-                        .compactMap { line -> String? in
-                            guard let range = line.range(of: #"\b\w+\.dll\b"#, options: [.regularExpression, .caseInsensitive]) else { return nil }
-                            return String(line[range])
-                        }
-                    peImports = Array(Set(dllRefs)).sorted()
-                }
+            } catch {
+                // objdump failure is non-fatal — return empty array
             }
-        } catch {
-            // objdump failure is non-fatal — return empty array
         }
 
         // Bottle type detection: check for syswow64 directory
