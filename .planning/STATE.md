@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-04-02T15:10:26.617Z"
+last_updated: "2026-04-02T17:27:24.514Z"
 progress:
   total_phases: 24
-  completed_phases: 22
+  completed_phases: 23
   total_plans: 57
-  completed_plans: 55
+  completed_plans: 57
 ---
 
 # Project State
@@ -64,6 +64,7 @@ Progress: [████████████████████] ~100% (
 | Phase 23-homebrew-tap-distribution-with-launcher-app P02 | 1 | 2 tasks | 2 files |
 | Phase 23-homebrew-tap-distribution-with-launcher-app P01 | 1 | 2 tasks | 2 files |
 | Phase 24-architecture-code-quality-cleanup P03 | 15 | 2 tasks | 4 files |
+| Phase 24-architecture-code-quality-cleanup P02 | 19 | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -115,6 +116,8 @@ Progress: [████████████████████] ~100% (
 - [Phase 23-homebrew-tap-distribution-with-launcher-app]: CellarLauncher polls 20x0.5s for port 8080 (not fixed sleep) and uses opt_bin DSL path (not hardcoded prefix)
 - [Phase 24-architecture-code-quality-cleanup]: fputs(message, stderr) used for service error logging — keeps agent stdout clean while exposing GitHub API failures via terminal
 - [Phase 24-architecture-code-quality-cleanup]: 404 and auth-unavailable paths not logged in collective memory services — expected graceful degradation, not errors
+- [Phase 24-architecture-code-quality-cleanup]: AgentTools.swift keeps only coordinator code (state, init, captureHandoff, toolDefinitions, execute(), jsonResult()) — all tool implementations moved to Core/Tools/ extension files
+- [Phase 24-architecture-code-quality-cleanup]: searchWeb/fetchPage migrated from DispatchSemaphore+ResultBox to URLSession async/await during AgentTools decomposition
 
 ### Roadmap Evolution
 
