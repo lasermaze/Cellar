@@ -19,13 +19,8 @@ actor GameService {
     }
 
     func deleteGame(id: String, cleanBottle: Bool) throws {
-        var games = try CellarStore.loadGames()
-        games.removeAll { $0.id == id }
-        try CellarStore.saveGames(games)
-        if cleanBottle {
-            let bottleDir = CellarPaths.bottleDir(for: id)
-            try? FileManager.default.removeItem(at: bottleDir)
-        }
+        // GameRemover handles games.json update + all artifact deletion
+        try GameRemover.remove(gameId: id)
     }
 
     func updateGame(_ entry: GameEntry) throws {
