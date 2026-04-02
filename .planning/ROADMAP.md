@@ -244,3 +244,19 @@ Plans:
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 21 to break down)
+
+### Phase 22: Seamless macOS UX
+
+**Goal:** Remove every friction point between "user opens Cellar" and "game is running" — pre-flight permission detection with deep links, first-run auto-setup that eliminates manual dependency commands, game removal with full bottle cleanup, the hardcoded GOG path fix, and actionable error messages throughout — so that a non-technical user never has to leave the app to figure out what went wrong
+**Depends on:** Phase 21
+**Requirements**: UX-01, UX-02, UX-03, UX-04, UX-05
+**Success Criteria** (what must be TRUE):
+  1. Before launching a game, a pre-flight check surfaces all missing permissions (Screen Recording, Accessibility) with macOS deep links — the user resolves everything in one pass, not across multiple failed launch attempts
+  2. On first `cellar add` or web UI visit with missing dependencies, Cellar detects and offers inline installation with progress — no need to run `cellar status` first
+  3. `cellar remove <game-id>` deletes the bottle, logs, recipes, success records, and registry entry; the web UI delete button does the same with confirmation
+  4. LaunchCommand resolves executables from `entry.executablePath` and BottleScanner — the hardcoded GOG path is gone
+  5. Every user-facing error message includes a concrete "Try this:" suggestion with a command or action to take
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 22 to break down)
