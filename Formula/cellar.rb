@@ -1,19 +1,13 @@
-# This formula lives in the tap repo (cellar-community/homebrew-cellar) at Formula/cellar.rb.
-# It is stored here in the main repo as a template; CI uses NSHipster/update-homebrew-formula-action
-# to keep the sha256 and version in the tap repo in sync after each tagged release.
+# Homebrew formula — lives in this repo. Users install with:
+#   brew tap <org>/cellar https://github.com/<org>/Cellar
+#   brew install cellar
+# CI updates url, sha256, and version on each tagged release.
 class Cellar < Formula
   desc "AI-powered Wine launcher for old Windows games on macOS"
-  homepage "https://github.com/cellar-community/cellar"
-  url "https://github.com/cellar-community/cellar/releases/download/vPLACEHOLDER/cellar-PLACEHOLDER-macos.tar.gz"
+  homepage "https://github.com/lasermaze/cellar"
+  url "https://github.com/lasermaze/cellar/releases/download/vPLACEHOLDER/cellar-PLACEHOLDER-macos.tar.gz"
   sha256 "PLACEHOLDER"
   version "PLACEHOLDER"
-
-  bottle do
-    root_url "https://github.com/cellar-community/cellar/releases/download/vPLACEHOLDER"
-    cellar :any_skip_relocation
-    sha256 arm64_sequoia: "PLACEHOLDER"
-    sha256 sequoia:       "PLACEHOLDER"
-  end
 
   def install
     bin.install "cellar"
