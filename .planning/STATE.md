@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-04-02T05:41:43.077Z"
+last_updated: "2026-04-02T05:45:09.264Z"
 progress:
   total_phases: 22
-  completed_phases: 20
+  completed_phases: 21
   total_plans: 52
-  completed_plans: 51
+  completed_plans: 52
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 ## Current Position
 
-Phase: 22 of 22 (Seamless macOS UX) — In Progress
-Plan: 1 of 3 complete
-Status: Phase 22 Plan 01 complete — PermissionChecker with Screen Recording advisory, actionable "Try this:" errors across LaunchCommand, AddCommand, ServeCommand, and GameController.
-Last activity: 2026-04-02 — Phase 22 Plan 01: Pre-flight permissions and actionable errors
+Phase: 22 of 22 (Seamless macOS UX) — Complete
+Plan: 3 of 3 complete
+Status: Phase 22 complete — All plans delivered: PermissionChecker + actionable errors (22-01), GameRemover + cellar remove (22-02), inline dep installation + BottleScanner exe resolution (22-03).
+Last activity: 2026-04-02 — Phase 22 Plan 03: Inline dependency installation and dynamic executable resolution
 
-Progress: [████████████████████] ~59% (15 of ~22 phases complete across all milestones)
+Progress: [████████████████████] ~100% (22 of 22 phases complete)
 
 ## Performance Metrics
 
@@ -60,6 +60,7 @@ Progress: [████████████████████] ~59% (1
 | Phase 20-smarter-wine-log-parsing-and-structured-diagnostics P02 | 10 | 2 tasks | 2 files |
 | Phase 22-seamless-macos-ux P01 | 82 | 2 tasks | 5 files |
 | Phase 22-seamless-macos-ux P02 | 2 | 2 tasks | 4 files |
+| Phase 22-seamless-macos-ux P03 | 4 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,7 @@ Progress: [████████████████████] ~59% (1
 - [Phase 22-seamless-macos-ux]: Only Screen Recording checked — Accessibility deferred (no current code uses Accessibility API per research)
 - [Phase 22-seamless-macos-ux]: GameRemover always does full cleanup regardless of cleanBottle parameter — web delete now always removes all artifacts
 - [Phase 22-seamless-macos-ux]: games.json removal is critical (throws on failure); artifact deletions use try? so missing files are silently skipped
+- [Phase 22-seamless-macos-ux]: AddCommand re-checks DependencyStatus after each install step; winetricks not installed inline (only needed per-game); LaunchCommand falls back to first discovered exe when recipe name not matched
 
 ### Roadmap Evolution
 
