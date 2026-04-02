@@ -256,7 +256,9 @@ Plans:
   3. `cellar remove <game-id>` deletes the bottle, logs, recipes, success records, and registry entry; the web UI delete button does the same with confirmation
   4. LaunchCommand resolves executables from `entry.executablePath` and BottleScanner — the hardcoded GOG path is gone
   5. Every user-facing error message includes a concrete "Try this:" suggestion with a command or action to take
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 22 to break down)
+- [ ] 22-01-PLAN.md — Pre-flight permission check + actionable error messages
+- [ ] 22-02-PLAN.md — Game removal (CLI `cellar remove` + web delete upgrade)
+- [ ] 22-03-PLAN.md — First-run auto-setup + hardcoded GOG path fix
