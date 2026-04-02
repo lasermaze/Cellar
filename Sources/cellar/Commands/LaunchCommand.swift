@@ -45,8 +45,16 @@ struct LaunchCommand: ParsableCommand {
         if let stored = entry.executablePath {
             executablePath = stored
         } else if let recipe = try RecipeEngine.findBundledRecipe(for: game) {
-            let gogDir = bottleURL.path + "/drive_c/GOG Games/Cossacks - European Wars"
-            executablePath = gogDir + "/" + recipe.executable
+            let discovered = BottleScanner.scanForExecutables(bottlePath: bottleURL)
+            if let found = BottleScanner.findExecutable(named: recipe.executable, in: discovered) {
+                executablePath = found.path
+            } else if let first = discovered.first {
+                executablePath = first.path
+            } else {
+                print("Error: No executables found in bottle for '\(game)'.")
+                print("Try this: Run `cellar add /path/to/installer.exe` to reinstall the game.")
+                throw ExitCode.failure
+            }
         } else {
             print("Error: No executable path stored and no recipe available.")
             print("Try this: Run `cellar add /path/to/installer.exe` to re-add the game with a working installer.")
