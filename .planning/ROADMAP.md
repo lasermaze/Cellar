@@ -294,3 +294,13 @@ Key deliverables:
 
 Plans:
 - [x] TBD (run /gsd:plan-phase 24 to break down) (completed 2026-04-02)
+
+### Phase 25: Kimi model support
+
+**Goal:** Add Kimi (Moonshot AI) as a supported AI provider alongside Claude and Deepseek — API integration, model detection, provider selection, and agent loop compatibility.
+**Requirements**: Kimi API integration, AIProvider enum extension, AIService provider detection, AgentLoopProvider Kimi implementation, .env/config support
+**Depends on:** Phase 24
+**Plans:** 2/2 plans complete
+
+Plans:
+- [x] TBD (run /gsd:plan-phase 25 to break down) (completed 2026-04-02)

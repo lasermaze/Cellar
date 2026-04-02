@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-04-02T17:37:11.223Z"
+last_updated: "2026-04-02T19:39:40.263Z"
 progress:
-  total_phases: 24
-  completed_phases: 23
-  total_plans: 57
-  completed_plans: 57
+  total_phases: 25
+  completed_phases: 24
+  total_plans: 59
+  completed_plans: 59
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 ## Current Position
 
-Phase: 22 of 22 (Seamless macOS UX) — Complete
-Plan: 3 of 3 complete
-Status: Phase 22 complete — All plans delivered: PermissionChecker + actionable errors (22-01), GameRemover + cellar remove (22-02), inline dep installation + BottleScanner exe resolution (22-03).
-Last activity: 2026-04-02 — Phase 22 Plan 03: Inline dependency installation and dynamic executable resolution
+Phase: 25 of 25 (Kimi Model Support) — Complete
+Plan: 2 of 2 complete
+Status: Phase 25 complete — All plans delivered: Kimi provider enum/agent/routing (25-01), Kimi web settings UI with API key management (25-02).
+Last activity: 2026-04-02 — Phase 25 Plan 02: Kimi API key and provider selection in web settings UI
 
-Progress: [████████████████████] ~100% (22 of 22 phases complete)
+Progress: [████████████████████] ~100% (25 of 25 phases complete)
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Progress: [████████████████████] ~100% (
 | Phase 23-homebrew-tap-distribution-with-launcher-app P01 | 1 | 2 tasks | 2 files |
 | Phase 24-architecture-code-quality-cleanup P03 | 15 | 2 tasks | 4 files |
 | Phase 24-architecture-code-quality-cleanup P02 | 19 | 2 tasks | 6 files |
+| Phase 25-kimi-model-support P02 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -118,6 +119,7 @@ Progress: [████████████████████] ~100% (
 - [Phase 24-architecture-code-quality-cleanup]: 404 and auth-unavailable paths not logged in collective memory services — expected graceful degradation, not errors
 - [Phase 24-architecture-code-quality-cleanup]: AgentTools.swift keeps only coordinator code (state, init, captureHandoff, toolDefinitions, execute(), jsonResult()) — all tool implementations moved to Core/Tools/ extension files
 - [Phase 24-architecture-code-quality-cleanup]: searchWeb/fetchPage migrated from DispatchSemaphore+ResultBox to URLSession async/await during AgentTools decomposition
+- [Phase 25-kimi-model-support]: Followed deepseekKey pattern exactly for Kimi settings — same masking, .env write/delete logic, struct field placement
 
 ### Roadmap Evolution
 
@@ -143,4 +145,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-04-02
-Stopped at: Completed 23-02-PLAN.md — InstallAppCommand subcommand: discovers Cellar.app in Homebrew libexec via symlink resolution, copies to ~/Applications with overwrite support.
+Stopped at: Completed 25-01-PLAN.md — Kimi (Moonshot AI) added as AI provider: .kimi enum case, KimiAgentProvider at api.moonshot.cn, KIMI_API_KEY auto-detect, all 4 AIService operation routes wired.
