@@ -68,6 +68,7 @@ struct CollectiveMemoryWriteService {
         do {
             try pushEntry(entry: entry, token: token)
         } catch {
+            fputs("[CollectiveMemoryWriteService] Push failed for '\(record.gameId)': \(error)\n", stderr)
             logPushEvent("ERROR", gameId: record.gameId, "Push failed: \(error)")
         }
     }
@@ -161,7 +162,9 @@ struct CollectiveMemoryWriteService {
         var mergedEntries: [CollectiveMemoryEntry]
         var commitMessage: String
 
+        logPushEvent("INFO", gameId: entry.gameId, "GET \(url.absoluteString)")
         if let (data, statusCode) = performRequest(request: getRequest) {
+            logPushEvent("INFO", gameId: entry.gameId, "GET status: \(statusCode)")
             switch statusCode {
             case 200:
                 // Decode existing file
@@ -218,6 +221,7 @@ struct CollectiveMemoryWriteService {
                 return .error
             }
         } else {
+            fputs("[CollectiveMemoryWriteService] Network error during push for '\(entry.gameId)'\n", stderr)
             logPushEvent("ERROR", gameId: entry.gameId, "Network error on GET")
             return .error
         }
@@ -226,6 +230,7 @@ struct CollectiveMemoryWriteService {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let fileData = try? encoder.encode(mergedEntries) else {
+            fputs("[CollectiveMemoryWriteService] Failed to encode entry for '\(entry.gameId)'\n", stderr)
             logPushEvent("ERROR", gameId: entry.gameId, "Failed to encode entries array")
             return .error
         }
@@ -254,18 +259,22 @@ struct CollectiveMemoryWriteService {
         putRequest.httpBody = putBodyData
         putRequest.timeoutInterval = 5
 
+        logPushEvent("INFO", gameId: entry.gameId, "PUT \(url.absoluteString)")
         if let (_, statusCode) = performRequest(request: putRequest) {
             switch statusCode {
             case 200, 201:
                 logPushEvent("INFO", gameId: entry.gameId, "Push succeeded: \(commitMessage)")
                 return .ok
             case 409:
+                fputs("[CollectiveMemoryWriteService] Conflict on push for '\(entry.gameId)' — retrying\n", stderr)
                 return .conflict
             default:
+                fputs("[CollectiveMemoryWriteService] HTTP \(statusCode) on push for '\(entry.gameId)'\n", stderr)
                 logPushEvent("WARN", gameId: entry.gameId, "PUT returned \(statusCode): \(commitMessage)")
                 return .error
             }
         } else {
+            fputs("[CollectiveMemoryWriteService] Network error during push for '\(entry.gameId)'\n", stderr)
             logPushEvent("ERROR", gameId: entry.gameId, "Network error on PUT")
             return .error
         }

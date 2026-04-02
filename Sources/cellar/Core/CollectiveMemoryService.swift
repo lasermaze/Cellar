@@ -28,6 +28,7 @@ struct CollectiveMemoryService {
 
         // Step 2: Detect local Wine version
         guard let localWineVersion = detectWineVersion(wineURL: wineURL) else {
+            fputs("[CollectiveMemoryService] Could not detect Wine version for environment fingerprint\n", stderr)
             return nil
         }
 
@@ -49,11 +50,15 @@ struct CollectiveMemoryService {
 
         // Step 5: Synchronous fetch
         guard let (data, statusCode) = performFetch(request: request) else {
+            fputs("[CollectiveMemoryService] Network error fetching collective memory for '\(gameName)'\n", stderr)
             return nil
         }
 
-        // 404 = no entry yet, normal flow; any other 4xx/5xx = skip silently
+        // 404 = no entry yet, normal flow; any other 4xx/5xx = log and skip
         guard statusCode == 200 else {
+            if statusCode != 404 {
+                fputs("[CollectiveMemoryService] HTTP \(statusCode) fetching collective memory for '\(gameName)'\n", stderr)
+            }
             return nil
         }
 
@@ -62,6 +67,7 @@ struct CollectiveMemoryService {
         do {
             entries = try JSONDecoder().decode([CollectiveMemoryEntry].self, from: data)
         } catch {
+            fputs("[CollectiveMemoryService] Failed to decode collective memory JSON for '\(gameName)'\n", stderr)
             return nil
         }
 

@@ -144,6 +144,7 @@ final class GitHubAuthService: @unchecked Sendable {
             &cfError
         ) else {
             let detail = cfError?.takeRetainedValue().localizedDescription ?? "unknown error"
+            fputs("[GitHubAuthService] Failed to sign JWT: \(detail)\n", stderr)
             throw GitHubAuthError.signFailed(detail)
         }
 
@@ -180,7 +181,13 @@ final class GitHubAuthService: @unchecked Sendable {
         let data = try performHTTPRequest(request: request)
 
         let decoder = JSONDecoder()
-        let tokenResponse = try decoder.decode(InstallationTokenResponse.self, from: data)
+        let tokenResponse: InstallationTokenResponse
+        do {
+            tokenResponse = try decoder.decode(InstallationTokenResponse.self, from: data)
+        } catch {
+            fputs("[GitHubAuthService] Failed to decode installation token response\n", stderr)
+            throw error
+        }
 
         let dateFormatter = ISO8601DateFormatter()
         guard let expiryDate = dateFormatter.date(from: tokenResponse.expiresAt) else {
@@ -203,10 +210,12 @@ final class GitHubAuthService: @unchecked Sendable {
 
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
+                fputs("[GitHubAuthService] Network error: \(error.localizedDescription)\n", stderr)
                 box.value = .failure(error)
             } else if let data = data {
                 let httpResponse = response as? HTTPURLResponse
                 if let code = httpResponse?.statusCode, code >= 400 {
+                    fputs("[GitHubAuthService] HTTP \(code) from GitHub API\n", stderr)
                     let body = String(data: data, encoding: .utf8) ?? "<unreadable>"
                     box.value = .failure(GitHubAuthError.httpError(statusCode: code, body: body))
                 } else {
