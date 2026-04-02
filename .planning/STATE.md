@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-04-02T05:48:50.396Z"
+last_updated: "2026-04-02T06:31:58.262Z"
 progress:
-  total_phases: 22
-  completed_phases: 21
-  total_plans: 52
-  completed_plans: 52
+  total_phases: 23
+  completed_phases: 22
+  total_plans: 54
+  completed_plans: 54
 ---
 
 # Project State
@@ -61,6 +61,8 @@ Progress: [████████████████████] ~100% (
 | Phase 22-seamless-macos-ux P01 | 82 | 2 tasks | 5 files |
 | Phase 22-seamless-macos-ux P02 | 2 | 2 tasks | 4 files |
 | Phase 22-seamless-macos-ux P03 | 4 | 2 tasks | 2 files |
+| Phase 23-homebrew-tap-distribution-with-launcher-app P02 | 1 | 2 tasks | 2 files |
+| Phase 23-homebrew-tap-distribution-with-launcher-app P01 | 1 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -106,6 +108,10 @@ Progress: [████████████████████] ~100% (
 - [Phase 22-seamless-macos-ux]: GameRemover always does full cleanup regardless of cleanBottle parameter — web delete now always removes all artifacts
 - [Phase 22-seamless-macos-ux]: games.json removal is critical (throws on failure); artifact deletions use try? so missing files are silently skipped
 - [Phase 22-seamless-macos-ux]: AddCommand re-checks DependencyStatus after each install step; winetricks not installed inline (only needed per-game); LaunchCommand falls back to first discovered exe when recipe name not matched
+- [Phase 23-homebrew-tap-distribution-with-launcher-app]: Binary resolved via (path as NSString).resolvingSymlinksInPath to follow Homebrew symlinks; app path derived as ../libexec/Cellar.app relative to bin dir — no brew --prefix subprocess needed
+- [Phase 23-homebrew-tap-distribution-with-launcher-app]: Use cellar-community/homebrew-cellar as placeholder tap org — user updates before first release
+- [Phase 23-homebrew-tap-distribution-with-launcher-app]: Formula .app pattern: create in libexec, copy to ~/Applications via cellar install-app subcommand
+- [Phase 23-homebrew-tap-distribution-with-launcher-app]: CellarLauncher polls 20x0.5s for port 8080 (not fixed sleep) and uses opt_bin DSL path (not hardcoded prefix)
 
 ### Roadmap Evolution
 
@@ -128,5 +134,5 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-01
-Stopped at: Completed 22-02-PLAN.md — GameRemover service and cellar remove command with full artifact cleanup, web delete upgraded to use GameRemover.
+Last session: 2026-04-02
+Stopped at: Completed 23-02-PLAN.md — InstallAppCommand subcommand: discovers Cellar.app in Homebrew libexec via symlink resolution, copies to ~/Applications with overwrite support.
