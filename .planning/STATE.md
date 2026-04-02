@@ -121,6 +121,7 @@ Progress: [████████████████████] ~100% (
 - Phase 21 added (2026-03-31): Pre-flight dependency check from PE imports
 - Phase 23 added (2026-04-02): Homebrew tap distribution with launcher .app — zero-friction install via brew, CI-built binary, post-install .app wrapper
 - Phase 22 added (2026-04-01): Seamless macOS UX — pre-flight permissions, game removal, actionable errors, first-run setup
+- Phase 24 added (2026-04-02): Architecture & Code Quality Cleanup — async/await migration, AgentTools decomposition, KnownDLLRegistry expansion, error reporting, dependency audit
 
 ### Pending Todos
 
