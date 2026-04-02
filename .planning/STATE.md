@@ -125,5 +125,5 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-02
-Stopped at: Completed 22-01-PLAN.md — PermissionChecker with Screen Recording advisory check, actionable "Try this:" error messages in LaunchCommand (4 sites), AddCommand (5 sites), ServeCommand (1 site), GameController Wine-not-installed abort.
+Last session: 2026-04-01
+Stopped at: Completed 22-02-PLAN.md — GameRemover service and cellar remove command with full artifact cleanup, web delete upgraded to use GameRemover.
