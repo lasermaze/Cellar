@@ -128,6 +128,7 @@ Progress: [████████████████████] ~100% (
 - Phase 23 added (2026-04-02): Homebrew tap distribution with launcher .app — zero-friction install via brew, CI-built binary, post-install .app wrapper
 - Phase 22 added (2026-04-01): Seamless macOS UX — pre-flight permissions, game removal, actionable errors, first-run setup
 - Phase 24 added (2026-04-02): Architecture & Code Quality Cleanup — async/await migration, AgentTools decomposition, KnownDLLRegistry expansion, error reporting, dependency audit
+- Phase 25 added (2026-04-02): Kimi model support — add Kimi (Moonshot AI) as AI provider alongside Claude and Deepseek
 
 ### Pending Todos
 
