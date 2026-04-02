@@ -17,12 +17,17 @@ struct AIService {
         case "claude", "anthropic":
             if let key = env["ANTHROPIC_API_KEY"], !key.isEmpty { return .anthropic(apiKey: key) }
             return .unavailable  // Claude requested but no key
+        case "kimi", "moonshot":
+            if let key = env["KIMI_API_KEY"], !key.isEmpty { return .kimi(apiKey: key) }
+            return .unavailable  // Kimi requested but no key
         default:
             // Auto-detect: check which keys are present
             let hasAnthropic = env["ANTHROPIC_API_KEY"].map { !$0.isEmpty } ?? false
             let hasDeepseek = env["DEEPSEEK_API_KEY"].map { !$0.isEmpty } ?? false
+            let hasKimi = env["KIMI_API_KEY"].map { !$0.isEmpty } ?? false
             if hasAnthropic { return .anthropic(apiKey: env["ANTHROPIC_API_KEY"]!) }
             if hasDeepseek { return .deepseek(apiKey: env["DEEPSEEK_API_KEY"]!) }
+            if hasKimi { return .kimi(apiKey: env["KIMI_API_KEY"]!) }
             // Legacy: check OpenAI key
             if let key = env["OPENAI_API_KEY"], !key.isEmpty { return .openai(apiKey: key) }
             return .unavailable
@@ -100,6 +105,8 @@ struct AIService {
             let requested = CellarConfig.load().aiProvider ?? env["AI_PROVIDER"]
             if requested?.lowercased() == "deepseek" {
                 return .failed("Deepseek API key not configured. Set DEEPSEEK_API_KEY in ~/.cellar/.env or environment.")
+            } else if requested?.lowercased() == "kimi" || requested?.lowercased() == "moonshot" {
+                return .failed("Kimi API key not configured. Set KIMI_API_KEY in ~/.cellar/.env or environment.")
             } else if requested != nil {
                 return .failed("Anthropic API key not configured. Set ANTHROPIC_API_KEY in ~/.cellar/.env or environment.")
             }
@@ -182,6 +189,8 @@ struct AIService {
             let requested = CellarConfig.load().aiProvider ?? env["AI_PROVIDER"]
             if requested?.lowercased() == "deepseek" {
                 return .failed("Deepseek API key not configured. Set DEEPSEEK_API_KEY in ~/.cellar/.env or environment.")
+            } else if requested?.lowercased() == "kimi" || requested?.lowercased() == "moonshot" {
+                return .failed("Kimi API key not configured. Set KIMI_API_KEY in ~/.cellar/.env or environment.")
             } else if requested != nil {
                 return .failed("Anthropic API key not configured. Set ANTHROPIC_API_KEY in ~/.cellar/.env or environment.")
             }
@@ -308,6 +317,8 @@ struct AIService {
             let requested = CellarConfig.load().aiProvider ?? env["AI_PROVIDER"]
             if requested?.lowercased() == "deepseek" {
                 return .failed("Deepseek API key not configured. Set DEEPSEEK_API_KEY in ~/.cellar/.env or environment.")
+            } else if requested?.lowercased() == "kimi" || requested?.lowercased() == "moonshot" {
+                return .failed("Kimi API key not configured. Set KIMI_API_KEY in ~/.cellar/.env or environment.")
             } else if requested != nil {
                 return .failed("Anthropic API key not configured. Set ANTHROPIC_API_KEY in ~/.cellar/.env or environment.")
             }
@@ -529,6 +540,8 @@ struct AIService {
             let requested = CellarConfig.load().aiProvider ?? env["AI_PROVIDER"]
             if requested?.lowercased() == "deepseek" {
                 return .failed("Deepseek API key not configured. Set DEEPSEEK_API_KEY in ~/.cellar/.env or environment.")
+            } else if requested?.lowercased() == "kimi" || requested?.lowercased() == "moonshot" {
+                return .failed("Kimi API key not configured. Set KIMI_API_KEY in ~/.cellar/.env or environment.")
             } else if requested != nil {
                 return .failed("Anthropic API key not configured. Set ANTHROPIC_API_KEY in ~/.cellar/.env or environment.")
             }
@@ -824,6 +837,12 @@ struct AIService {
                 tools: AgentTools.toolDefinitions,
                 systemPrompt: systemPrompt
             )
+        case .kimi(let apiKey):
+            agentProvider = KimiAgentProvider(
+                apiKey: apiKey,
+                tools: AgentTools.toolDefinitions,
+                systemPrompt: systemPrompt
+            )
         default:
             return .unavailable
         }
@@ -1018,9 +1037,39 @@ struct AIService {
             return try await callOpenAI(apiKey: apiKey, systemPrompt: systemPrompt, userMessage: userMessage)
         case .deepseek(let apiKey):
             return try await callDeepseek(apiKey: apiKey, systemPrompt: systemPrompt, userMessage: userMessage)
+        case .kimi(let apiKey):
+            return try await callKimi(apiKey: apiKey, systemPrompt: systemPrompt, userMessage: userMessage)
         case .unavailable:
             throw AIServiceError.unavailable
         }
+    }
+
+    private static func callKimi(apiKey: String, systemPrompt: String, userMessage: String) async throws -> String {
+        let requestBody = OpenAIRequest(
+            model: "moonshot-v1-128k",
+            messages: [
+                OpenAIRequest.Message(role: "system", content: systemPrompt),
+                OpenAIRequest.Message(role: "user", content: userMessage)
+            ],
+            responseFormat: OpenAIRequest.ResponseFormat(type: "json_object")
+        )
+
+        let encoder = JSONEncoder()
+        let bodyData = try encoder.encode(requestBody)
+
+        var request = URLRequest(url: URL(string: "https://api.moonshot.cn/v1/chat/completions")!)
+        request.httpMethod = "POST"
+        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.httpBody = bodyData
+
+        let responseData = try await callAPI(request: request)
+        let response = try JSONDecoder().decode(OpenAIResponse.self, from: responseData)
+
+        guard let content = response.firstContent else {
+            throw AIServiceError.decodingError("Kimi response had no content")
+        }
+        return content
     }
 
     private static func callDeepseek(apiKey: String, systemPrompt: String, userMessage: String) async throws -> String {

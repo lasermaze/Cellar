@@ -6,6 +6,7 @@ enum AIProvider {
     case anthropic(apiKey: String)
     case openai(apiKey: String)
     case deepseek(apiKey: String)
+    case kimi(apiKey: String)
     case unavailable
 }
 
