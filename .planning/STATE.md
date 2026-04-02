@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-04-01T01:40:45.945Z"
+last_updated: "2026-04-02T05:41:43.077Z"
 progress:
-  total_phases: 21
+  total_phases: 22
   completed_phases: 20
-  total_plans: 49
-  completed_plans: 49
+  total_plans: 52
+  completed_plans: 51
 ---
 
 # Project State
@@ -18,16 +18,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-03-30)
 
 **Core value:** Any user can go from "I have these old game files" to "the game launches and works" without manually configuring Wine.
-**Current focus:** Phase 20 — Smarter Wine log parsing and structured diagnostics
+**Current focus:** Phase 22 — Seamless macOS UX (pre-flight permissions, game removal, actionable errors, first-run setup)
 
 ## Current Position
 
-Phase: 20 of 21 (Smarter Wine log parsing and structured diagnostics) — Complete
-Plan: 2 of 2 complete
-Status: Phase 20 complete — Structured diagnostics wired into all agent tools (launchGame, traceLaunch, readLog), cross-launch diff tracking with action recording, DiagnosticRecord disk persistence, previous-session injection in AIService, updated system prompt.
-Last activity: 2026-03-31 — Phase 20 Plan 02: Wire diagnostics into agent tools
+Phase: 22 of 22 (Seamless macOS UX) — In Progress
+Plan: 1 of 3 complete
+Status: Phase 22 Plan 01 complete — PermissionChecker with Screen Recording advisory, actionable "Try this:" errors across LaunchCommand, AddCommand, ServeCommand, and GameController.
+Last activity: 2026-04-02 — Phase 22 Plan 01: Pre-flight permissions and actionable errors
 
-Progress: [████████████████████] ~57% (14 of ~22 phases complete across all milestones)
+Progress: [████████████████████] ~59% (15 of ~22 phases complete across all milestones)
 
 ## Performance Metrics
 
@@ -58,6 +58,8 @@ Progress: [████████████████████] ~57% (1
 | Phase 19-import-lutris-and-protondb-compatibility-databases P02 | 8 | 2 tasks | 2 files |
 | Phase 20-smarter-wine-log-parsing-and-structured-diagnostics P01 | 15 | 2 tasks | 6 files |
 | Phase 20-smarter-wine-log-parsing-and-structured-diagnostics P02 | 10 | 2 tasks | 2 files |
+| Phase 22-seamless-macos-ux P01 | 82 | 2 tasks | 5 files |
+| Phase 22-seamless-macos-ux P02 | 2 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -98,6 +100,10 @@ Progress: [████████████████████] ~57% (1
 - [Phase 20-01]: filteredLog() derives subsystem membership from WineDiagnostics fields, not re-parsing stderr
 - [Phase 20-02]: Action tracking appended in execute() dispatch after tool call returns — single instrumentation point covers all tools without modifying each handler
 - [Phase 20-02]: DiagnosticRecord injected into initial message only when previousSession is nil — avoids doubling context when SessionHandoff already provides last-session summary
+- [Phase 22-seamless-macos-ux]: PermissionChecker uses CGPreflightScreenCaptureAccess() — advisory only, never blocks launch
+- [Phase 22-seamless-macos-ux]: Only Screen Recording checked — Accessibility deferred (no current code uses Accessibility API per research)
+- [Phase 22-seamless-macos-ux]: GameRemover always does full cleanup regardless of cleanBottle parameter — web delete now always removes all artifacts
+- [Phase 22-seamless-macos-ux]: games.json removal is critical (throws on failure); artifact deletions use try? so missing files are silently skipped
 
 ### Roadmap Evolution
 
@@ -119,5 +125,5 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-03-31
-Stopped at: Completed 20-01-PLAN.md — WineDiagnostics data model, DiagnosticRecord persistence, expanded WineErrorParser with 8+ subsystems, causal chains, success signals, noise filtering.
+Last session: 2026-04-02
+Stopped at: Completed 22-01-PLAN.md — PermissionChecker with Screen Recording advisory check, actionable "Try this:" error messages in LaunchCommand (4 sites), AddCommand (5 sites), ServeCommand (1 site), GameController Wine-not-installed abort.
