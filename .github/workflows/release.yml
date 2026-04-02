@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build universal binary
+        run: |
+          swift build -c release --arch x86_64 --arch arm64
+          VERSION="${GITHUB_REF_NAME#v}"
+          ARCHIVE="cellar-${VERSION}-macos.tar.gz"
+          tar -czf "$ARCHIVE" -C .build/apple/Products/Release cellar
+          echo "ARCHIVE=$ARCHIVE" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Upload to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ARCHIVE }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Homebrew formula
+        uses: NSHipster/update-homebrew-formula-action@main
+        with:
+          repository: ${{ github.repository }}
+          tap: cellar-community/homebrew-cellar
+          formula: Formula/cellar.rb
+        env:
+          GH_PERSONAL_ACCESS_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
