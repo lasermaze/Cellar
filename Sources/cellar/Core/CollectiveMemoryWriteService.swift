@@ -16,9 +16,9 @@ struct CollectiveMemoryWriteService {
     ///   - record: The locally-saved SuccessRecord to contribute.
     ///   - gameName: The display name of the game.
     ///   - wineURL: URL to the wine binary (used to detect Wine version and flavor).
-    static func push(record: SuccessRecord, gameName: String, wineURL: URL) {
+    static func push(record: SuccessRecord, gameName: String, wineURL: URL) async {
         // Step 1: Auth check
-        let authResult = GitHubAuthService.shared.getToken()
+        let authResult = await GitHubAuthService.shared.getToken()
         guard case .token(let token) = authResult else {
             // Auth not configured — silent skip
             return
@@ -66,7 +66,7 @@ struct CollectiveMemoryWriteService {
 
         // Step 7: Push to GitHub
         do {
-            try pushEntry(entry: entry, token: token)
+            try await pushEntry(entry: entry, token: token)
         } catch {
             fputs("[CollectiveMemoryWriteService] Push failed for '\(record.gameId)': \(error)\n", stderr)
             logPushEvent("ERROR", gameId: record.gameId, "Push failed: \(error)")
@@ -77,13 +77,13 @@ struct CollectiveMemoryWriteService {
     /// The write service handles deduplication: same environmentHash increments
     /// confirmations, different hash appends a new entry, new game creates the file.
     /// Returns (synced, failed) counts.
-    static func syncAll(wineURL: URL) -> (synced: Int, failed: Int) {
+    static func syncAll(wineURL: URL) async -> (synced: Int, failed: Int) {
         let config = CellarConfig.load()
         guard config.contributeMemory == true else {
             return (0, 0)
         }
 
-        let authResult = GitHubAuthService.shared.getToken()
+        let authResult = await GitHubAuthService.shared.getToken()
         guard case .token = authResult else {
             return (0, 0)
         }
@@ -99,7 +99,7 @@ struct CollectiveMemoryWriteService {
             let lineCountBefore = (try? String(contentsOf: logFile, encoding: .utf8))?
                 .components(separatedBy: "\n").count ?? 0
 
-            push(record: record, gameName: record.gameName, wineURL: wineURL)
+            await push(record: record, gameName: record.gameName, wineURL: wineURL)
 
             // Check if push logged a success line
             let logAfter = (try? String(contentsOf: logFile, encoding: .utf8)) ?? ""
@@ -119,7 +119,7 @@ struct CollectiveMemoryWriteService {
 
     /// GET + merge + PUT flow against GitHub Contents API.
     /// Throws on unrecoverable errors; caller wraps in do/catch.
-    private static func pushEntry(entry: CollectiveMemoryEntry, token: String) throws {
+    private static func pushEntry(entry: CollectiveMemoryEntry, token: String) async throws {
         let slug = slugify(entry.gameName)
         let urlString = "https://api.github.com/repos/\(GitHubAuthService.shared.memoryRepo)/contents/entries/\(slug).json"
         guard let url = URL(string: urlString) else {
@@ -128,13 +128,13 @@ struct CollectiveMemoryWriteService {
         }
 
         // First attempt
-        let firstAttempt = performMergeAndPut(entry: entry, token: token, url: url)
+        let firstAttempt = await performMergeAndPut(entry: entry, token: token, url: url)
         if firstAttempt == .ok { return }
 
         // 409 conflict: one retry
         if firstAttempt == .conflict {
             logPushEvent("INFO", gameId: entry.gameId, "409 conflict on first PUT, retrying with re-fetch")
-            let retryResult = performMergeAndPut(entry: entry, token: token, url: url)
+            let retryResult = await performMergeAndPut(entry: entry, token: token, url: url)
             if retryResult == .conflict {
                 logPushEvent("WARN", gameId: entry.gameId, "409 conflict on retry, giving up")
             }
@@ -150,7 +150,7 @@ struct CollectiveMemoryWriteService {
         entry: CollectiveMemoryEntry,
         token: String,
         url: URL
-    ) -> MergeResult {
+    ) async -> MergeResult {
         // GET with standard JSON Accept (returns sha + base64 content)
         var getRequest = URLRequest(url: url)
         getRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -163,7 +163,7 @@ struct CollectiveMemoryWriteService {
         var commitMessage: String
 
         logPushEvent("INFO", gameId: entry.gameId, "GET \(url.absoluteString)")
-        if let (data, statusCode) = performRequest(request: getRequest) {
+        if let (data, statusCode) = await performRequest(request: getRequest) {
             logPushEvent("INFO", gameId: entry.gameId, "GET status: \(statusCode)")
             switch statusCode {
             case 200:
@@ -260,7 +260,7 @@ struct CollectiveMemoryWriteService {
         putRequest.timeoutInterval = 5
 
         logPushEvent("INFO", gameId: entry.gameId, "PUT \(url.absoluteString)")
-        if let (_, statusCode) = performRequest(request: putRequest) {
+        if let (_, statusCode) = await performRequest(request: putRequest) {
             switch statusCode {
             case 200, 201:
                 logPushEvent("INFO", gameId: entry.gameId, "Push succeeded: \(commitMessage)")
@@ -282,26 +282,14 @@ struct CollectiveMemoryWriteService {
 
     // MARK: - Private: HTTP
 
-    /// Perform a synchronous HTTP request using DispatchSemaphore.
+    /// Perform an async HTTP request.
     /// Returns (data, statusCode) on any HTTP response, nil on network error.
-    private static func performRequest(request: URLRequest) -> (data: Data, statusCode: Int)? {
-        final class ResultBox: @unchecked Sendable {
-            var value: (Data, Int)?
+    private static func performRequest(request: URLRequest) async -> (data: Data, statusCode: Int)? {
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse else {
+            return nil
         }
-        let box = ResultBox()
-        let semaphore = DispatchSemaphore(value: 0)
-
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if error == nil,
-               let data = data,
-               let httpResponse = response as? HTTPURLResponse {
-                box.value = (data, httpResponse.statusCode)
-            }
-            semaphore.signal()
-        }.resume()
-
-        semaphore.wait()
-        return box.value
+        return (data, http.statusCode)
     }
 
     // MARK: - Private: Wine Detection

@@ -58,7 +58,7 @@ struct MemoryStatsService {
 
     /// Fetch aggregate memory stats (game count, total confirmations, recent contributions).
     /// Returns a MemoryStats with isAvailable: false when auth is missing or network fails.
-    static func fetchStats() -> MemoryStats {
+    static func fetchStats() async -> MemoryStats {
         let emptyUnavailable = MemoryStats(
             gameCount: 0,
             totalConfirmations: 0,
@@ -67,7 +67,7 @@ struct MemoryStatsService {
         )
 
         // Step 1: Auth check
-        let authResult = GitHubAuthService.shared.getToken()
+        let authResult = await GitHubAuthService.shared.getToken()
         guard case .token(let token) = authResult else {
             return emptyUnavailable
         }
@@ -84,7 +84,7 @@ struct MemoryStatsService {
         listRequest.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         listRequest.timeoutInterval = 5
 
-        guard let (listData, listStatus) = performFetch(request: listRequest) else {
+        guard let (listData, listStatus) = await performFetch(request: listRequest) else {
             return emptyUnavailable
         }
 
@@ -127,7 +127,7 @@ struct MemoryStatsService {
             fileRequest.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
             fileRequest.timeoutInterval = 5
 
-            guard let (fileData, fileStatus) = performFetch(request: fileRequest),
+            guard let (fileData, fileStatus) = await performFetch(request: fileRequest),
                   fileStatus == 200 else { continue }
 
             guard let entries = try? JSONDecoder().decode([CollectiveMemoryEntry].self, from: fileData),
@@ -165,9 +165,9 @@ struct MemoryStatsService {
 
     /// Fetch per-game memory entries for the given slug.
     /// Returns nil when auth is missing, the game is not found, or any network/parse error occurs.
-    static func fetchGameDetail(slug: String) -> GameDetail? {
+    static func fetchGameDetail(slug: String) async -> GameDetail? {
         // Step 1: Auth check
-        let authResult = GitHubAuthService.shared.getToken()
+        let authResult = await GitHubAuthService.shared.getToken()
         guard case .token(let token) = authResult else {
             return nil
         }
@@ -184,7 +184,7 @@ struct MemoryStatsService {
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         request.timeoutInterval = 5
 
-        guard let (data, statusCode) = performFetch(request: request),
+        guard let (data, statusCode) = await performFetch(request: request),
               statusCode == 200 else {
             return nil
         }
@@ -220,25 +220,13 @@ struct MemoryStatsService {
 
     // MARK: - Private Helpers
 
-    /// Perform a synchronous HTTP fetch using DispatchSemaphore.
+    /// Perform an async HTTP fetch.
     /// Returns (data, statusCode) on any HTTP response, nil on network error.
-    private static func performFetch(request: URLRequest) -> (data: Data, statusCode: Int)? {
-        final class ResultBox: @unchecked Sendable {
-            var value: (Data, Int)?
+    private static func performFetch(request: URLRequest) async -> (data: Data, statusCode: Int)? {
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse else {
+            return nil
         }
-        let box = ResultBox()
-        let semaphore = DispatchSemaphore(value: 0)
-
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if error == nil,
-               let data = data,
-               let httpResponse = response as? HTTPURLResponse {
-                box.value = (data, httpResponse.statusCode)
-            }
-            semaphore.signal()
-        }.resume()
-
-        semaphore.wait()
-        return box.value
+        return (data, http.statusCode)
     }
 }

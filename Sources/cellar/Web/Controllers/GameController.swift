@@ -141,13 +141,8 @@ enum GameController {
                 try? CellarConfig.save(config)
             }
 
-            // Push on background queue (blocking network call)
-            await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-                DispatchQueue.global(qos: .userInitiated).async {
-                    CollectiveMemoryWriteService.push(record: record, gameName: game.name, wineURL: wineURL)
-                    continuation.resume()
-                }
-            }
+            // Push to collective memory (async network call)
+            await CollectiveMemoryWriteService.push(record: record, gameName: game.name, wineURL: wineURL)
 
             var headers = HTTPHeaders()
             headers.add(name: .contentType, value: "text/html")

@@ -11,7 +11,7 @@ struct DLLDownloader {
     /// Download and cache a known DLL. Returns path to the cached DLL file.
     /// Uses GitHub REST API: GET /repos/{owner}/{repo}/releases/latest
     /// Checks cache first — only downloads if not already cached.
-    static func downloadAndCache(_ dll: KnownDLL) throws -> URL {
+    static func downloadAndCache(_ dll: KnownDLL) async throws -> URL {
         let cachedFile = CellarPaths.cachedDLLFile(dllName: dll.name, fileName: dll.dllFileName)
 
         // Check cache first
@@ -29,8 +29,8 @@ struct DLLDownloader {
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
 
-        // Synchronous fetch using DispatchSemaphore (same pattern as AIService.callAPI)
-        let responseData = try syncRequest(request)
+        // Async fetch using URLSession.data(for:)
+        let responseData = try await syncRequest(request)
 
         // Parse JSON to find asset download URL
         guard let json = try? JSONSerialization.jsonObject(with: responseData) as? [String: Any],
@@ -48,7 +48,7 @@ struct DLLDownloader {
 
         // Download the zip file
         let zipRequest = URLRequest(url: downloadURL)
-        let zipData = try syncRequest(zipRequest)
+        let zipData = try await syncRequest(zipRequest)
 
         // Write zip to temp file
         let tempZip = NSTemporaryDirectory() + UUID().uuidString + ".zip"
@@ -106,29 +106,15 @@ struct DLLDownloader {
         return destination
     }
 
-    /// Synchronous HTTP request using DispatchSemaphore (mirrors AIService pattern).
-    private static func syncRequest(_ request: URLRequest) throws -> Data {
-        final class ResultBox: @unchecked Sendable {
-            var value: Result<Data, Error> = .failure(DLLError.downloadFailed("No response"))
+    /// Async HTTP request using URLSession.data(for:).
+    private static func syncRequest(_ request: URLRequest) async throws -> Data {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw DLLError.downloadFailed("No HTTP response")
         }
-        let box = ResultBox()
-        let semaphore = DispatchSemaphore(value: 0)
-
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                box.value = .failure(error)
-            } else if let data = data {
-                let httpResponse = response as? HTTPURLResponse
-                if let code = httpResponse?.statusCode, code >= 400 {
-                    box.value = .failure(DLLError.downloadFailed("HTTP \(code)"))
-                } else {
-                    box.value = .success(data)
-                }
-            }
-            semaphore.signal()
-        }.resume()
-
-        semaphore.wait()
-        return try box.value.get()
+        if http.statusCode >= 400 {
+            throw DLLError.downloadFailed("HTTP \(http.statusCode)")
+        }
+        return data
     }
 }

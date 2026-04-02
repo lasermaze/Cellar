@@ -1,13 +1,13 @@
 import ArgumentParser
 import Foundation
 
-struct SyncCommand: ParsableCommand {
+struct SyncCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "sync",
         abstract: "Sync local success records to collective memory"
     )
 
-    mutating func run() {
+    mutating func run() async {
         let config = CellarConfig.load()
 
         guard config.contributeMemory == true else {
@@ -30,7 +30,7 @@ struct SyncCommand: ParsableCommand {
 
         print("Syncing \(records.count) success record(s) to collective memory...")
 
-        let result = CollectiveMemoryWriteService.syncAll(wineURL: wineURL)
+        let result = await CollectiveMemoryWriteService.syncAll(wineURL: wineURL)
 
         if result.synced > 0 {
             print("Synced: \(result.synced)")

@@ -29,7 +29,7 @@ private struct ResearchResult: Codable {
 ///
 /// Reference type (class) to allow mutable state accumulation across tool calls
 /// within a single agent loop run — env vars, launch count, installed deps.
-final class AgentTools {
+final class AgentTools: @unchecked Sendable {
 
     // MARK: - Injected Context
 
@@ -602,7 +602,7 @@ final class AgentTools {
     // MARK: - Dispatch
 
     /// Dispatch a tool call by name. Returns a JSON string result. Never throws.
-    func execute(toolName: String, input: JSONValue) -> String {
+    func execute(toolName: String, input: JSONValue) async -> String {
         // Check web control flags before executing any tool
         if shouldAbort {
             return "{\"error\": \"Agent stopped by user.\", \"STOP\": true}"
@@ -629,7 +629,7 @@ final class AgentTools {
         case "set_environment":   result = setEnvironment(input: input)
         case "set_registry":      result = setRegistry(input: input)
         case "install_winetricks": result = installWinetricks(input: input)
-        case "place_dll":         result = placeDLL(input: input)
+        case "place_dll":         result = await placeDLL(input: input)
         case "launch_game":       result = launchGame(input: input)
         case "save_recipe":       result = saveRecipe(input: input)
         case "write_game_file":   result = writeGameFile(input: input)
@@ -642,7 +642,7 @@ final class AgentTools {
         case "search_web":        result = searchWeb(input: input)
         case "fetch_page":        result = fetchPage(input: input)
         case "list_windows":      result = listWindows(input: input)
-        case "query_compatibility": result = queryCompatibility(input: input)
+        case "query_compatibility": result = await queryCompatibility(input: input)
         default:
             return jsonResult(["error": "Unknown tool: \(toolName)"])
         }
@@ -1205,7 +1205,7 @@ final class AgentTools {
 
     // MARK: 8. place_dll
 
-    private func placeDLL(input: JSONValue) -> String {
+    private func placeDLL(input: JSONValue) async -> String {
         guard let dllName = input["dll_name"]?.asString, !dllName.isEmpty else {
             return jsonResult(["error": "dll_name is required"])
         }
@@ -1249,7 +1249,7 @@ final class AgentTools {
 
         do {
             print("Downloading \(knownDLL.name) from GitHub...")
-            let cachedDLL = try DLLDownloader.downloadAndCache(knownDLL)
+            let cachedDLL = try await DLLDownloader.downloadAndCache(knownDLL)
             let placedDLL = try DLLDownloader.place(cachedDLL: cachedDLL, into: targetDir)
             print("Placed \(placedDLL.lastPathComponent) in \(targetDir.path)")
 
@@ -2476,13 +2476,13 @@ final class AgentTools {
 
     // MARK: - Compatibility Lookup
 
-    private func queryCompatibility(input: JSONValue) -> String {
+    private func queryCompatibility(input: JSONValue) async -> String {
         guard case .object(let obj) = input,
               case .string(let gameName) = obj["game_name"] else {
             return "Error: game_name parameter required"
         }
 
-        guard let report = CompatibilityService.fetchReport(for: gameName) else {
+        guard let report = await CompatibilityService.fetchReport(for: gameName) else {
             return "No compatibility data found for '\(gameName)'. Lutris and ProtonDB had no matching entries."
         }
 

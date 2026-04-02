@@ -1,7 +1,7 @@
 import ArgumentParser
 import Foundation
 
-struct AddCommand: ParsableCommand {
+struct AddCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "add",
         abstract: "Add a game by running its installer inside a Wine bottle"
@@ -13,7 +13,7 @@ struct AddCommand: ParsableCommand {
     @Flag(help: "Pre-install recipe dependencies before running installer (old behavior)")
     var forceProactiveDeps: Bool = false
 
-    mutating func run() throws {
+    mutating func run() async throws {
         let installerURL = URL(fileURLWithPath: installerPath)
 
         // 1. Verify installer exists
@@ -226,24 +226,10 @@ struct AddCommand: ParsableCommand {
             var fileContext: [URL] = discovered  // already have exe list from scan
             // Add DLLs and config files from game install directory only
             let driveCURL = bottleURL.appendingPathComponent("drive_c")
-            if let enumerator = FileManager.default.enumerator(
-                at: driveCURL,
-                includingPropertiesForKeys: [.isRegularFileKey],
-                options: [.skipsHiddenFiles]
-            ) {
-                for case let fileURL as URL in enumerator {
-                    let ext = fileURL.pathExtension.lowercased()
-                    // Skip Wine system directories
-                    let relativePath = fileURL.path.replacingOccurrences(of: driveCURL.path, with: "")
-                    if relativePath.hasPrefix("/windows/") { continue }
-                    if ["dll", "ini", "cfg"].contains(ext) {
-                        fileContext.append(fileURL)
-                    }
-                    if fileContext.count >= 50 { break }
-                }
-            }
+            // Collect file URLs synchronously to avoid async context restriction on NSEnumerator
+            fileContext += collectInstalledFiles(in: driveCURL, limit: 50)
 
-            switch AIService.generateRecipe(gameName: gameName, gameId: gameId, installedFiles: fileContext) {
+            switch await AIService.generateRecipe(gameName: gameName, gameId: gameId, installedFiles: fileContext) {
             case .success(let aiRecipe):
                 print("\nAI generated recipe for \(gameName):")
                 // Display with same transparency as bundled recipes
@@ -306,6 +292,26 @@ struct AddCommand: ParsableCommand {
     }
 
     // MARK: - Helpers
+
+    /// Collect installed file URLs from drive_c synchronously (avoids NSEnumerator async restriction).
+    private func collectInstalledFiles(in driveCURL: URL, limit: Int) -> [URL] {
+        var result: [URL] = []
+        guard let enumerator = FileManager.default.enumerator(
+            at: driveCURL,
+            includingPropertiesForKeys: [.isRegularFileKey],
+            options: [.skipsHiddenFiles]
+        ) else { return result }
+        while let fileURL = enumerator.nextObject() as? URL {
+            let ext = fileURL.pathExtension.lowercased()
+            let relativePath = fileURL.path.replacingOccurrences(of: driveCURL.path, with: "")
+            if relativePath.hasPrefix("/windows/") { continue }
+            if ["dll", "ini", "cfg"].contains(ext) {
+                result.append(fileURL)
+            }
+            if result.count >= limit { break }
+        }
+        return result
+    }
 
     /// Convert a directory name to a slug: lowercase, spaces to hyphens, strip non-alphanumeric except hyphens.
     private func slugify(_ name: String) -> String {

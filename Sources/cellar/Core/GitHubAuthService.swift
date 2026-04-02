@@ -31,28 +31,42 @@ final class GitHubAuthService: @unchecked Sendable {
 
     /// Return a valid installation access token, refreshing if within 5 minutes of expiry.
     /// Always returns gracefully — never throws or crashes.
-    func getToken() -> GitHubAuthResult {
-        lock.lock()
-        defer { lock.unlock() }
-
-        // Cache hit: token exists and won't expire within 5 minutes
-        if let token = cachedToken,
-           let expiry = tokenExpiry,
-           expiry > Date().addingTimeInterval(5 * 60) {
-            return .token(token)
+    func getToken() async -> GitHubAuthResult {
+        // Check cache synchronously first (NSLock provides thread safety for @unchecked Sendable)
+        if let cached = cachedTokenIfValid() {
+            return .token(cached)
         }
 
-        // Cache miss: fetch a fresh token
+        // Cache miss: fetch a fresh token asynchronously
         do {
-            let (token, expiry) = try refreshToken()
-            cachedToken = token
-            tokenExpiry = expiry
+            let (token, expiry) = try await refreshToken()
+            cacheToken(token, expiry: expiry)
             return .token(token)
         } catch GitHubAuthError.credentialsNotConfigured {
             return .unavailable(reason: "GitHub App credentials not configured — set GITHUB_APP_ID, GITHUB_INSTALLATION_ID, and GITHUB_APP_KEY_PATH in ~/.cellar/.env or environment")
         } catch {
             return .unavailable(reason: error.localizedDescription)
         }
+    }
+
+    /// Synchronous cache check (NSLock-protected). Returns cached token or nil.
+    private func cachedTokenIfValid() -> String? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let token = cachedToken,
+              let expiry = tokenExpiry,
+              expiry > Date().addingTimeInterval(5 * 60) else {
+            return nil
+        }
+        return token
+    }
+
+    /// Synchronous cache write (NSLock-protected).
+    private func cacheToken(_ token: String, expiry: Date) {
+        lock.lock()
+        defer { lock.unlock() }
+        cachedToken = token
+        tokenExpiry = expiry
     }
 
     /// Reset cached token — useful for testing and future token invalidation scenarios.
@@ -72,10 +86,10 @@ final class GitHubAuthService: @unchecked Sendable {
 
     // MARK: - Private: Token Refresh
 
-    private func refreshToken() throws -> (token: String, expiresAt: Date) {
+    private func refreshToken() async throws -> (token: String, expiresAt: Date) {
         let credentials = try loadCredentials()
         let jwt = try makeJWT(appID: credentials.appID, pemString: credentials.pemString)
-        return try fetchInstallationToken(jwt: jwt, installationID: credentials.installationID)
+        return try await fetchInstallationToken(jwt: jwt, installationID: credentials.installationID)
     }
 
     // MARK: - Private: JWT Generation
@@ -166,7 +180,7 @@ final class GitHubAuthService: @unchecked Sendable {
     private func fetchInstallationToken(
         jwt: String,
         installationID: String
-    ) throws -> (token: String, expiresAt: Date) {
+    ) async throws -> (token: String, expiresAt: Date) {
         let urlString = "https://api.github.com/app/installations/\(installationID)/access_tokens"
         guard let url = URL(string: urlString) else {
             throw GitHubAuthError.httpError(statusCode: 0, body: "Invalid URL: \(urlString)")
@@ -178,7 +192,7 @@ final class GitHubAuthService: @unchecked Sendable {
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
 
-        let data = try performHTTPRequest(request: request)
+        let data = try await performHTTPRequest(request: request)
 
         let decoder = JSONDecoder()
         let tokenResponse: InstallationTokenResponse
@@ -197,36 +211,18 @@ final class GitHubAuthService: @unchecked Sendable {
         return (tokenResponse.token, expiryDate)
     }
 
-    /// Synchronous HTTP request using DispatchSemaphore + ResultBox pattern.
-    /// Mirrors AIService.callAPI — copied here to keep GitHubAuthService self-contained.
-    private func performHTTPRequest(request: URLRequest) throws -> Data {
-        final class ResultBox: @unchecked Sendable {
-            var value: Result<Data, Error> = .failure(
-                GitHubAuthError.httpError(statusCode: 0, body: "No response received")
-            )
+    /// Async HTTP request using URLSession.data(for:).
+    private func performHTTPRequest(request: URLRequest) async throws -> Data {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw GitHubAuthError.httpError(statusCode: 0, body: "No HTTP response received")
         }
-        let box = ResultBox()
-        let semaphore = DispatchSemaphore(value: 0)
-
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                fputs("[GitHubAuthService] Network error: \(error.localizedDescription)\n", stderr)
-                box.value = .failure(error)
-            } else if let data = data {
-                let httpResponse = response as? HTTPURLResponse
-                if let code = httpResponse?.statusCode, code >= 400 {
-                    fputs("[GitHubAuthService] HTTP \(code) from GitHub API\n", stderr)
-                    let body = String(data: data, encoding: .utf8) ?? "<unreadable>"
-                    box.value = .failure(GitHubAuthError.httpError(statusCode: code, body: body))
-                } else {
-                    box.value = .success(data)
-                }
-            }
-            semaphore.signal()
-        }.resume()
-
-        semaphore.wait()
-        return try box.value.get()
+        if http.statusCode >= 400 {
+            fputs("[GitHubAuthService] HTTP \(http.statusCode) from GitHub API\n", stderr)
+            let body = String(data: data, encoding: .utf8) ?? "<unreadable>"
+            throw GitHubAuthError.httpError(statusCode: http.statusCode, body: body)
+        }
+        return data
     }
 
     // MARK: - Private: Credential Loading

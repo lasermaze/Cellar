@@ -14,7 +14,7 @@ struct WineActionExecutor {
         envConfigs: inout [(description: String, environment: [String: String], actions: [WineFix])],
         configIndex: Int,
         installedDeps: inout Set<String>
-    ) -> Bool {
+    ) async -> Bool {
         switch fix {
         case .installWinetricks(let verb):
             guard !installedDeps.contains(verb) else { return true }
@@ -65,7 +65,7 @@ struct WineActionExecutor {
 
             do {
                 print("Downloading \(knownDLL.name) from GitHub...")
-                let cachedDLL = try DLLDownloader.downloadAndCache(knownDLL)
+                let cachedDLL = try await DLLDownloader.downloadAndCache(knownDLL)
 
                 let targetDir: URL
                 switch target {
@@ -87,7 +87,7 @@ struct WineActionExecutor {
 
                 // Apply required DLL overrides (e.g. ddraw=n,b for cnc-ddraw)
                 for (dll, mode) in knownDLL.requiredOverrides {
-                    _ = execute(.setDLLOverride(dll, mode), envConfigs: &envConfigs, configIndex: configIndex, installedDeps: &installedDeps)
+                    _ = await execute(.setDLLOverride(dll, mode), envConfigs: &envConfigs, configIndex: configIndex, installedDeps: &installedDeps)
                 }
 
                 return true
@@ -119,7 +119,7 @@ struct WineActionExecutor {
         case .compound(let fixes):
             var allSucceeded = true
             for subFix in fixes {
-                if !execute(subFix, envConfigs: &envConfigs, configIndex: configIndex, installedDeps: &installedDeps) {
+                if await !execute(subFix, envConfigs: &envConfigs, configIndex: configIndex, installedDeps: &installedDeps) {
                     allSucceeded = false
                     // Continue executing remaining sub-actions even if one fails
                 }

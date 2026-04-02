@@ -201,9 +201,9 @@ struct CompatibilityService {
     /// Fetch a unified compatibility report for the given game name.
     /// Returns nil if the report is empty or if both APIs are unreachable.
     /// Never throws — all errors are swallowed.
-    static func fetchReport(for gameName: String) -> CompatibilityReport? {
+    static func fetchReport(for gameName: String) async -> CompatibilityReport? {
         // Step 1: Search Lutris for best game match
-        guard let lutrisGame = fetchLutrisGame(name: gameName) else {
+        guard let lutrisGame = await fetchLutrisGame(name: gameName) else {
             return nil
         }
 
@@ -212,31 +212,16 @@ struct CompatibilityService {
             .first(where: { $0.service == "steam" })
             .map { $0.slug }
 
-        // Step 3: Parallel fetch of installers + ProtonDB summary
-        final class ResultBox<T>: @unchecked Sendable { var value: T? }
-        let installersBox = ResultBox<[LutrisInstaller]>()
-        let protonBox = ResultBox<ProtonDBSummary>()
-
-        let installerSemaphore = DispatchSemaphore(value: 0)
-        let protonSemaphore = DispatchSemaphore(value: 0)
-
-        DispatchQueue.global().async {
-            installersBox.value = fetchLutrisInstallers(slug: lutrisGame.slug)
-            installerSemaphore.signal()
-        }
-
-        DispatchQueue.global().async {
+        // Step 3: Parallel fetch of installers + ProtonDB summary using async let
+        async let installersResult = fetchLutrisInstallers(slug: lutrisGame.slug)
+        async let protonResult: ProtonDBSummary? = {
             if let appId = steamAppId {
-                protonBox.value = fetchProtonDBSummary(appId: appId)
+                return await fetchProtonDBSummary(appId: appId)
             }
-            protonSemaphore.signal()
-        }
+            return nil
+        }()
 
-        installerSemaphore.wait()
-        protonSemaphore.wait()
-
-        let installers = installersBox.value ?? []
-        let protonSummary = protonBox.value
+        let (installers, protonSummary) = await (installersResult, protonResult)
 
         // Step 4 & 5: Extract and filter config from installers
         let extracted = extractFromInstallers(installers)
@@ -262,9 +247,9 @@ struct CompatibilityService {
         return report.isEmpty ? nil : report
     }
 
-    // MARK: - Private Fetchers
+    // MARK: - Private Fetchers (async)
 
-    private static func fetchLutrisGame(name: String) -> LutrisGame? {
+    private static func fetchLutrisGame(name: String) async -> LutrisGame? {
         let normalized = name.lowercased()
             .components(separatedBy: .whitespacesAndNewlines)
             .joined(separator: "-")
@@ -283,7 +268,7 @@ struct CompatibilityService {
         request.timeoutInterval = 5
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        guard let (data, statusCode) = performFetch(request: request), statusCode == 200 else {
+        guard let (data, statusCode) = await performFetch(request: request), statusCode == 200 else {
             return nil
         }
 
@@ -311,7 +296,7 @@ struct CompatibilityService {
         return bestGame
     }
 
-    private static func fetchLutrisInstallers(slug: String) -> [LutrisInstaller] {
+    private static func fetchLutrisInstallers(slug: String) async -> [LutrisInstaller] {
         let cacheFile = CellarPaths.lutrisCompatCacheDir.appendingPathComponent("installers-\(slug).json")
 
         if let cached: [LutrisInstaller] = readCache([LutrisInstaller].self, from: cacheFile, ttlDays: 30) {
@@ -326,7 +311,7 @@ struct CompatibilityService {
         request.timeoutInterval = 5
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        guard let (data, statusCode) = performFetch(request: request), statusCode == 200 else {
+        guard let (data, statusCode) = await performFetch(request: request), statusCode == 200 else {
             return []
         }
 
@@ -339,7 +324,7 @@ struct CompatibilityService {
         return installers
     }
 
-    private static func fetchProtonDBSummary(appId: String) -> ProtonDBSummary? {
+    private static func fetchProtonDBSummary(appId: String) async -> ProtonDBSummary? {
         let cacheFile = CellarPaths.protondbCompatCacheDir.appendingPathComponent("\(appId).json")
 
         if let cached: ProtonDBSummary = readCache(ProtonDBSummary.self, from: cacheFile, ttlDays: 30) {
@@ -353,7 +338,7 @@ struct CompatibilityService {
         var request = URLRequest(url: url)
         request.timeoutInterval = 5
 
-        guard let (data, statusCode) = performFetch(request: request), statusCode == 200 else {
+        guard let (data, statusCode) = await performFetch(request: request), statusCode == 200 else {
             return nil
         }
 
@@ -501,23 +486,11 @@ struct CompatibilityService {
 
     // MARK: - HTTP Helper
 
-    private static func performFetch(request: URLRequest) -> (data: Data, statusCode: Int)? {
-        final class ResultBox: @unchecked Sendable {
-            var value: (Data, Int)?
+    private static func performFetch(request: URLRequest) async -> (data: Data, statusCode: Int)? {
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              let http = response as? HTTPURLResponse else {
+            return nil
         }
-        let box = ResultBox()
-        let semaphore = DispatchSemaphore(value: 0)
-
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if error == nil,
-               let data = data,
-               let httpResponse = response as? HTTPURLResponse {
-                box.value = (data, httpResponse.statusCode)
-            }
-            semaphore.signal()
-        }.resume()
-
-        semaphore.wait()
-        return box.value
+        return (data, http.statusCode)
     }
 }

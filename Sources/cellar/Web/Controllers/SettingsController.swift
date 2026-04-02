@@ -48,7 +48,7 @@ enum SettingsController {
                 throw Abort(.preconditionFailed, reason: "Wine is not installed")
             }
 
-            let result = CollectiveMemoryWriteService.syncAll(wineURL: wineURL)
+            let result = await CollectiveMemoryWriteService.syncAll(wineURL: wineURL)
 
             let env = loadEnvFile()
             let anthropicKey = env["ANTHROPIC_API_KEY"] ?? ""

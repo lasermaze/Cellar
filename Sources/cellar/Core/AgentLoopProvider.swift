@@ -33,7 +33,7 @@ protocol AgentLoopProvider {
     mutating func appendAssistantResponse(_ response: AgentLoopProviderResponse)
     mutating func appendToolResults(_ results: [(id: String, content: String, isError: Bool)])
     var maxOutputTokensLimit: Int { get }
-    mutating func callWithRetry(maxTokens: Int, emit: (AgentEvent) -> Void) throws -> AgentLoopProviderResponse
+    mutating func callWithRetry(maxTokens: Int, emit: (AgentEvent) -> Void) async throws -> AgentLoopProviderResponse
 }
 
 // MARK: - Per-Provider Pricing Map
@@ -48,33 +48,18 @@ let modelPricing: [String: (input: Double, output: Double)] = [
 
 // MARK: - Shared HTTP Helper
 
-/// Synchronous HTTP call using DispatchSemaphore to bridge async URLSession.
+/// Async HTTP call using URLSession.data(for:).
 /// Used by both AnthropicAgentProvider and DeepseekAgentProvider.
-func agentCallAPI(request: URLRequest) throws -> Data {
-    // Use a class box for Swift 6 Sendable compliance — avoids captured-var mutation warning
-    final class ResultBox: @unchecked Sendable {
-        var value: Result<Data, Error> = .failure(AgentLoopError.noResponse)
+func agentCallAPI(request: URLRequest) async throws -> Data {
+    let (data, response) = try await URLSession.shared.data(for: request)
+    guard let http = response as? HTTPURLResponse else {
+        throw AgentLoopError.noResponse
     }
-    let box = ResultBox()
-    let semaphore = DispatchSemaphore(value: 0)
-
-    URLSession.shared.dataTask(with: request) { data, response, error in
-        if let error = error {
-            box.value = .failure(error)
-        } else if let data = data {
-            let httpResponse = response as? HTTPURLResponse
-            if let code = httpResponse?.statusCode, code >= 400 {
-                let body = String(data: data, encoding: .utf8) ?? "(binary)"
-                box.value = .failure(AgentLoopError.httpError(statusCode: code, body: body))
-            } else {
-                box.value = .success(data)
-            }
-        }
-        semaphore.signal()
-    }.resume()
-
-    semaphore.wait()
-    return try box.value.get()
+    if http.statusCode >= 400 {
+        let body = String(data: data, encoding: .utf8) ?? "(binary)"
+        throw AgentLoopError.httpError(statusCode: http.statusCode, body: body)
+    }
+    return data
 }
 
 // MARK: - AnthropicAgentProvider
@@ -132,12 +117,12 @@ struct AnthropicAgentProvider: AgentLoopProvider {
 
     // MARK: API Call
 
-    mutating func callWithRetry(maxTokens: Int, emit: (AgentEvent) -> Void) throws -> AgentLoopProviderResponse {
-        let backoffSeconds: [Double] = [1.0, 2.0, 4.0]
+    mutating func callWithRetry(maxTokens: Int, emit: (AgentEvent) -> Void) async throws -> AgentLoopProviderResponse {
+        let backoffNanos: [UInt64] = [1_000_000_000, 2_000_000_000, 4_000_000_000]
 
         for attempt in 1...3 {
             do {
-                let response = try callAnthropic(maxTokens: maxTokens)
+                let response = try await callAnthropic(maxTokens: maxTokens)
                 return translateAnthropicResponse(response)
             } catch let error as AgentLoopError {
                 if case .httpError(let code, _) = error {
@@ -147,13 +132,13 @@ struct AnthropicAgentProvider: AgentLoopProvider {
                 }
                 if attempt < 3 {
                     emit(.status("API error, retrying (\(attempt + 1)/3)..."))
-                    Thread.sleep(forTimeInterval: backoffSeconds[attempt - 1])
+                    try await Task.sleep(nanoseconds: backoffNanos[attempt - 1])
                 }
             } catch {
                 // Network errors (URLError etc) — retriable
                 if attempt < 3 {
                     emit(.status("API error, retrying (\(attempt + 1)/3)..."))
-                    Thread.sleep(forTimeInterval: backoffSeconds[attempt - 1])
+                    try await Task.sleep(nanoseconds: backoffNanos[attempt - 1])
                 }
             }
         }
@@ -162,7 +147,7 @@ struct AnthropicAgentProvider: AgentLoopProvider {
 
     // MARK: Private
 
-    private func callAnthropic(maxTokens: Int) throws -> AnthropicToolResponse {
+    private func callAnthropic(maxTokens: Int) async throws -> AnthropicToolResponse {
         let requestBody = AnthropicToolRequest(
             model: modelName,
             maxTokens: maxTokens,
@@ -181,7 +166,7 @@ struct AnthropicAgentProvider: AgentLoopProvider {
         urlRequest.setValue("application/json", forHTTPHeaderField: "content-type")
         urlRequest.httpBody = bodyData
 
-        let responseData = try agentCallAPI(request: urlRequest)
+        let responseData = try await agentCallAPI(request: urlRequest)
 
         do {
             return try JSONDecoder().decode(AnthropicToolResponse.self, from: responseData)
@@ -328,12 +313,12 @@ struct DeepseekAgentProvider: AgentLoopProvider {
 
     // MARK: API Call
 
-    mutating func callWithRetry(maxTokens: Int, emit: (AgentEvent) -> Void) throws -> AgentLoopProviderResponse {
-        let backoffSeconds: [Double] = [1.0, 2.0, 4.0]
+    mutating func callWithRetry(maxTokens: Int, emit: (AgentEvent) -> Void) async throws -> AgentLoopProviderResponse {
+        let backoffNanos: [UInt64] = [1_000_000_000, 2_000_000_000, 4_000_000_000]
 
         for attempt in 1...3 {
             do {
-                let response = try callDeepseek(maxTokens: maxTokens)
+                let response = try await callDeepseek(maxTokens: maxTokens)
                 return try translateDeepseekResponse(response)
             } catch let error as AgentLoopError {
                 if case .httpError(let code, _) = error {
@@ -343,13 +328,13 @@ struct DeepseekAgentProvider: AgentLoopProvider {
                 }
                 if attempt < 3 {
                     emit(.status("API error, retrying (\(attempt + 1)/3)..."))
-                    Thread.sleep(forTimeInterval: backoffSeconds[attempt - 1])
+                    try await Task.sleep(nanoseconds: backoffNanos[attempt - 1])
                 }
             } catch {
                 // Network errors (URLError etc) — retriable
                 if attempt < 3 {
                     emit(.status("API error, retrying (\(attempt + 1)/3)..."))
-                    Thread.sleep(forTimeInterval: backoffSeconds[attempt - 1])
+                    try await Task.sleep(nanoseconds: backoffNanos[attempt - 1])
                 }
             }
         }
@@ -358,7 +343,7 @@ struct DeepseekAgentProvider: AgentLoopProvider {
 
     // MARK: Private
 
-    private func callDeepseek(maxTokens: Int) throws -> OpenAIToolResponse {
+    private func callDeepseek(maxTokens: Int) async throws -> OpenAIToolResponse {
         let requestBody = OpenAIToolRequest(
             model: modelName,
             maxTokens: maxTokens,
@@ -375,7 +360,7 @@ struct DeepseekAgentProvider: AgentLoopProvider {
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.httpBody = bodyData
 
-        let responseData = try agentCallAPI(request: urlRequest)
+        let responseData = try await agentCallAPI(request: urlRequest)
 
         do {
             return try JSONDecoder().decode(OpenAIToolResponse.self, from: responseData)

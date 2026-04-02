@@ -58,46 +58,30 @@ struct AIService {
 
     // MARK: - HTTP
 
-    /// Make a synchronous HTTP request using DispatchSemaphore to bridge async URLSession.
-    /// Uses URLSession.shared (background delegate queue) to avoid semaphore deadlock.
-    private static func callAPI(request: URLRequest) throws -> Data {
-        // Use a class box for Swift 6 Sendable compliance — avoids captured-var mutation warning
-        final class ResultBox: @unchecked Sendable {
-            var value: Result<Data, Error> = .failure(AIServiceError.allRetriesFailed)
+    /// Async HTTP call using URLSession.data(for:).
+    private static func callAPI(request: URLRequest) async throws -> Data {
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw AIServiceError.allRetriesFailed
         }
-        let box = ResultBox()
-        let semaphore = DispatchSemaphore(value: 0)
-
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                box.value = .failure(error)
-            } else if let data = data {
-                let httpResponse = response as? HTTPURLResponse
-                if let code = httpResponse?.statusCode, code >= 400 {
-                    box.value = .failure(AIServiceError.httpError(statusCode: code))
-                } else {
-                    box.value = .success(data)
-                }
-            }
-            semaphore.signal()
-        }.resume()
-
-        semaphore.wait()
-        return try box.value.get()
+        if http.statusCode >= 400 {
+            throw AIServiceError.httpError(statusCode: http.statusCode)
+        }
+        return data
     }
 
     // MARK: - Retry
 
     /// Retry a throwing closure up to maxAttempts times with a 1-second delay between attempts.
-    private static func withRetry<T>(maxAttempts: Int = 3, work: () throws -> T) throws -> T {
+    private static func withRetry<T>(maxAttempts: Int = 3, work: () async throws -> T) async throws -> T {
         var lastError: Error = AIServiceError.allRetriesFailed
         for attempt in 1...maxAttempts {
             do {
-                return try work()
+                return try await work()
             } catch {
                 lastError = error
                 if attempt < maxAttempts {
-                    Thread.sleep(forTimeInterval: 1.0)
+                    try await Task.sleep(nanoseconds: 1_000_000_000)
                 }
             }
         }
@@ -109,7 +93,7 @@ struct AIService {
     /// Diagnose a Wine failure using AI. Returns a plain-English explanation and optional WineFix.
     /// Returns .unavailable if no API key is configured.
     /// Returns .failed if all retry attempts are exhausted.
-    static func diagnose(stderr: String, gameId: String) -> AIResult<AIDiagnosis> {
+    static func diagnose(stderr: String, gameId: String) async -> AIResult<AIDiagnosis> {
         let provider = detectProvider()
         if case .unavailable = provider {
             let env = loadEnvironment()
@@ -121,10 +105,10 @@ struct AIService {
             }
             return .unavailable
         }
-        return _diagnose(stderr: stderr, gameId: gameId, provider: provider)
+        return await _diagnose(stderr: stderr, gameId: gameId, provider: provider)
     }
 
-    private static func _diagnose(stderr: String, gameId: String, provider: AIProvider) -> AIResult<AIDiagnosis> {
+    private static func _diagnose(stderr: String, gameId: String, provider: AIProvider) async -> AIResult<AIDiagnosis> {
         // Truncate stderr to last 8000 characters (avoid context window overflow)
         let truncatedStderr = String(stderr.suffix(8000))
 
@@ -148,8 +132,8 @@ struct AIService {
         let userMessage = "Game ID: \(gameId)\n\nWine stderr output:\n\(truncatedStderr)"
 
         do {
-            let responseText = try withRetry {
-                let data = try makeAPICall(
+            let responseText = try await withRetry {
+                let data = try await makeAPICall(
                     provider: provider,
                     systemPrompt: systemPrompt,
                     userMessage: userMessage
@@ -191,7 +175,7 @@ struct AIService {
     /// Generate a Wine recipe for a game using AI. Returns a Recipe struct.
     /// Returns .unavailable if no API key is configured.
     /// Returns .failed if all retry attempts are exhausted or parsing fails.
-    static func generateRecipe(gameName: String, gameId: String, installedFiles: [URL]) -> AIResult<Recipe> {
+    static func generateRecipe(gameName: String, gameId: String, installedFiles: [URL]) async -> AIResult<Recipe> {
         let provider = detectProvider()
         if case .unavailable = provider {
             let env = loadEnvironment()
@@ -203,7 +187,7 @@ struct AIService {
             }
             return .unavailable
         }
-        return _generateRecipe(gameName: gameName, gameId: gameId, installedFiles: installedFiles, provider: provider)
+        return await _generateRecipe(gameName: gameName, gameId: gameId, installedFiles: installedFiles, provider: provider)
     }
 
     private static func _generateRecipe(
@@ -211,7 +195,7 @@ struct AIService {
         gameId: String,
         installedFiles: [URL],
         provider: AIProvider
-    ) -> AIResult<Recipe> {
+    ) async -> AIResult<Recipe> {
         // Filter and cap file list: .exe, .dll (game dir only), .ini, .cfg
         let relevantExtensions = Set(["exe", "dll", "ini", "cfg"])
         let filteredFiles = installedFiles
@@ -274,8 +258,8 @@ struct AIService {
         """
 
         do {
-            let responseText = try withRetry {
-                try makeAPICall(provider: provider, systemPrompt: systemPrompt, userMessage: userMessage)
+            let responseText = try await withRetry {
+                try await makeAPICall(provider: provider, systemPrompt: systemPrompt, userMessage: userMessage)
             }
 
             return parseRecipeResponse(responseText)
@@ -317,7 +301,7 @@ struct AIService {
         currentEnvironment: [String: String],
         attemptHistory: [(description: String, envDiff: [String: String], errorSummary: String)],
         escalationLevel: Int = 1
-    ) -> AIResult<AIVariantResult> {
+    ) async -> AIResult<AIVariantResult> {
         let provider = detectProvider()
         if case .unavailable = provider {
             let env = loadEnvironment()
@@ -329,7 +313,7 @@ struct AIService {
             }
             return .unavailable
         }
-        return _generateVariants(
+        return await _generateVariants(
             gameId: gameId, gameName: gameName,
             currentEnvironment: currentEnvironment,
             attemptHistory: attemptHistory,
@@ -345,7 +329,7 @@ struct AIService {
         attemptHistory: [(description: String, envDiff: [String: String], errorSummary: String)],
         escalationLevel: Int,
         provider: AIProvider
-    ) -> AIResult<AIVariantResult> {
+    ) async -> AIResult<AIVariantResult> {
         let systemPrompt = buildVariantSystemPrompt(level: escalationLevel)
 
         // Build user message with game context and attempt history
@@ -384,8 +368,8 @@ struct AIService {
         let userMessage = lines.joined(separator: "\n")
 
         do {
-            let responseText = try withRetry {
-                try makeAPICall(provider: provider, systemPrompt: systemPrompt, userMessage: userMessage)
+            let responseText = try await withRetry {
+                try await makeAPICall(provider: provider, systemPrompt: systemPrompt, userMessage: userMessage)
             }
 
             return parseVariantsResponse(responseText)
@@ -536,7 +520,7 @@ struct AIService {
         onOutput: (@Sendable (AgentEvent) -> Void)? = nil,
         askUserHandler: (@Sendable (_ question: String, _ options: [String]?) -> String)? = nil,
         onToolsCreated: ((AgentTools) -> Void)? = nil
-    ) -> AIResult<String> {
+    ) async -> AIResult<String> {
         // Validate provider before building prompts
         let provider = detectProvider()
         switch provider {
@@ -853,13 +837,13 @@ struct AIService {
         )
 
         // Fetch collective memory context (silent skip on any failure)
-        let memoryContext = CollectiveMemoryService.fetchBestEntry(
+        let memoryContext = await CollectiveMemoryService.fetchBestEntry(
             for: entry.name,
             wineURL: wineURL
         )
 
         // Fetch community compatibility data from Lutris + ProtonDB (silent skip on any failure)
-        let compatContext = CompatibilityService.fetchReport(for: entry.name)
+        let compatContext = await CompatibilityService.fetchReport(for: entry.name)
 
         // Check for handoff from a previous incomplete session
         let previousSession = SessionHandoff.read(gameId: gameId)
@@ -888,9 +872,9 @@ struct AIService {
         contextParts.append(launchInstruction)
         let initialMessage = contextParts.joined(separator: "\n\n")
 
-        let result = agentLoop.run(
+        let result = await agentLoop.run(
             initialMessage: initialMessage,
-            toolExecutor: { name, input in tools.execute(toolName: name, input: input) },
+            toolExecutor: { name, input in await tools.execute(toolName: name, input: input) },
             canStop: { tools.isTaskComplete },
             shouldAbort: {
                 if tools.shouldAbort { return true }
@@ -901,7 +885,11 @@ struct AIService {
                         "game_name": .string(entry.name),
                         "resolution_narrative": .string("User confirmed game is working from web UI.")
                     ])
-                    _ = tools.execute(toolName: "save_success", input: saveInput)
+                    // Fire-and-forget save: cannot await in sync closure, save completes async
+                    let capturedTools = tools
+                    Task.detached {
+                        _ = await capturedTools.execute(toolName: "save_success", input: saveInput)
+                    }
                     tools.taskState = .savedAfterConfirm
                     return true
                 }
@@ -916,7 +904,7 @@ struct AIService {
         if result.completed {
             // Contribution hook: push working config to collective memory if user confirmed success
             if tools.taskState == .savedAfterConfirm {
-                handleContributionIfNeeded(
+                await handleContributionIfNeeded(
                     tools: tools,
                     gameName: entry.name,
                     wineURL: wineURL,
@@ -985,7 +973,7 @@ struct AIService {
         gameName: String,
         wineURL: URL,
         isWebContext: Bool
-    ) {
+    ) async {
         guard tools.taskState == .savedAfterConfirm else { return }
 
         var config = CellarConfig.load()
@@ -1012,7 +1000,7 @@ struct AIService {
 
         // Load the just-saved SuccessRecord and push
         guard let record = SuccessDatabase.load(gameId: tools.gameId) else { return }
-        CollectiveMemoryWriteService.push(record: record, gameName: gameName, wineURL: wineURL)
+        await CollectiveMemoryWriteService.push(record: record, gameName: gameName, wineURL: wineURL)
     }
 
     // MARK: - Private Helpers
@@ -1022,20 +1010,20 @@ struct AIService {
         provider: AIProvider,
         systemPrompt: String,
         userMessage: String
-    ) throws -> String {
+    ) async throws -> String {
         switch provider {
         case .anthropic(let apiKey):
-            return try callAnthropic(apiKey: apiKey, systemPrompt: systemPrompt, userMessage: userMessage)
+            return try await callAnthropic(apiKey: apiKey, systemPrompt: systemPrompt, userMessage: userMessage)
         case .openai(let apiKey):
-            return try callOpenAI(apiKey: apiKey, systemPrompt: systemPrompt, userMessage: userMessage)
+            return try await callOpenAI(apiKey: apiKey, systemPrompt: systemPrompt, userMessage: userMessage)
         case .deepseek(let apiKey):
-            return try callDeepseek(apiKey: apiKey, systemPrompt: systemPrompt, userMessage: userMessage)
+            return try await callDeepseek(apiKey: apiKey, systemPrompt: systemPrompt, userMessage: userMessage)
         case .unavailable:
             throw AIServiceError.unavailable
         }
     }
 
-    private static func callDeepseek(apiKey: String, systemPrompt: String, userMessage: String) throws -> String {
+    private static func callDeepseek(apiKey: String, systemPrompt: String, userMessage: String) async throws -> String {
         let requestBody = OpenAIRequest(
             model: "deepseek-chat",
             messages: [
@@ -1054,7 +1042,7 @@ struct AIService {
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.httpBody = bodyData
 
-        let responseData = try callAPI(request: request)
+        let responseData = try await callAPI(request: request)
         let response = try JSONDecoder().decode(OpenAIResponse.self, from: responseData)
 
         guard let content = response.firstContent else {
@@ -1063,7 +1051,7 @@ struct AIService {
         return content
     }
 
-    private static func callAnthropic(apiKey: String, systemPrompt: String, userMessage: String) throws -> String {
+    private static func callAnthropic(apiKey: String, systemPrompt: String, userMessage: String) async throws -> String {
         let requestBody = AnthropicRequest(
             model: "claude-opus-4-6",
             maxTokens: 1024,
@@ -1081,7 +1069,7 @@ struct AIService {
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.httpBody = bodyData
 
-        let responseData = try callAPI(request: request)
+        let responseData = try await callAPI(request: request)
         let response = try JSONDecoder().decode(AnthropicResponse.self, from: responseData)
 
         guard let text = response.firstText else {
@@ -1090,7 +1078,7 @@ struct AIService {
         return text
     }
 
-    private static func callOpenAI(apiKey: String, systemPrompt: String, userMessage: String) throws -> String {
+    private static func callOpenAI(apiKey: String, systemPrompt: String, userMessage: String) async throws -> String {
         let requestBody = OpenAIRequest(
             model: "gpt-4o-mini",
             messages: [
@@ -1109,7 +1097,7 @@ struct AIService {
         request.setValue("application/json", forHTTPHeaderField: "content-type")
         request.httpBody = bodyData
 
-        let responseData = try callAPI(request: request)
+        let responseData = try await callAPI(request: request)
         let response = try JSONDecoder().decode(OpenAIResponse.self, from: responseData)
 
         guard let content = response.firstContent else {
