@@ -11,6 +11,7 @@ enum SettingsController {
             let anthropicKey = env["ANTHROPIC_API_KEY"] ?? ""
             let openaiKey = env["OPENAI_API_KEY"] ?? ""
             let deepseekKey = env["DEEPSEEK_API_KEY"] ?? ""
+            let kimiKey = env["KIMI_API_KEY"] ?? ""
             let aiProvider = env["AI_PROVIDER"] ?? ""
             let config = CellarConfig.load()
             let contributeMemory = config.contributeMemory ?? false
@@ -20,9 +21,11 @@ enum SettingsController {
                 anthropicKey: maskKey(anthropicKey),
                 openaiKey: maskKey(openaiKey),
                 deepseekKey: maskKey(deepseekKey),
+                kimiKey: maskKey(kimiKey),
                 hasAnthropicKey: !anthropicKey.isEmpty,
                 hasOpenaiKey: !openaiKey.isEmpty,
                 hasDeepseekKey: !deepseekKey.isEmpty,
+                hasKimiKey: !kimiKey.isEmpty,
                 aiProvider: aiProvider,
                 contributeMemory: contributeMemory,
                 successCount: successCount,
@@ -54,6 +57,7 @@ enum SettingsController {
             let anthropicKey = env["ANTHROPIC_API_KEY"] ?? ""
             let openaiKey = env["OPENAI_API_KEY"] ?? ""
             let deepseekKey = env["DEEPSEEK_API_KEY"] ?? ""
+            let kimiKey = env["KIMI_API_KEY"] ?? ""
             let aiProvider = env["AI_PROVIDER"] ?? ""
             let config = CellarConfig.load()
             let contributeMemory = config.contributeMemory ?? false
@@ -69,9 +73,11 @@ enum SettingsController {
                 anthropicKey: maskKey(anthropicKey),
                 openaiKey: maskKey(openaiKey),
                 deepseekKey: maskKey(deepseekKey),
+                kimiKey: maskKey(kimiKey),
                 hasAnthropicKey: !anthropicKey.isEmpty,
                 hasOpenaiKey: !openaiKey.isEmpty,
                 hasDeepseekKey: !deepseekKey.isEmpty,
+                hasKimiKey: !kimiKey.isEmpty,
                 aiProvider: aiProvider,
                 contributeMemory: contributeMemory,
                 successCount: successCount,
@@ -101,6 +107,12 @@ enum SettingsController {
                 env["DEEPSEEK_API_KEY"] = key
             } else if input.deepseekKey?.isEmpty == true {
                 env.removeValue(forKey: "DEEPSEEK_API_KEY")
+            }
+
+            if let key = input.kimiKey, !key.isEmpty, !key.contains("••••") {
+                env["KIMI_API_KEY"] = key
+            } else if input.kimiKey?.isEmpty == true {
+                env.removeValue(forKey: "KIMI_API_KEY")
             }
 
             if let providerValue = input.aiProvider {
@@ -166,10 +178,12 @@ enum SettingsController {
         let anthropicKey: String
         let openaiKey: String
         let deepseekKey: String
+        let kimiKey: String
         let hasAnthropicKey: Bool
         let hasOpenaiKey: Bool
         let hasDeepseekKey: Bool
-        let aiProvider: String  // current value: "claude", "deepseek", or "" (auto-detect)
+        let hasKimiKey: Bool
+        let aiProvider: String  // current value: "claude", "deepseek", "kimi", or "" (auto-detect)
         let contributeMemory: Bool
         let successCount: Int
         let syncResult: String
@@ -179,6 +193,7 @@ enum SettingsController {
         let anthropicKey: String?
         let openaiKey: String?
         let deepseekKey: String?
+        let kimiKey: String?
         let aiProvider: String?
     }
 
