@@ -12,6 +12,7 @@
               <option value="" #if(aiProvider == ""):selected#endif>Auto-detect</option>
               <option value="claude" #if(aiProvider == "claude"):selected#endif>Claude (Anthropic)</option>
               <option value="deepseek" #if(aiProvider == "deepseek"):selected#endif>Deepseek</option>
+              <option value="kimi" #if(aiProvider == "kimi"):selected#endif>Kimi (Moonshot AI)</option>
             </select>
             <div class="form-hint">Auto-detect uses whichever API key is configured. Takes effect on next launch.</div>
           </div>
@@ -60,6 +61,22 @@
               id="deepseekKey"
               name="deepseekKey"
               placeholder="#if(hasDeepseekKey): #(deepseekKey) #else: sk-... #endif"
+              autocomplete="off"
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="kimiKey">
+              Kimi API Key
+              #if(hasKimiKey):
+                <span style="color: var(--success);"> (configured)</span>
+              #endif
+            </label>
+            <input
+              type="password"
+              id="kimiKey"
+              name="kimiKey"
+              placeholder="#if(hasKimiKey): #(kimiKey) #else: sk-... #endif"
               autocomplete="off"
             >
           </div>
