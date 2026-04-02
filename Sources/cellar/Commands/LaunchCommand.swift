@@ -15,13 +15,17 @@ struct LaunchCommand: ParsableCommand {
         let status = DependencyChecker().checkAll()
         guard status.allRequired, let wineURL = status.wine else {
             print("Error: Wine is not installed.")
-            print("Run `cellar` first to install dependencies.")
+            print("Try this: Run `cellar` to install Wine and other dependencies.")
             throw ExitCode.failure
         }
 
+        // Pre-flight: check permissions (advisory only)
+        PermissionChecker.printWarningsIfNeeded()
+
         // 2. Find game
         guard var entry = try CellarStore.findGame(id: game) else {
-            print("Game not found. Run `cellar add /path/to/installer` first.")
+            print("Error: Game '\(game)' not found.")
+            print("Try this: Run `cellar add /path/to/installer.exe` to add a game first.")
             throw ExitCode.failure
         }
 
@@ -29,6 +33,7 @@ struct LaunchCommand: ParsableCommand {
         let bottleManager = BottleManager(wineBinary: wineURL)
         guard bottleManager.bottleExists(gameId: game) else {
             print("Error: Bottle for '\(game)' not found.")
+            print("Try this: Run `cellar add /path/to/installer.exe` to reinstall the game.")
             throw ExitCode.failure
         }
 
@@ -44,6 +49,7 @@ struct LaunchCommand: ParsableCommand {
             executablePath = gogDir + "/" + recipe.executable
         } else {
             print("Error: No executable path stored and no recipe available.")
+            print("Try this: Run `cellar add /path/to/installer.exe` to re-add the game with a working installer.")
             throw ExitCode.failure
         }
 
