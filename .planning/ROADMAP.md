@@ -277,3 +277,20 @@ Plans:
 Plans:
 - [ ] 23-01-PLAN.md — GitHub Actions release workflow + Homebrew tap formula with post_install .app creation
 - [ ] 23-02-PLAN.md — `cellar install-app` subcommand for copying .app to ~/Applications
+
+### Phase 24: Architecture & Code Quality Cleanup
+
+**Goal:** Modernize codebase architecture — migrate to async/await, break up monoliths, expand registries, improve error reporting, and audit dependency weight.
+**Requirements**: Swift async/await migration, AgentTools decomposition, KnownDLLRegistry expansion, GitHub API error reporting, Vapor dependency audit
+**Depends on:** Phase 23
+**Plans:** 1/3 plans executed
+
+Key deliverables:
+1. Replace DispatchSemaphore HTTP client with native async/await; remove @unchecked Sendable hacks
+2. Split AgentTools.swift (2,500+ lines) into logical tool category files
+3. Audit Vapor/Leaf dependency weight vs. lighter alternatives
+4. Expand KnownDLLRegistry beyond the single cnc-ddraw entry (dgVoodoo2, dxwrapper, DXVK, etc.)
+5. Add proper error reporting to CollectiveMemoryService/GitHubAuthService (replace silent nil returns)
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 24 to break down)

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-04-02T06:31:58.262Z"
+last_updated: "2026-04-02T15:10:26.617Z"
 progress:
-  total_phases: 23
+  total_phases: 24
   completed_phases: 22
-  total_plans: 54
-  completed_plans: 54
+  total_plans: 57
+  completed_plans: 55
 ---
 
 # Project State
@@ -63,6 +63,7 @@ Progress: [████████████████████] ~100% (
 | Phase 22-seamless-macos-ux P03 | 4 | 2 tasks | 2 files |
 | Phase 23-homebrew-tap-distribution-with-launcher-app P02 | 1 | 2 tasks | 2 files |
 | Phase 23-homebrew-tap-distribution-with-launcher-app P01 | 1 | 2 tasks | 2 files |
+| Phase 24-architecture-code-quality-cleanup P03 | 15 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -112,6 +113,8 @@ Progress: [████████████████████] ~100% (
 - [Phase 23-homebrew-tap-distribution-with-launcher-app]: Use cellar-community/homebrew-cellar as placeholder tap org — user updates before first release
 - [Phase 23-homebrew-tap-distribution-with-launcher-app]: Formula .app pattern: create in libexec, copy to ~/Applications via cellar install-app subcommand
 - [Phase 23-homebrew-tap-distribution-with-launcher-app]: CellarLauncher polls 20x0.5s for port 8080 (not fixed sleep) and uses opt_bin DSL path (not hardcoded prefix)
+- [Phase 24-architecture-code-quality-cleanup]: fputs(message, stderr) used for service error logging — keeps agent stdout clean while exposing GitHub API failures via terminal
+- [Phase 24-architecture-code-quality-cleanup]: 404 and auth-unavailable paths not logged in collective memory services — expected graceful degradation, not errors
 
 ### Roadmap Evolution
 
