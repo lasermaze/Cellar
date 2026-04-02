@@ -113,6 +113,7 @@ Progress: [████████████████████] ~100% (
 - Phase 19 added (2026-03-31): Import Lutris and ProtonDB compatibility databases
 - Phase 20 added (2026-03-31): Smarter Wine log parsing and structured diagnostics
 - Phase 21 added (2026-03-31): Pre-flight dependency check from PE imports
+- Phase 23 added (2026-04-02): Homebrew tap distribution with launcher .app — zero-friction install via brew, CI-built binary, post-install .app wrapper
 - Phase 22 added (2026-04-01): Seamless macOS UX — pre-flight permissions, game removal, actionable errors, first-run setup
 
 ### Pending Todos

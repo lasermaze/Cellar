@@ -262,3 +262,17 @@ Plans:
 - [ ] 22-01-PLAN.md — Pre-flight permission check + actionable error messages
 - [ ] 22-02-PLAN.md — Game removal (CLI `cellar remove` + web delete upgrade)
 - [ ] 22-03-PLAN.md — First-run auto-setup + hardcoded GOG path fix
+
+### Phase 23: Homebrew tap distribution with launcher .app
+
+**Goal:** Users install Cellar with a single `brew install` command that bypasses all Gatekeeper friction — a Homebrew tap repo hosts the formula, GitHub Actions builds release binaries, and a post-install step creates a minimal launcher `.app` in /Applications that starts `cellar serve` and opens the browser on double-click
+**Depends on:** Phase 22
+**Requirements**: DIST-01, DIST-02, DIST-03
+**Success Criteria** (what must be TRUE):
+  1. `brew tap <org>/cellar && brew install cellar` downloads a pre-built binary from GitHub Releases, installs it to the Homebrew bin, and the `cellar` command works immediately — no Xcode or Swift toolchain required on the user's machine
+  2. GitHub Actions workflow builds a universal (arm64 + x86_64) release binary on every tagged push, uploads it to GitHub Releases, and updates the bottle hash in the formula
+  3. After `brew install`, a `Cellar.app` exists in /Applications that on double-click starts `cellar serve` (if not already running) and opens `http://127.0.0.1:8080` in the default browser — no terminal interaction required for subsequent use
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 23 to break down)
