@@ -272,7 +272,8 @@ Plans:
   1. `brew tap <org>/cellar && brew install cellar` downloads a pre-built binary from GitHub Releases, installs it to the Homebrew bin, and the `cellar` command works immediately — no Xcode or Swift toolchain required on the user's machine
   2. GitHub Actions workflow builds a universal (arm64 + x86_64) release binary on every tagged push, uploads it to GitHub Releases, and updates the bottle hash in the formula
   3. After `brew install`, a `Cellar.app` exists in /Applications that on double-click starts `cellar serve` (if not already running) and opens `http://127.0.0.1:8080` in the default browser — no terminal interaction required for subsequent use
-**Plans:** 0 plans
+**Plans:** 0/2 plans complete
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 23 to break down)
+- [ ] 23-01-PLAN.md — GitHub Actions release workflow + Homebrew tap formula with post_install .app creation
+- [ ] 23-02-PLAN.md — `cellar install-app` subcommand for copying .app to ~/Applications
