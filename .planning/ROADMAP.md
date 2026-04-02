@@ -251,7 +251,7 @@ Plans:
 **Depends on:** Phase 21
 **Requirements**: UX-01, UX-02, UX-03, UX-04, UX-05
 **Success Criteria** (what must be TRUE):
-  1. Before launching a game, a pre-flight check surfaces all missing permissions (Screen Recording, Accessibility) with macOS deep links — the user resolves everything in one pass, not across multiple failed launch attempts
+  1. Before launching a game, a pre-flight check surfaces missing Screen Recording permission with macOS deep links — the user resolves it in one pass, not across multiple failed launch attempts (Accessibility deferred: no current code uses Accessibility API)
   2. On first `cellar add` or web UI visit with missing dependencies, Cellar detects and offers inline installation with progress — no need to run `cellar status` first
   3. `cellar remove <game-id>` deletes the bottle, logs, recipes, success records, and registry entry; the web UI delete button does the same with confirmation
   4. LaunchCommand resolves executables from `entry.executablePath` and BottleScanner — the hardcoded GOG path is gone
