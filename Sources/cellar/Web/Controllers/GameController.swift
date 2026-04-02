@@ -40,7 +40,7 @@ enum GameController {
                 throw Abort(.badRequest, reason: "Installer not found at \(input.installPath)")
             }
             guard LaunchService.resolveWine() != nil else {
-                throw Abort(.serviceUnavailable, reason: "Wine is not installed")
+                throw Abort(.serviceUnavailable, reason: "Wine is not installed. Visit /status for setup instructions.")
             }
 
             let installerName = installerURL.deletingPathExtension().lastPathComponent

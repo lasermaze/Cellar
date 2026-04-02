@@ -37,6 +37,8 @@ struct ServeCommand: ParsableCommand {
         done.wait()
         if let error = state.error {
             print("Error: \(error)")
+            print("Try this: Check if port \(portValue) is already in use with: lsof -i :\(portValue)")
+            print("  Or try a different port: cellar serve --port \(portValue + 1)")
             Foundation.exit(1)
         }
     }

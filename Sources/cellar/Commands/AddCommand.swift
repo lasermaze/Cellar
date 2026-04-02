@@ -19,6 +19,7 @@ struct AddCommand: ParsableCommand {
         // 1. Verify installer exists
         guard FileManager.default.fileExists(atPath: installerURL.path) else {
             print("Error: Installer not found at \(installerPath)")
+            print("Try this: Check the path exists with: ls \(installerPath)")
             throw ExitCode.failure
         }
 
@@ -26,7 +27,7 @@ struct AddCommand: ParsableCommand {
         let status = DependencyChecker().checkAll()
         guard status.allRequired, let wineURL = status.wine else {
             print("Error: Wine is not installed.")
-            print("Run `cellar` first to install dependencies.")
+            print("Try this: Run `cellar` to install Wine and other dependencies.")
             throw ExitCode.failure
         }
 
@@ -54,6 +55,7 @@ struct AddCommand: ParsableCommand {
         if forceProactiveDeps, let deps = recipe?.setupDeps, !deps.isEmpty {
             guard let winetricksURL = status.winetricks else {
                 print("Error: winetricks is required for --force-proactive-deps but was not found.")
+                print("Try this: Run `brew install winetricks` to install winetricks.")
                 throw ExitCode.failure
             }
             let runner = WinetricksRunner(winetricksURL: winetricksURL, wineBinary: wineURL, bottlePath: CellarPaths.bottleDir(for: gameId).path)
@@ -89,6 +91,7 @@ struct AddCommand: ParsableCommand {
                 if case .installWinetricks(let verb) = error.suggestedFix {
                     guard let winetricksURL = status.winetricks else {
                         print("Error: winetricks needed to install \(verb) but not found.")
+                        print("Try this: Run `brew install winetricks` to install winetricks.")
                         throw ExitCode.failure
                     }
                     print("Installer failed — diagnosed: \(error.detail)")
@@ -123,6 +126,7 @@ struct AddCommand: ParsableCommand {
                 if answer == "y" {
                     guard let winetricksURL = status.winetricks else {
                         print("Error: winetricks not found.")
+                        print("Try this: Run `brew install winetricks` to install winetricks.")
                         throw ExitCode.failure
                     }
                     let runner = WinetricksRunner(winetricksURL: winetricksURL, wineBinary: wineURL, bottlePath: CellarPaths.bottleDir(for: gameId).path)
