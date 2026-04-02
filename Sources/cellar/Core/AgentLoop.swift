@@ -119,10 +119,10 @@ struct AgentLoop {
     /// - Returns: AgentLoopResult with finalText, iterationsUsed, and completed flag.
     mutating func run(
         initialMessage: String,
-        toolExecutor: (String, JSONValue) -> String,
+        toolExecutor: (String, JSONValue) async -> String,
         canStop: (() -> Bool)? = nil,
         shouldAbort: (() -> Bool)? = nil
-    ) -> AgentLoopResult {
+    ) async -> AgentLoopResult {
         var iterationCount = 0
         var allText: [String] = []
 
@@ -183,7 +183,7 @@ struct AgentLoop {
             emit(.iteration(number: iterationCount, total: maxIterations))
             let response: AgentLoopProviderResponse
             do {
-                response = try provider.callWithRetry(maxTokens: currentMaxTokens, emit: emit)
+                response = try await provider.callWithRetry(maxTokens: currentMaxTokens, emit: emit)
             } catch let error as AgentLoopError {
                 if case .apiUnavailable = error {
                     emit(.error("API unavailable after 3 attempts. Your game state is unchanged."))
@@ -227,7 +227,7 @@ struct AgentLoop {
                 provider.appendUserMessage(stopMsg)
                 hasSentBudgetHalt = true
                 // Make one final API call for the agent to save
-                if let finalResponse = try? provider.callWithRetry(maxTokens: currentMaxTokens, emit: emit) {
+                if let finalResponse = try? await provider.callWithRetry(maxTokens: currentMaxTokens, emit: emit) {
                     totalInputTokens += finalResponse.inputTokens
                     totalOutputTokens += finalResponse.outputTokens
                     for text in finalResponse.textBlocks {
@@ -288,7 +288,7 @@ struct AgentLoop {
                 var userStopped = false
                 for call in response.toolCalls {
                     emit(.toolCall(name: call.name))
-                    let result = toolExecutor(call.name, call.input)
+                    let result = await toolExecutor(call.name, call.input)
                     emit(.toolResult(name: call.name, truncated: String(result.prefix(200))))
                     results.append((id: call.id, content: result, isError: false))
 

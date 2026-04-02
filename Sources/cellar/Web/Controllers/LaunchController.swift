@@ -364,83 +364,78 @@ enum LaunchController {
 
         let wineProcess = WineProcess(wineBinary: wineURL, winePrefix: bottleURL)
 
-        // Run on a detached dispatch queue to avoid NIO event loop deadlock.
-        // AgentLoop uses DispatchSemaphore internally -- MUST NOT run on NIO.
-        let result = await withCheckedContinuation { (continuation: CheckedContinuation<AIResult<String>, Never>) in
-            DispatchQueue.global(qos: .userInitiated).async {
-                let onOutput: @Sendable (AgentEvent) -> Void = { event in
-                    switch event {
-                    case .iteration(let n, let total):
-                        sendSSE(writer: sseWriter, event: "iteration",
-                                data: "<div class='iteration'>Iteration \(n)/\(total)</div>")
-                    case .text(let text):
-                        sendSSE(writer: sseWriter, event: "log",
-                                data: "<div class='agent-text'>\(escapeHTML(text))</div>")
-                    case .toolCall(let name):
-                        sendSSE(writer: sseWriter, event: "tool",
-                                data: "<div class='tool-call'>Tool: \(escapeHTML(name))</div>")
-                    case .toolResult(let name, let truncated):
-                        sendSSE(writer: sseWriter, event: "log",
-                                data: "<div class='tool-result'>\(escapeHTML(name)): \(escapeHTML(truncated))</div>")
-                    case .cost(_, _, let usd):
-                        sendSSE(writer: sseWriter, event: "cost",
-                                data: "<div class='cost'>Cost: $\(String(format: "%.4f", usd))</div>")
-                    case .budgetWarning(let pct):
-                        sendSSE(writer: sseWriter, event: "status",
-                                data: "<div class='warning'>Budget warning: \(pct)% used</div>")
-                    case .status(let msg):
-                        sendSSE(writer: sseWriter, event: "status",
-                                data: "<div>\(escapeHTML(msg))</div>")
-                    case .error(let msg):
-                        sendSSE(writer: sseWriter, event: "error",
-                                data: "<div class='error'>\(escapeHTML(msg))</div>")
-                    case .completed(let loopResult):
-                        sendSSE(writer: sseWriter, event: "status",
-                                data: "<div>Agent completed: \(loopResult.iterationsUsed) iterations, $\(String(format: "%.4f", loopResult.estimatedCostUSD))</div>")
-                    }
-                }
-
-                let capturedGameId = gameId
-                let capturedWriter = sseWriter
-                let webAskUser: @Sendable (_ question: String, _ options: [String]?) -> String = { question, options in
-                    // Send prompt to browser via SSE — rendered inside a <dialog> modal
-                    var html = "<header><h3>Agent Question</h3></header>"
-                    html += "<p>\(escapeHTML(question))</p>"
-                    html += "<form hx-post='/games/\(capturedGameId)/launch/respond' hx-swap='none'>"
-                    if let opts = options, !opts.isEmpty {
-                        for opt in opts {
-                            html += "<label style='display: block; margin-bottom: 0.5rem;'>"
-                            html += "<input type='radio' name='answer' value='\(escapeHTML(opt))'> \(escapeHTML(opt))"
-                            html += "</label>"
-                        }
-                        html += "<hr>"
-                    }
-                    html += "<input type='text' name='answer' placeholder='Type your answer...'>"
-                    html += "<footer style='display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;'>"
-                    html += "<button type='submit'>Submit</button>"
-                    html += "</footer></form>"
-                    sendSSE(writer: capturedWriter, event: "prompt", data: html)
-                    // Block until browser responds
-                    return PendingUserResponse.shared.waitForResponse(gameId: capturedGameId)
-                }
-
-                let aiResult = AIService.runAgentLoop(
-                    gameId: gameId,
-                    entry: game,
-                    executablePath: executablePath,
-                    wineURL: wineURL,
-                    bottleURL: bottleURL,
-                    wineProcess: wineProcess,
-                    onOutput: onOutput,
-                    askUserHandler: webAskUser,
-                    onToolsCreated: { tools in
-                        ActiveAgents.shared.register(gameId: gameId, tools: tools)
-                    }
-                )
-                ActiveAgents.shared.remove(gameId: gameId)
-                continuation.resume(returning: aiResult)
+        let onOutput: @Sendable (AgentEvent) -> Void = { event in
+            switch event {
+            case .iteration(let n, let total):
+                sendSSE(writer: sseWriter, event: "iteration",
+                        data: "<div class='iteration'>Iteration \(n)/\(total)</div>")
+            case .text(let text):
+                sendSSE(writer: sseWriter, event: "log",
+                        data: "<div class='agent-text'>\(escapeHTML(text))</div>")
+            case .toolCall(let name):
+                sendSSE(writer: sseWriter, event: "tool",
+                        data: "<div class='tool-call'>Tool: \(escapeHTML(name))</div>")
+            case .toolResult(let name, let truncated):
+                sendSSE(writer: sseWriter, event: "log",
+                        data: "<div class='tool-result'>\(escapeHTML(name)): \(escapeHTML(truncated))</div>")
+            case .cost(_, _, let usd):
+                sendSSE(writer: sseWriter, event: "cost",
+                        data: "<div class='cost'>Cost: $\(String(format: "%.4f", usd))</div>")
+            case .budgetWarning(let pct):
+                sendSSE(writer: sseWriter, event: "status",
+                        data: "<div class='warning'>Budget warning: \(pct)% used</div>")
+            case .status(let msg):
+                sendSSE(writer: sseWriter, event: "status",
+                        data: "<div>\(escapeHTML(msg))</div>")
+            case .error(let msg):
+                sendSSE(writer: sseWriter, event: "error",
+                        data: "<div class='error'>\(escapeHTML(msg))</div>")
+            case .completed(let loopResult):
+                sendSSE(writer: sseWriter, event: "status",
+                        data: "<div>Agent completed: \(loopResult.iterationsUsed) iterations, $\(String(format: "%.4f", loopResult.estimatedCostUSD))</div>")
             }
         }
+
+        let capturedGameId = gameId
+        let capturedWriter = sseWriter
+        // PendingUserResponse.waitForResponse blocks on DispatchSemaphore — run on a global queue
+        // to avoid blocking Swift's cooperative thread pool.
+        let webAskUser: @Sendable (_ question: String, _ options: [String]?) -> String = { question, options in
+            // Send prompt to browser via SSE — rendered inside a <dialog> modal
+            var html = "<header><h3>Agent Question</h3></header>"
+            html += "<p>\(escapeHTML(question))</p>"
+            html += "<form hx-post='/games/\(capturedGameId)/launch/respond' hx-swap='none'>"
+            if let opts = options, !opts.isEmpty {
+                for opt in opts {
+                    html += "<label style='display: block; margin-bottom: 0.5rem;'>"
+                    html += "<input type='radio' name='answer' value='\(escapeHTML(opt))'> \(escapeHTML(opt))"
+                    html += "</label>"
+                }
+                html += "<hr>"
+            }
+            html += "<input type='text' name='answer' placeholder='Type your answer...'>"
+            html += "<footer style='display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem;'>"
+            html += "<button type='submit'>Submit</button>"
+            html += "</footer></form>"
+            sendSSE(writer: capturedWriter, event: "prompt", data: html)
+            // Block on DispatchSemaphore (intentional — PendingUserResponse is a web bridge pattern)
+            return PendingUserResponse.shared.waitForResponse(gameId: capturedGameId)
+        }
+
+        let result = await AIService.runAgentLoop(
+            gameId: gameId,
+            entry: game,
+            executablePath: executablePath,
+            wineURL: wineURL,
+            bottleURL: bottleURL,
+            wineProcess: wineProcess,
+            onOutput: onOutput,
+            askUserHandler: webAskUser,
+            onToolsCreated: { tools in
+                ActiveAgents.shared.register(gameId: gameId, tools: tools)
+            }
+        )
+        ActiveAgents.shared.remove(gameId: gameId)
 
         switch result {
         case .success(let summary):

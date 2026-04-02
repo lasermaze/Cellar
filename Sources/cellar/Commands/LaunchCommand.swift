@@ -1,7 +1,7 @@
 import ArgumentParser
 import Foundation
 
-struct LaunchCommand: ParsableCommand {
+struct LaunchCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "launch",
         abstract: "Launch an installed game via Wine"
@@ -10,7 +10,7 @@ struct LaunchCommand: ParsableCommand {
     @Argument(help: "Game name or ID to launch")
     var game: String
 
-    mutating func run() throws {
+    mutating func run() async throws {
         // 1. Check dependencies
         let status = DependencyChecker().checkAll()
         guard status.allRequired, let wineURL = status.wine else {
@@ -62,7 +62,7 @@ struct LaunchCommand: ParsableCommand {
         }
 
         // 5. Try agent loop (requires Anthropic API key)
-        switch AIService.runAgentLoop(
+        switch await AIService.runAgentLoop(
             gameId: game,
             entry: entry,
             executablePath: executablePath,
