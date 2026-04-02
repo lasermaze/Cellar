@@ -23,11 +23,29 @@ struct AddCommand: ParsableCommand {
             throw ExitCode.failure
         }
 
-        // 2. Check dependencies
-        let status = DependencyChecker().checkAll()
-        guard status.allRequired, let wineURL = status.wine else {
+        // 2. Check dependencies — offer inline install if missing
+        var status = DependencyChecker().checkAll()
+        if !status.allRequired {
+            print("Missing dependencies detected. Setting up now...\n")
+            let installer = GuidedInstaller()
+            if status.homebrew == nil {
+                installer.installHomebrew()
+                status = DependencyChecker().checkAll()
+            }
+            if status.homebrew != nil && status.wine == nil {
+                installer.installWine()
+                status = DependencyChecker().checkAll()
+            }
+            guard status.allRequired else {
+                print("Error: Dependencies could not be installed automatically.")
+                print("Try this: Run `cellar` for step-by-step setup guidance.")
+                throw ExitCode.failure
+            }
+            print("\nDependencies installed successfully. Continuing with game installation...\n")
+        }
+        guard let wineURL = status.wine else {
             print("Error: Wine is not installed.")
-            print("Try this: Run `cellar` to install Wine and other dependencies.")
+            print("Try this: Run `cellar` for step-by-step setup guidance.")
             throw ExitCode.failure
         }
 
