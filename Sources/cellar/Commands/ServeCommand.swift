@@ -22,7 +22,17 @@ struct ServeCommand: ParsableCommand {
                     let env = Environment(name: "development", arguments: ["vapor"])
                     let app = try await Application.make(env)
                     try WebApp.configure(app, port: portValue)
-                    print("Cellar web server running on http://127.0.0.1:\(portValue)")
+                    // Suppress Vapor's default log noise
+                    app.logger.logLevel = .error
+                    let url = "http://127.0.0.1:\(portValue)"
+                    print("")
+                    print("  🍷 Cellar is running at \(url)")
+                    print("")
+                    print("  Open in browser:  \(url)")
+                    print("  Stop server:      Ctrl+C")
+                    print("")
+                    // Auto-open browser
+                    Process.launchedProcess(launchPath: "/usr/bin/open", arguments: [url])
                     try await app.execute()
                     try await app.asyncShutdown()
                 } catch {
