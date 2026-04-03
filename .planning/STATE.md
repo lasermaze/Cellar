@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-04-03T02:39:36.493Z"
+last_updated: "2026-04-03T04:58:35.414Z"
 progress:
-  total_phases: 27
+  total_phases: 28
   completed_phases: 26
-  total_plans: 63
-  completed_plans: 63
+  total_plans: 65
+  completed_plans: 64
 ---
 
 # Project State
@@ -70,6 +70,7 @@ Progress: [████████████████████] ~96% (1
 | Phase 26-iso-disc-image-support-for-game-installation P02 | 4 | 1 tasks | 1 files |
 | Phase 27-distribution-github-releases-install-script P01 | 1 | 1 tasks | 1 files |
 | Phase 27-distribution-github-releases-install-script P02 | 1 | 1 tasks | 1 files |
+| Phase 28-fix-collective-memory-prompt-injection-vulnerability P02 | 174 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -131,6 +132,9 @@ Progress: [████████████████████] ~96% (1
 - [Phase 27-distribution-github-releases-install-script]: Checksum generated as separate .sha256 file so install.sh can download and verify independently
 - [Phase 27-distribution-github-releases-install-script]: xattr -rd ... || true is critical in install.sh — xattr exits 1 when no quarantine attribute exists, which would abort under set -e
 - [Phase 27-distribution-github-releases-install-script]: install.sh shasum verification uses cd into TMPDIR first so relative filename in .sha256 resolves correctly
+- [Phase 28-02]: OriginCheckMiddleware uses [HTTPMethod] array instead of Set — HTTPMethod does not conform to Hashable in Vapor
+- [Phase 28-02]: OriginCheckMiddleware registered before FileMiddleware so CSRF check runs before any route handler
+- [Phase 28-02]: chmod return value ignored — best-effort inside a throwing function context
 
 ### Roadmap Evolution
 
