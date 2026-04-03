@@ -337,3 +337,13 @@ Plans:
 Plans:
 - [ ] 28-01-PLAN.md — Shared env allowlist, reasoning removal, sanitizeEntry() helper, write-side env+registry validation
 - [ ] 28-02-PLAN.md — System prompt hardening, CSRF Origin middleware, .env chmod 600
+
+### Phase 29: Secure collective memory — Cloudflare Worker write proxy, remove bundled private key
+
+**Goal:** Remove the bundled GitHub App private key from the binary. Make the memory repo public (anonymous reads, no auth). Route writes through a Cloudflare Worker that holds the key as a secret and validates entries server-side. Delete GitHubAuthService and all bundled credentials.
+**Requirements**: Public repo anonymous reads, Cloudflare Worker write proxy with server-side validation, remove github-app.pem and github-app.json from binary, delete GitHubAuthService, local read cache with TTL, configurable proxy URL
+**Depends on:** Phase 28
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 29 to break down)
