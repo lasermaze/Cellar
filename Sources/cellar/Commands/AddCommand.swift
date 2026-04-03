@@ -4,10 +4,10 @@ import Foundation
 struct AddCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "add",
-        abstract: "Add a game by running its installer inside a Wine bottle"
+        abstract: "Add a game from an installer or disc image"
     )
 
-    @Argument(help: "Path to the game installer (e.g. setup.exe)")
+    @Argument(help: "Path to the game installer (.exe) or disc image (.iso, .bin, .cue)")
     var installerPath: String
 
     @Flag(help: "Pre-install recipe dependencies before running installer (old behavior)")
@@ -21,6 +21,31 @@ struct AddCommand: AsyncParsableCommand {
             print("Error: Installer not found at \(installerPath)")
             print("Try this: Check the path exists with: ls \(installerPath)")
             throw ExitCode.failure
+        }
+
+        // Disc image support: mount .iso/.bin/.cue and discover installer
+        let discImageExtensions: Set<String> = ["iso", "bin", "cue", "img"]
+        let inputExtension = installerURL.pathExtension.lowercased()
+        var mountResult: MountResult? = nil
+        var effectiveInstallerURL = installerURL
+
+        // Defer cleanup at function scope — always unmounts, even on error
+        defer {
+            if let m = mountResult {
+                print("Unmounting disc image...")
+                DiscImageHandler().detach(mountResult: m)
+                print("Disc image unmounted.")
+            }
+        }
+
+        if discImageExtensions.contains(inputExtension) {
+            let handler = DiscImageHandler()
+            print("Mounting disc image \(installerURL.lastPathComponent)...")
+            let mount = try handler.mount(imageURL: installerURL)
+            mountResult = mount
+            print("Mounted at \(mount.mountPoint.path)")
+            effectiveInstallerURL = try handler.discoverInstaller(at: mount.mountPoint)
+            print("Found installer: \(effectiveInstallerURL.lastPathComponent)")
         }
 
         // 2. Check dependencies — offer inline install if missing
@@ -49,8 +74,15 @@ struct AddCommand: AsyncParsableCommand {
             throw ExitCode.failure
         }
 
-        // 3. Derive game name and ID from installer filename (strip extension)
-        let installerName = installerURL.deletingPathExtension().lastPathComponent
+        // 3. Derive game name and ID
+        let installerName: String
+        if let m = mountResult, let label = DiscImageHandler().volumeLabel(from: m.mountPoint) {
+            // For disc images, prefer volume label (e.g., "Civilization III")
+            installerName = label
+        } else {
+            // For .exe or disc images without meaningful label, use filename
+            installerName = effectiveInstallerURL.deletingPathExtension().lastPathComponent
+        }
         let gameName = installerName.replacingOccurrences(of: "_", with: " ")
         let gameId = slugify(installerName)
 
@@ -94,7 +126,7 @@ struct AddCommand: AsyncParsableCommand {
         let wineProcess = WineProcess(wineBinary: wineURL, winePrefix: CellarPaths.bottleDir(for: gameId))
         print("Running installer inside Wine bottle...")
         let installerResult = try wineProcess.run(
-            binary: installerURL.path,
+            binary: effectiveInstallerURL.path,
             arguments: ["/VERYSILENT", "/SP-", "/SUPPRESSMSGBOXES"],
             environment: [:]
         )
@@ -120,7 +152,7 @@ struct AddCommand: AsyncParsableCommand {
                         installed = true
                         print("Installed \(verb). Retrying installer...")
                         let retryResult = try wineProcess.run(
-                            binary: installerURL.path,
+                            binary: effectiveInstallerURL.path,
                             arguments: ["/VERYSILENT", "/SP-", "/SUPPRESSMSGBOXES"],
                             environment: [:]
                         )
@@ -160,7 +192,7 @@ struct AddCommand: AsyncParsableCommand {
                     }
                     print("Retrying installer...")
                     _ = try wineProcess.run(
-                        binary: installerURL.path,
+                        binary: effectiveInstallerURL.path,
                         arguments: ["/VERYSILENT", "/SP-", "/SUPPRESSMSGBOXES"],
                         environment: [:]
                     )
