@@ -117,9 +117,53 @@ struct SuccessDatabase {
         }
     }
 
-    /// Query by game_id (exact match).
+    /// Query by game_id — tries exact match first, then fuzzy substring match across all records.
     static func queryByGameId(_ gameId: String) -> SuccessRecord? {
-        return load(gameId: gameId)
+        // 1. Exact match
+        if let exact = load(gameId: gameId) { return exact }
+
+        // 2. Fuzzy match: extract meaningful words from the query (strip version numbers, prefixes)
+        let queryWords = extractGameWords(gameId)
+        guard !queryWords.isEmpty else { return nil }
+
+        // 3. Score all records by word overlap
+        let candidates = loadAll().map { record -> (SuccessRecord, Double) in
+            let recordWords = extractGameWords(record.gameId)
+                + extractGameWords(record.gameName)
+            let overlap = queryWords.filter { word in
+                recordWords.contains { $0.contains(word) || word.contains($0) }
+            }
+            let score = queryWords.isEmpty ? 0 : Double(overlap.count) / Double(queryWords.count)
+            return (record, score)
+        }
+        .filter { $0.1 >= 0.5 }  // at least 50% word overlap
+        .sorted { $0.1 > $1.1 }
+
+        return candidates.first?.0
+    }
+
+    /// Extract meaningful words from a game identifier, stripping version numbers and common prefixes.
+    private static func extractGameWords(_ input: String) -> [String] {
+        let lowered = input.lowercased()
+            .replacingOccurrences(of: "-", with: " ")
+            .replacingOccurrences(of: "_", with: " ")
+
+        // Strip common installer prefixes
+        let stripped = lowered
+            .replacingOccurrences(of: "setup ", with: "")
+            .replacingOccurrences(of: "install ", with: "")
+
+        return stripped.split(separator: " ")
+            .map(String.init)
+            .filter { word in
+                // Skip version numbers (e.g., "2007", "1630", "v1", "10")
+                guard word.count > 1 else { return false }
+                if word.allSatisfy({ $0.isNumber || $0 == "." }) { return false }
+                if word.hasPrefix("v") && word.dropFirst().allSatisfy({ $0.isNumber || $0 == "." }) { return false }
+                // Skip noise words
+                let noise: Set<String> = ["the", "of", "and", "gog", "goty", "edition", "revision", "exe", "bin"]
+                return !noise.contains(word)
+            }
     }
 
     /// Query by tags (any overlap).
