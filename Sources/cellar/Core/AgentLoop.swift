@@ -4,7 +4,9 @@ import Foundation
 
 /// Why the agent loop stopped.
 enum AgentStopReason: Sendable {
-    case completed
+    case completed          // Agent called end_turn naturally
+    case userAborted        // User clicked stop
+    case userConfirmed      // User clicked confirm — caller must save after loop
     case budgetExhausted
     case maxIterations
     case apiError(String)
@@ -41,6 +43,40 @@ enum AgentEvent: Sendable {
     case status(String)
     case error(String)
     case completed(AgentLoopResult)
+}
+
+// MARK: - ToolResult
+
+/// Typed result from tool execution. Eliminates string matching for control flow.
+enum ToolResult: Sendable {
+    /// Tool executed successfully. `content` is the JSON string for the LLM.
+    case success(content: String)
+    /// Tool executed but the agent should stop after this iteration.
+    case stop(content: String, reason: StopReason)
+    /// Tool execution failed (still sent to LLM as tool_result).
+    case error(content: String)
+
+    enum StopReason: Sendable {
+        case userAborted
+        case userConfirmedWorking
+    }
+
+    /// The JSON string to include in the tool_result message to the LLM.
+    var content: String {
+        switch self {
+        case .success(let c), .stop(let c, _), .error(let c): return c
+        }
+    }
+
+    var isStop: Bool {
+        if case .stop = self { return true }
+        return false
+    }
+
+    var isError: Bool {
+        if case .error = self { return true }
+        return false
+    }
 }
 
 // MARK: - AgentLoop
