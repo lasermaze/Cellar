@@ -194,9 +194,6 @@ extension AgentTools {
 
         do {
             try SuccessDatabase.save(record)
-            if taskState == .userConfirmedOk {
-                taskState = .savedAfterConfirm
-            }
             let savedPath = CellarPaths.successdbFile(for: gameId).path
 
             // Backward compatibility: also save as user recipe

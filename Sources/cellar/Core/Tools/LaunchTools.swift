@@ -25,7 +25,6 @@ extension AgentTools {
         // Enforce max launch limit (diagnostic launches are free)
         if !isDiagnostic {
             if launchCount >= maxLaunches {
-                taskState = .exhausted
                 return jsonResult([
                     "error": "Maximum launches (\(maxLaunches)) reached for this session. Save a recipe if you found a working configuration.",
                     "launch_number": launchCount
@@ -174,21 +173,9 @@ extension AgentTools {
             resultDict["user_feedback"] = feedback
             resultDict["user_was_asked"] = true
             resultDict["IMPORTANT"] = "The user was already asked about the game and responded: '\(feedback)'. Use their feedback to decide next steps. Do NOT call ask_user to re-ask the same question."
-
-            // Track task state based on user feedback
-            let lower = feedback.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-            let positive = ["yes", "y", "works", "perfect", "good", "great", "fine", "ok", "okay"]
-            if positive.contains(lower) || lower.hasPrefix("yes") {
-                taskState = .userConfirmedOk
-            } else if !lower.isEmpty {
-                taskState = .working  // Reset even if previously confirmed (regression)
-            }
         } else if !isDiagnostic && !result.timedOut && result.elapsed < 10.0 {
             // Fast crash — task is definitely not complete
             resultDict["IMPORTANT"] = "Game crashed in \(String(format: "%.1f", result.elapsed))s. This is NOT a success. Diagnose the crash using read_log and diagnostics, then fix and relaunch."
-            if taskState == .userConfirmedOk {
-                taskState = .working  // Regression
-            }
         }
 
         return jsonResult(resultDict)

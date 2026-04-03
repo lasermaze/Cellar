@@ -68,22 +68,31 @@ private final class ActiveAgents: @unchecked Sendable {
     static let shared = ActiveAgents()
     private let lock = NSLock()
     private var agents: [String: AgentTools] = [:]
+    private var controls: [String: AgentControl] = [:]
 
-    func register(gameId: String, tools: AgentTools) {
+    func register(gameId: String, tools: AgentTools, control: AgentControl) {
         lock.lock()
         agents[gameId] = tools
+        controls[gameId] = control
         lock.unlock()
     }
 
-    func get(gameId: String) -> AgentTools? {
+    func getTools(gameId: String) -> AgentTools? {
         lock.lock()
         defer { lock.unlock() }
         return agents[gameId]
     }
 
+    func getControl(gameId: String) -> AgentControl? {
+        lock.lock()
+        defer { lock.unlock() }
+        return controls[gameId]
+    }
+
     func remove(gameId: String) {
         lock.lock()
         agents.removeValue(forKey: gameId)
+        controls.removeValue(forKey: gameId)
         lock.unlock()
     }
 }
@@ -167,30 +176,23 @@ enum LaunchController {
 
         // POST /games/:gameId/launch/stop -- force stop agent
         app.post("games", ":gameId", "launch", "stop") { req async throws -> Response in
-            guard let gameId = req.parameters.get("gameId") else {
-                throw Abort(.badRequest)
-            }
-            if let tools = ActiveAgents.shared.get(gameId: gameId) {
-                tools.shouldAbort = true
-            }
-            // Force-release the guard even if agent is stuck in a synchronous call
+            guard let gameId = req.parameters.get("gameId") else { throw Abort(.badRequest) }
+            ActiveAgents.shared.getControl(gameId: gameId)?.abort()
             await LaunchGuard.shared.release()
             var headers = HTTPHeaders()
             headers.add(name: .contentType, value: "text/html")
-            return Response(status: .ok, headers: headers, body: .init(string: "<span style='color: var(--error);'>Agent stopped</span>"))
+            return Response(status: .ok, headers: headers,
+                            body: .init(string: "<span style='color: var(--error);'>Agent stopped</span>"))
         }
 
         // POST /games/:gameId/launch/confirm -- user confirms game is working
         app.post("games", ":gameId", "launch", "confirm") { req async throws -> Response in
-            guard let gameId = req.parameters.get("gameId") else {
-                throw Abort(.badRequest)
-            }
-            if let tools = ActiveAgents.shared.get(gameId: gameId) {
-                tools.userForceConfirmed = true
-            }
+            guard let gameId = req.parameters.get("gameId") else { throw Abort(.badRequest) }
+            ActiveAgents.shared.getControl(gameId: gameId)?.confirm()
             var headers = HTTPHeaders()
             headers.add(name: .contentType, value: "text/html")
-            return Response(status: .ok, headers: headers, body: .init(string: "<span style='color: var(--success);'>Confirmed! Saving config...</span>"))
+            return Response(status: .ok, headers: headers,
+                            body: .init(string: "<span style='color: var(--success);'>Confirmed! Saving config...</span>"))
         }
 
         // POST /games/:gameId/launch/respond -- user answers agent prompt
@@ -431,8 +433,8 @@ enum LaunchController {
             wineProcess: wineProcess,
             onOutput: onOutput,
             askUserHandler: webAskUser,
-            onToolsCreated: { tools in
-                ActiveAgents.shared.register(gameId: gameId, tools: tools)
+            onToolsCreated: { tools, control in
+                ActiveAgents.shared.register(gameId: gameId, tools: tools, control: control)
             }
         )
         ActiveAgents.shared.remove(gameId: gameId)
