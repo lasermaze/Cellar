@@ -280,7 +280,7 @@ struct CollectiveMemoryService {
     /// Sanitize a collective memory entry by validating and truncating all injectable fields.
     /// Drops disallowed env keys, invalid DLL modes, and registry keys with unexpected prefixes.
     /// Logs dropped values to stderr without blocking.
-    private static func sanitizeEntry(_ entry: CollectiveMemoryEntry) -> CollectiveMemoryEntry {
+    static func sanitizeEntry(_ entry: CollectiveMemoryEntry) -> CollectiveMemoryEntry {
         // Sanitize environment: filter against allowlist, truncate values to 200 chars
         let sanitizedEnv = entry.config.environment.reduce(into: [String: String]()) { result, pair in
             let (key, value) = pair

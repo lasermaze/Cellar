@@ -153,7 +153,7 @@ enum SettingsController {
 
     // MARK: - .env File Handling
 
-    private static func loadEnvFile() -> [String: String] {
+    static func loadEnvFile() -> [String: String] {
         let envFile = CellarPaths.base.appendingPathComponent(".env")
         guard let contents = try? String(contentsOf: envFile, encoding: .utf8) else {
             return [:]
@@ -189,7 +189,7 @@ enum SettingsController {
         chmod(envFile.path, 0o600)
     }
 
-    private static func maskKey(_ key: String) -> String {
+    static func maskKey(_ key: String) -> String {
         guard key.count > 8 else { return key.isEmpty ? "" : "••••" }
         let prefix = String(key.prefix(4))
         let suffix = String(key.suffix(4))

@@ -7,18 +7,21 @@ import Foundation
 struct OriginCheckMiddleware: AsyncMiddleware {
     let allowedPort: Int
 
-    func respond(to request: Request, chainingTo next: AsyncResponder) async throws -> Response {
-        let mutatingMethods: [HTTPMethod] = [.POST, .PUT, .DELETE, .PATCH]
-        guard mutatingMethods.contains(request.method) else {
-            return try await next.respond(to: request)
-        }
-        guard let origin = request.headers.first(name: .origin) else {
-            // No Origin header — non-browser client, allow through
-            return try await next.respond(to: request)
-        }
+    /// Pure logic: should this request be allowed through?
+    /// Returns true if allowed, false if should be blocked.
+    static func isOriginAllowed(_ origin: String?, method: String, allowedPort: Int) -> Bool {
+        let mutatingMethods = ["POST", "PUT", "DELETE", "PATCH"]
+        guard mutatingMethods.contains(method) else { return true }
+        guard let origin = origin else { return true }  // no Origin = non-browser client
         let allowed = ["http://localhost:\(allowedPort)", "http://127.0.0.1:\(allowedPort)"]
-        guard allowed.contains(origin) else {
-            throw Abort(.forbidden, reason: "CSRF: Origin '\(origin)' not allowed")
+        return allowed.contains(origin)
+    }
+
+    func respond(to request: Request, chainingTo next: AsyncResponder) async throws -> Response {
+        let method = request.method.string
+        let origin = request.headers.first(name: .origin)
+        guard Self.isOriginAllowed(origin, method: method, allowedPort: allowedPort) else {
+            throw Abort(.forbidden, reason: "CSRF: Origin '\(origin ?? "")' not allowed")
         }
         return try await next.respond(to: request)
     }
