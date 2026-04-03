@@ -304,3 +304,14 @@ Plans:
 
 Plans:
 - [x] 25-01-PLAN.md — Add Kimi (Moonshot AI) as full AI provider: .kimi enum case, KimiAgentProvider, detectProvider cascade, callKimi(), error messages (completed 2026-04-02)
+
+### Phase 26: ISO disc image support for game installation
+
+**Goal:** Support .iso, .bin/.cue, and other disc image formats in `cellar add` — mount, detect installer, run through existing bottle/recipe pipeline, unmount.
+**Requirements**: ISO/BIN/CUE detection in AddCommand, disc image mounting, installer discovery within mounted volumes, cleanup/unmount after install
+**Depends on:** Phase 25
+**Plans:** 2 plans
+
+Plans:
+- [ ] 26-01-PLAN.md -- DiscImageHandler struct: mount/discover/detach logic for .iso/.bin/.cue via hdiutil
+- [ ] 26-02-PLAN.md -- AddCommand integration: disc image detection, routing, volume label naming, defer cleanup
