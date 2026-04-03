@@ -24,14 +24,10 @@ final class AgentTools: @unchecked Sendable {
     let wineURL: URL
     let wineProcess: WineProcess
 
-    // MARK: - Web Control Flags
+    // MARK: - Control Channel
 
-    /// Set to true to force-stop the agent loop at the next iteration.
-    var shouldAbort = false
-
-    /// Set to true when user manually confirms game is working from web UI.
-    /// Triggers save_success + stop on next tool execution.
-    var userForceConfirmed = false
+    /// Thread-safe control channel — set by AIService before loop starts.
+    var control: AgentControl!
 
     // MARK: - User Input Handler
 
@@ -63,9 +59,6 @@ final class AgentTools: @unchecked Sendable {
     var installedDeps: Set<String> = []
     /// Log file from the most recent launch_game call.
     var lastLogFile: URL? = nil
-    /// Tracks whether the agent's task is complete.
-    enum TaskState { case working, userConfirmedOk, savedAfterConfirm, exhausted }
-    var taskState: TaskState = .working
 
     /// Actions applied since the last launch (for changes_since_last tracking).
     /// Internal so extension files (LaunchTools, DiagnosticTools) can read/write.
@@ -74,14 +67,6 @@ final class AgentTools: @unchecked Sendable {
     var lastAppliedActions: [String] = []
     /// Previous launch diagnostics for computing changes between launches.
     var previousDiagnostics: WineDiagnostics? = nil
-
-    /// Whether the agent is allowed to stop via end_turn.
-    var isTaskComplete: Bool {
-        switch taskState {
-        case .savedAfterConfirm, .exhausted: return true
-        case .working, .userConfirmedOk: return false
-        }
-    }
 
     // MARK: - Init
 
