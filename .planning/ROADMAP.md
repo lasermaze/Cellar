@@ -62,7 +62,7 @@
 **Milestone Goal:** Fix critical bugs in the agent loop (race conditions, unresponsive stop, lost saves) and modernize the architecture with typed results, thread-safe control, a middleware system, and structured event logging — so the loop is correct, observable, and maintainable.
 
 - [x] **Phase 31: New Types** — ToolResult enum, AgentControl, LoopState, expanded AgentStopReason (completed 2026-04-03)
-- [ ] **Phase 32: Middleware System** — AgentMiddleware protocol, BudgetTracker, SpinDetector, EventLogger, JSONL event log
+- [x] **Phase 32: Middleware System** — AgentMiddleware protocol, BudgetTracker, SpinDetector, EventLogger, JSONL event log (completed 2026-04-03)
 - [ ] **Phase 33: Rewrite the Loop** — New run() signature, extracted helpers, clean endTurn semantics, ≤150-line body
 - [ ] **Phase 34: Update AgentTools** — execute() returns ToolResult, remove bare vars, post-loop save logic
 - [ ] **Phase 35: Wire It Together** — AIService, ActiveAgents, LaunchController, prepareStep integration
@@ -383,7 +383,7 @@ Plans:
   2. After an agent session, the JSONL file at `~/.cellar/logs/<gameId>-<timestamp>.jsonl` contains one record per event including sessionStarted, llmCalled, toolInvoked, toolCompleted, budgetWarning, spinDetected, and sessionEnded
   3. `BudgetTracker` middleware fires warnings at 50% and 80% of the budget ceiling and halts at 100% — the loop body contains none of this threshold logic
   4. `SpinDetector` middleware identifies repeating tool call patterns and injects a pivot nudge message — spin detection is not inline in the loop
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 Plans:
 - [ ] 32-01-PLAN.md — AgentMiddleware protocol, MiddlewareContext, BudgetTracker, SpinDetector
 - [ ] 32-02-PLAN.md — AgentEventLog JSONL writer, AgentLogEntry enum, EventLogger middleware
@@ -462,7 +462,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19 �
 | 29. Secure collective memory | v1.2 | 3/3 | Complete | 2026-04-03 |
 | 30. Smart game name matching | v1.2 | 0 | Unused placeholder | — |
 | 31. New Types | 2/2 | Complete    | 2026-04-03 | - |
-| 32. Middleware System | 1/2 | In Progress|  | - |
+| 32. Middleware System | 2/2 | Complete   | 2026-04-03 | - |
 | 33. Rewrite the Loop | v1.3 | 0/TBD | Not started | - |
 | 34. Update AgentTools | v1.3 | 0/TBD | Not started | - |
 | 35. Wire It Together | v1.3 | 0/TBD | Not started | - |

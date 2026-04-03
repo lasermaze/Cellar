@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-03T22:19:33.001Z"
+last_updated: "2026-04-03T22:21:57.340Z"
 progress:
   total_phases: 32
-  completed_phases: 29
+  completed_phases: 30
   total_plans: 72
-  completed_plans: 71
+  completed_plans: 72
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 32 (Middleware System) — in progress
-Plan: P01 complete
-Status: Executing phase 32
-Last activity: 2026-04-02 — P01 complete: AgentMiddleware protocol, MiddlewareContext, BudgetTracker, SpinDetector added to new AgentMiddleware.swift
+Phase: 32 (Middleware System) — complete
+Plan: P02 complete (all plans done)
+Status: Phase 32 complete — ready for Phase 33
+Last activity: 2026-04-03 — P02 complete: AgentEventLog JSONL writer and EventLogger middleware added; all 3 middleware classes now in AgentMiddleware.swift
 
 Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 
@@ -78,6 +78,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 | Phase 31-new-types P02 | 2 | 1 tasks | 2 files |
 | Phase 31 PP01 | 101 | 2 tasks | 1 files |
 | Phase 32-middleware-system P01 | 2 | 2 tasks | 1 files |
+| Phase 32-middleware-system P02 | 1 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -163,6 +164,9 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 - [Phase 31-P01]: LoopState is private file-scope struct before AgentLoop — accessible by AgentLoop but not public API
 - [Phase 31-P01]: StopReason sub-enum uses .userConfirmedWorking (not .userConfirmed) to distinguish from AgentStopReason.userConfirmed
 - [Phase 32-middleware-system]: MiddlewareContext is a final class (reference type) so all middleware share mutation across a single step
+- [Phase 32-middleware-system]: ISO8601 colons replaced with dashes in log filename to avoid filesystem issues on macOS
+- [Phase 32-middleware-system]: summarizeForResume() only collects toolInvoked/envChanged/gameLaunched — other entries are metrics, not resume-relevant
+- [Phase 32-middleware-system]: EventLogger.afterTool prefixes 200-char result with STOP:/ERROR: to distinguish result types in the JSONL log
 
 ### Roadmap Evolution
 

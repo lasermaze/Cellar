@@ -30,12 +30,12 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 - [x] **MW-01**: `AgentMiddleware` protocol with `beforeTool`, `afterTool`, `afterStep` hooks
 - [x] **MW-02**: `BudgetTracker` middleware handles 50%/80%/100% budget thresholds — extracted from loop body
 - [x] **MW-03**: `SpinDetector` middleware detects repeating tool patterns and injects pivot nudges — extracted from loop body
-- [ ] **MW-04**: `EventLogger` middleware writes tool invocations and results to structured JSONL event log
+- [x] **MW-04**: `EventLogger` middleware writes tool invocations and results to structured JSONL event log
 
 ### Event Log
 
-- [ ] **LOG-01**: Append-only JSONL event log at `~/.cellar/logs/<gameId>-<timestamp>.jsonl`
-- [ ] **LOG-02**: Events include: sessionStarted, llmCalled, toolInvoked, toolCompleted, envChanged, gameLaunched, spinDetected, budgetWarning, sessionEnded
+- [x] **LOG-01**: Append-only JSONL event log at `~/.cellar/logs/<gameId>-<timestamp>.jsonl`
+- [x] **LOG-02**: Events include: sessionStarted, llmCalled, toolInvoked, toolCompleted, envChanged, gameLaunched, spinDetected, budgetWarning, sessionEnded
 - [ ] **LOG-03**: Event log can generate a resume summary for injection into next session's initial message
 - [ ] **LOG-04**: SessionHandoff still works as fallback — event log is preferred when available
 
@@ -71,9 +71,9 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 | MW-01 | Phase 32 | Complete |
 | MW-02 | Phase 32 | Complete |
 | MW-03 | Phase 32 | Complete |
-| MW-04 | Phase 32 | Pending |
-| LOG-01 | Phase 32 | Pending |
-| LOG-02 | Phase 32 | Pending |
+| MW-04 | Phase 32 | Complete |
+| LOG-01 | Phase 32 | Complete |
+| LOG-02 | Phase 32 | Complete |
 | LOG-03 | Phase 36 | Pending |
 | LOG-04 | Phase 36 | Pending |
 | INT-01 | Phase 35 | Pending |
