@@ -2,7 +2,9 @@
 
 **Run old Windows games on your Mac — no manual Wine configuration needed.**
 
-Cellar is a free, open-source macOS command-line tool that uses an AI agent to automatically configure and run old Windows games on Mac (both Apple Silicon and Intel) via Wine. Instead of manually tweaking Wine settings, DLL overrides, and registry entries, Cellar's AI agent researches your game, diagnoses issues, and fixes compatibility problems automatically. It's a Wine configuration automation tool for retro gaming on Mac — an alternative to manual Wine setup, CrossOver, or Game Porting Toolkit for classic PC games.
+Cellar is a free, open-source macOS tool with both a **web UI** and **CLI** that uses an AI agent to automatically configure and run old Windows games on Mac (both Apple Silicon and Intel) via Wine. Instead of manually tweaking Wine settings, DLL overrides, and registry entries, Cellar's AI agent researches your game, diagnoses issues, and fixes compatibility problems automatically. It's a Wine configuration automation tool for retro gaming on Mac — an alternative to manual Wine setup, CrossOver, or Game Porting Toolkit for classic PC games.
+
+![Cellar Game Library — Web UI showing game cards with status, launch buttons, and AI agent option](docs/library.png)
 
 ## Install
 
@@ -38,6 +40,8 @@ When launching a game, Cellar's agent follows a three-phase **Research-Diagnose-
 - **Adapt** — applies targeted fixes based on evidence (not guesses), verifies each fix, then launches for real
 
 The agent has 20+ tools including web search, DLL trace analysis, PE import inspection, known DLL downloads (cnc-ddraw, dgVoodoo2, dxwrapper, DXVK), registry editing, and a community success database.
+
+![AI Agent launching Civilization III — live tool calls, log output, and cost tracking in the web UI](docs/agent.png)
 
 ## How Cellar compares
 
