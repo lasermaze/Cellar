@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-04-03T02:01:26.777Z"
+last_updated: "2026-04-03T02:04:04.049Z"
 progress:
   total_phases: 26
-  completed_phases: 24
+  completed_phases: 25
   total_plans: 61
-  completed_plans: 60
+  completed_plans: 61
 ---
 
 # Project State
@@ -67,6 +67,7 @@ Progress: [████████████████████] ~96% (1
 | Phase 24-architecture-code-quality-cleanup P02 | 19 | 2 tasks | 6 files |
 | Phase 25-kimi-model-support P02 | 3 | 2 tasks | 2 files |
 | Phase 26-iso-disc-image-support-for-game-installation P01 | 2 | 1 tasks | 1 files |
+| Phase 26-iso-disc-image-support-for-game-installation P02 | 4 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -123,6 +124,7 @@ Progress: [████████████████████] ~96% (1
 - [Phase 25-kimi-model-support]: Followed deepseekKey pattern exactly for Kimi settings — same masking, .env write/delete logic, struct field placement
 - [Phase 26-iso-disc-image-support-for-game-installation]: Separate DiscImageHandler struct (not inlined in AddCommand) — follows GuidedInstaller/WinetricksRunner isolation pattern
 - [Phase 26-iso-disc-image-support-for-game-installation]: CRawDiskImage attempted first for .bin; convert to CDR only as fallback — avoids unnecessary temp files
+- [Phase 26-iso-disc-image-support-for-game-installation]: effectiveInstallerURL shadows installerURL for pipeline — no conditional branches needed in downstream code
 
 ### Roadmap Evolution
 
