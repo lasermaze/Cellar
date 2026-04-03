@@ -1,33 +1,33 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Collective Agent Memory
-status: unknown
-last_updated: "2026-04-03T19:00:03.929Z"
+milestone: v1.3
+milestone_name: Agent Loop Rewrite
+status: defining_requirements
+last_updated: "2026-04-03T19:30:00.000Z"
 progress:
-  total_phases: 29
-  completed_phases: 28
-  total_plans: 68
-  completed_plans: 68
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-03-30)
+See: .planning/PROJECT.md (updated 2026-04-03)
 
 **Core value:** Any user can go from "I have these old game files" to "the game launches and works" without manually configuring Wine.
-**Current focus:** Phase 22 — Seamless macOS UX (pre-flight permissions, game removal, actionable errors, first-run setup)
+**Current focus:** v1.3 — Agent Loop Rewrite (bug fixes + architecture modernization)
 
 ## Current Position
 
-Phase: 29 of 29 (Secure Collective Memory — Cloudflare Worker Write Proxy) — Complete
-Plan: 3 of 3 complete
-Status: Phase 29 complete — Cloudflare Worker write proxy deployed, read path updated with CELLAR_MEMORY_REPO env var, private key removed from binary, GitHubAuthService deleted, all writes route through proxy.
-Last activity: 2026-04-02 — Phase 29 Plan 03: Remove bundled private key and simplify write path to POST to proxy
+Phase: Not started (defining requirements)
+Plan: —
+Status: Defining requirements for v1.3
+Last activity: 2026-04-03 — Milestone v1.3 started
 
-Progress: [████████████████████] 100% (all 29 phases complete)
+Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 
 ## Performance Metrics
 

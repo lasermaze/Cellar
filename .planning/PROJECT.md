@@ -34,18 +34,35 @@ Any user can go from "I have these old game files" to "the game launches and wor
 - ✓ Smart web research with actionable fix extraction — v1.1
 - ✓ Web interface for game management with CRUD and live agent logs — v1.1
 
+<!-- Shipped in v1.2 — 17 phases, ~35 plans -->
+
+- ✓ Agent queries collective memory (Git-backed) before starting diagnosis — v1.2
+- ✓ Agent reasons about environment fit before applying stored configs — v1.2
+- ✓ Agent pushes successful configs to collective memory via Cloudflare Worker proxy — v1.2
+- ✓ Collective memory with rich entries: working config, environment context, confidence — v1.2
+- ✓ Web interface shows collective memory state — v1.2
+- ✓ Community ready: public repo, anonymous reads, validated writes — v1.2
+- ✓ Kimi (Moonshot AI) provider support — v1.2
+- ✓ ISO/BIN/CUE disc image support in cellar add — v1.2
+- ✓ Single-command install via curl|bash — v1.2
+- ✓ Prompt injection hardening: sanitizeEntry, CSRF, .env permissions — v1.2
+- ✓ Async/await migration, AgentTools decomposition — v1.2
+- ✓ Secure collective memory: Cloudflare Worker proxy, private key removed from binary — v1.2
+
 ### Active
 
-<!-- v1.2: Collective Agent Memory -->
+<!-- v1.3: Agent Loop Rewrite -->
 
-- [ ] Agent queries collective memory (Git-backed) before starting diagnosis — checks if another agent has already solved this game
-- [ ] Agent reasons about whether a stored config fits its local environment (hardware, Wine version, macOS version) before applying
-- [ ] Agent pushes successful configs to collective memory after solving a game — including reasoning chain, environment context, and final config
-- [ ] Collective memory stores rich entries: working config, reasoning chain, environment context, confidence/votes
-- [ ] GitHub App bot token authenticates agent writes — no human approval needed
-- [ ] Confidence builds through multiple agents confirming same config works
-- [ ] Web interface shows collective memory state (configs, success rates, game coverage)
-- [ ] Community ready — public repo, documented, any Cellar user contributes and benefits automatically
+- [ ] Fix memory not saving on web UI confirm (race condition in fire-and-forget save)
+- [ ] Fix stop button unresponsive during API calls (no cancellation)
+- [ ] Fix agent exiting without saving (endTurn tug-of-war)
+- [ ] Fix data races on AgentTools shared state (bare vars, no synchronization)
+- [ ] Typed ToolResult enum replacing string matching for control flow
+- [ ] Thread-safe AgentControl channel between web routes and agent loop
+- [ ] Middleware system: BudgetTracker, SpinDetector, EventLogger extracted from loop body
+- [ ] JSONL event log for debugging and richer session resume
+- [ ] Post-loop save (one save path with await, no fire-and-forget)
+- [ ] Clean endTurn handling (stop means stop, no tug-of-war)
 
 ### Out of Scope
 
@@ -84,16 +101,18 @@ Any user can go from "I have these old game files" to "the game launches and wor
 - **License**: Open source (GPL-3.0 aligns with Whisky/Heroic ecosystem)
 - **Scope**: One game family first (old strategy games), expand from there
 
-## Current Milestone: v1.2 Collective Agent Memory
+## Current Milestone: v1.3 Agent Loop Rewrite
 
-**Goal:** Build a shared knowledge layer so that when any Cellar agent solves a game, every other agent benefits — an agent-first collective memory backed by a Git repo.
+**Goal:** Fix critical bugs in the agent loop (race conditions, unresponsive stop, lost saves) and modernize the architecture with typed results, thread-safe control, middleware system, and structured event logging.
 
 **Target features:**
-- Collective memory: Git-backed shared knowledge base of working configs, reasoning chains, and environment context
-- Agent-first queries: agent checks collective memory before starting diagnosis, reasons about fit before applying
-- Automatic contribution: agent pushes successful configs after solving a game, no human approval needed (GitHub App bot token)
-- Rich memory entries: working config + reasoning chain + environment context + confidence/votes
-- Community ready: public repo, documented, web interface shows memory state
+- Fix 4 critical bugs: memory not saving on confirm, stop button unresponsive, agent exits without saving, data races
+- Typed ToolResult enum replacing fragile string matching
+- Thread-safe AgentControl channel for web UI ↔ agent communication
+- Middleware system extracting budget tracking, spin detection, event logging from the loop body
+- JSONL event log for debugging and richer session resume
+- Post-loop save with await (one save path, no fire-and-forget)
+- Clean endTurn semantics (no tug-of-war)
 
 ## Key Decisions
 
@@ -116,4 +135,4 @@ Any user can go from "I have these old game files" to "the game launches and wor
 | Agents always reason before applying | Compare environments + adapt configs, not blind application | — Pending |
 
 ---
-*Last updated: 2026-03-30 after v1.2 milestone start*
+*Last updated: 2026-04-03 after v1.3 milestone start*
