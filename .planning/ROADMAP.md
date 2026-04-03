@@ -310,7 +310,7 @@ Plans:
 **Goal:** Support .iso, .bin/.cue, and other disc image formats in `cellar add` — mount, detect installer, run through existing bottle/recipe pipeline, unmount.
 **Requirements**: ISO/BIN/CUE detection in AddCommand, disc image mounting, installer discovery within mounted volumes, cleanup/unmount after install
 **Depends on:** Phase 25
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 26-01-PLAN.md -- DiscImageHandler struct: mount/discover/detach logic for .iso/.bin/.cue via hdiutil

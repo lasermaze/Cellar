@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-04-02T19:43:05.987Z"
+last_updated: "2026-04-03T02:01:26.777Z"
 progress:
-  total_phases: 25
+  total_phases: 26
   completed_phases: 24
-  total_plans: 59
-  completed_plans: 59
+  total_plans: 61
+  completed_plans: 60
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 ## Current Position
 
-Phase: 25 of 25 (Kimi Model Support) — Complete
-Plan: 2 of 2 complete
-Status: Phase 25 complete — All plans delivered: Kimi provider enum/agent/routing (25-01), Kimi web settings UI with API key management (25-02).
-Last activity: 2026-04-02 — Phase 25 Plan 02: Kimi API key and provider selection in web settings UI
+Phase: 26 of 26 (ISO Disc Image Support) — In Progress
+Plan: 1 of 2 complete
+Status: Phase 26 Plan 01 complete — DiscImageHandler struct with hdiutil mount/discover/detach for .iso/.bin/.cue disc images.
+Last activity: 2026-04-02 — Phase 26 Plan 01: DiscImageHandler with mount, discover, and detach methods
 
-Progress: [████████████████████] ~100% (25 of 25 phases complete)
+Progress: [████████████████████] ~96% (1 of 2 plans in phase 26 complete)
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Progress: [████████████████████] ~100% (
 | Phase 24-architecture-code-quality-cleanup P03 | 15 | 2 tasks | 4 files |
 | Phase 24-architecture-code-quality-cleanup P02 | 19 | 2 tasks | 6 files |
 | Phase 25-kimi-model-support P02 | 3 | 2 tasks | 2 files |
+| Phase 26-iso-disc-image-support-for-game-installation P01 | 2 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,8 @@ Progress: [████████████████████] ~100% (
 - [Phase 24-architecture-code-quality-cleanup]: AgentTools.swift keeps only coordinator code (state, init, captureHandoff, toolDefinitions, execute(), jsonResult()) — all tool implementations moved to Core/Tools/ extension files
 - [Phase 24-architecture-code-quality-cleanup]: searchWeb/fetchPage migrated from DispatchSemaphore+ResultBox to URLSession async/await during AgentTools decomposition
 - [Phase 25-kimi-model-support]: Followed deepseekKey pattern exactly for Kimi settings — same masking, .env write/delete logic, struct field placement
+- [Phase 26-iso-disc-image-support-for-game-installation]: Separate DiscImageHandler struct (not inlined in AddCommand) — follows GuidedInstaller/WinetricksRunner isolation pattern
+- [Phase 26-iso-disc-image-support-for-game-installation]: CRawDiskImage attempted first for .bin; convert to CDR only as fallback — avoids unnecessary temp files
 
 ### Roadmap Evolution
 
