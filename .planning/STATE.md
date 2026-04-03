@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-03T22:24:27.376Z"
+last_updated: "2026-04-03T22:34:00.999Z"
 progress:
-  total_phases: 32
-  completed_phases: 30
-  total_plans: 72
-  completed_plans: 72
+  total_phases: 33
+  completed_phases: 31
+  total_plans: 73
+  completed_plans: 73
 ---
 
 # Project State
@@ -79,6 +79,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 | Phase 31 PP01 | 101 | 2 tasks | 1 files |
 | Phase 32-middleware-system P01 | 2 | 2 tasks | 1 files |
 | Phase 32-middleware-system P02 | 1 | 2 tasks | 2 files |
+| Phase 33-rewrite-the-loop P01 | 134 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -167,6 +168,9 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 - [Phase 32-middleware-system]: ISO8601 colons replaced with dashes in log filename to avoid filesystem issues on macOS
 - [Phase 32-middleware-system]: summarizeForResume() only collects toolInvoked/envChanged/gameLaunched — other entries are metrics, not resume-relevant
 - [Phase 32-middleware-system]: EventLogger.afterTool prefixes 200-char result with STOP:/ERROR: to distinguish result types in the JSONL log
+- [Phase 33-rewrite-the-loop]: LoopState changed from private to file-internal so PrepareStepHook typealias can reference it
+- [Phase 33-rewrite-the-loop]: endTurn returns immediately — no tug-of-war, canStop, or consecutiveContinuations
+- [Phase 33-rewrite-the-loop]: Middleware hooks (beforeTool/afterTool/afterStep) called in executeTools helper — budget/spin logic fully extracted
 
 ### Roadmap Evolution
 

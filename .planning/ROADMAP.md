@@ -63,7 +63,7 @@
 
 - [x] **Phase 31: New Types** — ToolResult enum, AgentControl, LoopState, expanded AgentStopReason (completed 2026-04-03)
 - [x] **Phase 32: Middleware System** — AgentMiddleware protocol, BudgetTracker, SpinDetector, EventLogger, JSONL event log (completed 2026-04-03)
-- [ ] **Phase 33: Rewrite the Loop** — New run() signature, extracted helpers, clean endTurn semantics, ≤150-line body
+- [x] **Phase 33: Rewrite the Loop** — New run() signature, extracted helpers, clean endTurn semantics, ≤150-line body (completed 2026-04-03)
 - [ ] **Phase 34: Update AgentTools** — execute() returns ToolResult, remove bare vars, post-loop save logic
 - [ ] **Phase 35: Wire It Together** — AIService, ActiveAgents, LaunchController, prepareStep integration
 - [ ] **Phase 36: Event Log Resume and SessionHandoff Integration** — Resume summary from event log, SessionHandoff fallback
@@ -397,7 +397,7 @@ Plans:
   2. When the LLM returns `endTurn`, the loop exits immediately — there is no retry-on-endTurn logic and no scenario where the agent is forced to continue after deciding to stop
   3. The `prepareStep` hook is called at the start of each iteration before the LLM call — callers can inject messages or trim context without modifying the loop
   4. The new loop signature accepts `AgentControl` and a middleware chain — it does not read bare vars from AgentTools
-**Plans:** 1 plan
+**Plans:** 1/1 plans complete
 Plans:
 - [ ] 33-01-PLAN.md — Rewrite AgentLoop: new types, new run() signature, extracted helpers, clean endTurn, middleware integration
 
@@ -465,7 +465,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19 �
 | 30. Smart game name matching | v1.2 | 0 | Unused placeholder | — |
 | 31. New Types | 2/2 | Complete    | 2026-04-03 | - |
 | 32. Middleware System | 2/2 | Complete    | 2026-04-03 | - |
-| 33. Rewrite the Loop | v1.3 | 0/TBD | Not started | - |
+| 33. Rewrite the Loop | 1/1 | Complete   | 2026-04-03 | - |
 | 34. Update AgentTools | v1.3 | 0/TBD | Not started | - |
 | 35. Wire It Together | v1.3 | 0/TBD | Not started | - |
 | 36. Event Log Resume and SessionHandoff | v1.3 | 0/TBD | Not started | - |
