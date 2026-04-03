@@ -649,7 +649,7 @@ struct AIService {
         wineProcess: WineProcess,
         onOutput: (@Sendable (AgentEvent) -> Void)? = nil,
         askUserHandler: (@Sendable (_ question: String, _ options: [String]?) -> String)? = nil,
-        onToolsCreated: ((AgentTools) -> Void)? = nil
+        onToolsCreated: ((AgentTools, AgentControl) -> Void)? = nil
     ) async -> AIResult<String> {
         // Validate provider before building prompts
         let provider = detectProvider()
@@ -936,7 +936,13 @@ struct AIService {
         if let handler = askUserHandler {
             tools.askUserHandler = handler
         }
-        onToolsCreated?(tools)
+
+        // Create thread-safe control channel
+        let control = AgentControl()
+        tools.control = control
+
+        // Notify caller (LaunchController uses this to register with ActiveAgents)
+        onToolsCreated?(tools, control)
 
         let config = CellarConfig.load()
 
@@ -968,11 +974,28 @@ struct AIService {
             return .unavailable
         }
 
+        // Create event log
+        let eventLog = AgentEventLog(gameId: gameId)
+        eventLog.append(.sessionStarted(gameId: gameId, timestamp: ISO8601DateFormatter().string(from: Date())))
+
+        // Create middleware context
+        let mwContext = MiddlewareContext(control: control, budgetCeiling: config.budgetCeiling)
+
+        // Create middleware chain
+        let middlewareChain: [AgentMiddleware] = [
+            BudgetTracker(emit: { onOutput?($0) }),
+            SpinDetector(emit: { onOutput?($0) }),
+            EventLogger(eventLog: eventLog),
+        ]
+
+        // Create loop with middleware + prepareStep hook
         var agentLoop = AgentLoop(
             provider: agentProvider,
             maxIterations: 50,
             maxTokens: 16384,
             budgetCeiling: config.budgetCeiling,
+            middleware: middlewareChain,
+            prepareStep: nil,
             onOutput: onOutput
         )
 
@@ -988,7 +1011,7 @@ struct AIService {
         // Check for handoff from a previous incomplete session
         let previousSession = SessionHandoff.read(gameId: gameId)
         if previousSession != nil {
-            SessionHandoff.delete(gameId: gameId)  // consume on read
+            SessionHandoff.delete(gameId: gameId)
         }
 
         let launchInstruction = "Launch the game '\(entry.name)' (ID: \(gameId)). The executable is at: \(executablePath). Follow the Research-Diagnose-Adapt workflow: start by querying the success database, then inspect the game. Move quickly to a real launch_game call — research and at most one trace_launch before your first real launch."
@@ -1003,8 +1026,6 @@ struct AIService {
         if let previousSession = previousSession {
             contextParts.append(previousSession.formatForAgent())
         }
-        // Inject previous-session diagnostics ONLY if no SessionHandoff exists.
-        // (SessionHandoff already contains last session context; avoid doubling.)
         if previousSession == nil,
            let diagRecord = DiagnosticRecord.readLatest(gameId: gameId) {
             contextParts.append(diagRecord.formatForAgent())
@@ -1015,68 +1036,64 @@ struct AIService {
         let result = await agentLoop.run(
             initialMessage: initialMessage,
             toolExecutor: { name, input in await tools.execute(toolName: name, input: input) },
-            canStop: { tools.isTaskComplete },
-            shouldAbort: {
-                if tools.shouldAbort { return true }
-                if tools.userForceConfirmed && tools.taskState != .savedAfterConfirm {
-                    // User confirmed game works — save before aborting
-                    tools.taskState = .userConfirmedOk
-                    let saveInput: JSONValue = .object([
-                        "game_name": .string(entry.name),
-                        "resolution_narrative": .string("User confirmed game is working from web UI.")
-                    ])
-                    // Fire-and-forget save: cannot await in sync closure, save completes async
-                    let capturedTools = tools
-                    Task.detached {
-                        _ = await capturedTools.execute(toolName: "save_success", input: saveInput)
-                    }
-                    tools.taskState = .savedAfterConfirm
-                    return true
-                }
-                return tools.userForceConfirmed
-            }
+            control: control,
+            middlewareContext: mwContext
         )
 
-        // Always print cost summary
+        // ── POST-LOOP SAVE (the critical fix — BUG-01) ──
+        // Runs with await. No fire-and-forget. No race condition.
+        var didSave = false
+        if case .userConfirmed = result.stopReason {
+            let saveInput: JSONValue = .object([
+                "game_name": .string(entry.name),
+                "resolution_narrative": .string("User confirmed game is working from web UI.")
+            ])
+            _ = await tools.execute(toolName: "save_success", input: saveInput)
+            didSave = true
+        }
+
+        // Log session end
+        eventLog.append(.sessionEnded(
+            reason: "\(result.stopReason)",
+            iterations: result.iterationsUsed,
+            cost: result.estimatedCostUSD
+        ))
+
+        // Cost summary
         let costStr = String(format: "%.2f", result.estimatedCostUSD)
         print("Session cost: $\(costStr) (\(result.totalInputTokens) input + \(result.totalOutputTokens) output tokens, \(result.iterationsUsed) iterations)")
 
-        if result.completed {
-            // Contribution hook: push working config to collective memory if user confirmed success
-            if tools.taskState == .savedAfterConfirm {
+        // Post-loop outcomes
+        let isCompleted: Bool
+        if case .completed = result.stopReason { isCompleted = true } else { isCompleted = false }
+        let isSuccess = isCompleted || didSave
+        if isSuccess {
+            if didSave {
                 await handleContributionIfNeeded(
-                    tools: tools,
-                    gameName: entry.name,
-                    wineURL: wineURL,
-                    isWebContext: askUserHandler != nil
+                    tools: tools, gameName: entry.name,
+                    wineURL: wineURL, isWebContext: askUserHandler != nil
                 )
             }
-            // Clear any leftover handoff on success
             SessionHandoff.delete(gameId: gameId)
             return .success(result.finalText)
+        } else if case .userAborted = result.stopReason {
+            return .failed("[STOP:user] Agent stopped by user.")
         } else {
-            // Save session handoff so next launch can pick up where we left off
             let stopReasonStr: String
             let reason: String
             switch result.stopReason {
             case .budgetExhausted:
                 stopReasonStr = "budget_exhausted"
-                reason = "[STOP:budget] The AI agent ran out of its $\(String(format: "%.2f", result.estimatedCostUSD)) spending budget before finishing."
+                reason = "[STOP:budget] The AI agent ran out of its $\(costStr) spending budget before finishing."
             case .maxIterations:
                 stopReasonStr = "max_iterations"
                 reason = "[STOP:iterations] The AI agent used all \(result.iterationsUsed) iterations without finishing."
             case .apiError(let detail):
                 stopReasonStr = "api_error"
                 reason = "[STOP:api_error] The AI agent couldn't reach the API: \(detail)"
-            case .completed:
+            default:
                 stopReasonStr = "unknown"
                 reason = "[STOP:unknown]"
-            case .userAborted:
-                stopReasonStr = "user_aborted"
-                reason = "[STOP:user_aborted] The user stopped the agent."
-            case .userConfirmed:
-                stopReasonStr = "user_confirmed"
-                reason = "[STOP:user_confirmed] The user confirmed the agent's recommendation."
             }
 
             let handoff = tools.captureHandoff(
@@ -1087,7 +1104,6 @@ struct AIService {
             )
             SessionHandoff.write(handoff)
             print("Session state saved. Relaunch to continue where the agent left off.")
-
             return .failed(reason)
         }
     }
@@ -1120,7 +1136,7 @@ struct AIService {
         wineURL: URL,
         isWebContext: Bool
     ) async {
-        guard tools.taskState == .savedAfterConfirm else { return }
+        // Called only when post-loop save completed successfully
 
         var config = CellarConfig.load()
 
