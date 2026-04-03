@@ -90,29 +90,38 @@ enum SettingsController {
             let input = try req.content.decode(KeysInput.self)
             var env = loadEnvFile()
 
-            // Only update if the field isn't the masked placeholder
+            // Only update if the user typed a new key (non-empty, non-masked).
+            // Empty field = no change (keep existing key). To delete a key, user types "delete".
             if let key = input.anthropicKey, !key.isEmpty, !key.contains("••••") {
-                env["ANTHROPIC_API_KEY"] = key
-            } else if input.anthropicKey?.isEmpty == true {
-                env.removeValue(forKey: "ANTHROPIC_API_KEY")
+                if key.lowercased() == "delete" {
+                    env.removeValue(forKey: "ANTHROPIC_API_KEY")
+                } else {
+                    env["ANTHROPIC_API_KEY"] = key
+                }
             }
 
             if let key = input.openaiKey, !key.isEmpty, !key.contains("••••") {
-                env["OPENAI_API_KEY"] = key
-            } else if input.openaiKey?.isEmpty == true {
-                env.removeValue(forKey: "OPENAI_API_KEY")
+                if key.lowercased() == "delete" {
+                    env.removeValue(forKey: "OPENAI_API_KEY")
+                } else {
+                    env["OPENAI_API_KEY"] = key
+                }
             }
 
             if let key = input.deepseekKey, !key.isEmpty, !key.contains("••••") {
-                env["DEEPSEEK_API_KEY"] = key
-            } else if input.deepseekKey?.isEmpty == true {
-                env.removeValue(forKey: "DEEPSEEK_API_KEY")
+                if key.lowercased() == "delete" {
+                    env.removeValue(forKey: "DEEPSEEK_API_KEY")
+                } else {
+                    env["DEEPSEEK_API_KEY"] = key
+                }
             }
 
             if let key = input.kimiKey, !key.isEmpty, !key.contains("••••") {
-                env["KIMI_API_KEY"] = key
-            } else if input.kimiKey?.isEmpty == true {
-                env.removeValue(forKey: "KIMI_API_KEY")
+                if key.lowercased() == "delete" {
+                    env.removeValue(forKey: "KIMI_API_KEY")
+                } else {
+                    env["KIMI_API_KEY"] = key
+                }
             }
 
             if let providerValue = input.aiProvider {
@@ -162,6 +171,8 @@ enum SettingsController {
         let lines = env.sorted(by: { $0.key < $1.key }).map { "\($0.key)=\($0.value)" }
         let content = lines.joined(separator: "\n") + "\n"
         try content.write(to: envFile, atomically: true, encoding: .utf8)
+        // Set permissions to 0600 — API keys should not be world-readable
+        chmod(envFile.path, 0o600)
     }
 
     private static func maskKey(_ key: String) -> String {
