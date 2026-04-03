@@ -335,7 +335,12 @@ struct AgentLoop {
             }
 
             // Execute tool if middleware didn't short-circuit
-            let result = toolResult ?? await toolExecutor(call.name, call.input)
+            let result: ToolResult
+            if let override = toolResult {
+                result = override
+            } else {
+                result = await toolExecutor(call.name, call.input)
+            }
             emit(.toolResult(name: call.name, truncated: String(result.content.prefix(200))))
             results.append((id: call.id, content: result.content, isError: result.isError))
 
