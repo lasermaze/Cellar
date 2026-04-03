@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-04-03T02:36:05.543Z"
+last_updated: "2026-04-03T02:36:55.617Z"
 progress:
   total_phases: 27
-  completed_phases: 25
+  completed_phases: 26
   total_plans: 63
-  completed_plans: 62
+  completed_plans: 63
 ---
 
 # Project State
@@ -69,6 +69,7 @@ Progress: [████████████████████] ~96% (1
 | Phase 26-iso-disc-image-support-for-game-installation P01 | 2 | 1 tasks | 1 files |
 | Phase 26-iso-disc-image-support-for-game-installation P02 | 4 | 1 tasks | 1 files |
 | Phase 27-distribution-github-releases-install-script P01 | 1 | 1 tasks | 1 files |
+| Phase 27-distribution-github-releases-install-script P02 | 1 | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -128,6 +129,8 @@ Progress: [████████████████████] ~96% (1
 - [Phase 26-iso-disc-image-support-for-game-installation]: effectiveInstallerURL shadows installerURL for pipeline — no conditional branches needed in downstream code
 - [Phase 27-distribution-github-releases-install-script]: Homebrew formula update step removed from release workflow — formula update is now a separate manual or tap-side concern
 - [Phase 27-distribution-github-releases-install-script]: Checksum generated as separate .sha256 file so install.sh can download and verify independently
+- [Phase 27-distribution-github-releases-install-script]: xattr -rd ... || true is critical in install.sh — xattr exits 1 when no quarantine attribute exists, which would abort under set -e
+- [Phase 27-distribution-github-releases-install-script]: install.sh shasum verification uses cd into TMPDIR first so relative filename in .sha256 resolves correctly
 
 ### Roadmap Evolution
 
