@@ -36,10 +36,12 @@ if [ -n "${CELLAR_VERSION:-}" ]; then
   VERSION="$CELLAR_VERSION"
 else
   info "Fetching latest Cellar release..."
-  VERSION=$(curl -fsSL "https://api.github.com/repos/lasermaze/Cellar/releases/latest" \
-    | grep -o '"tag_name":"[^"]*"' | sed 's/"tag_name":"//;s/"//')
+  API_RESPONSE=$(curl -fsSL "https://api.github.com/repos/lasermaze/Cellar/releases/latest" 2>/dev/null || echo "")
+  VERSION=$(echo "$API_RESPONSE" | grep -o '"tag_name":"[^"]*"' | sed 's/"tag_name":"//;s/"//' || echo "")
   if [ -z "$VERSION" ]; then
-    error "Could not determine latest version from GitHub API"
+    error "Could not determine latest version from GitHub API."
+    error "This may mean no release has been published yet."
+    error "Check: https://github.com/lasermaze/Cellar/releases"
     exit 1
   fi
 fi
@@ -88,8 +90,9 @@ if ! grep -qF 'cellar/bin' "$RC" 2>/dev/null; then
   info "Added ~/.cellar/bin to PATH in ${RC}"
 fi
 
-# Step 9 — Smoke test
-if ! "$INSTALL_DIR/cellar" --help > /dev/null 2>&1; then
+# Step 9 — Smoke test (--help exits non-zero with ArgumentParser, so check output instead)
+SMOKE_OUTPUT=$("$INSTALL_DIR/cellar" --help 2>&1 || true)
+if ! echo "$SMOKE_OUTPUT" | grep -q "cellar"; then
   error "Smoke test failed. Try: xattr -rd com.apple.quarantine '$INSTALL_DIR/cellar'"
   error "Or check System Settings > Privacy & Security and allow the binary."
   exit 1
