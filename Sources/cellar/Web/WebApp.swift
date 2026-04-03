@@ -2,6 +2,28 @@
 @preconcurrency import Leaf
 import Foundation
 
+/// Blocks cross-origin POST/PUT/DELETE/PATCH requests (CSRF protection).
+/// Requests with no Origin header pass through — non-browser clients (curl, URLSession) are allowed.
+struct OriginCheckMiddleware: AsyncMiddleware {
+    let allowedPort: Int
+
+    func respond(to request: Request, chainingTo next: AsyncResponder) async throws -> Response {
+        let mutatingMethods: [HTTPMethod] = [.POST, .PUT, .DELETE, .PATCH]
+        guard mutatingMethods.contains(request.method) else {
+            return try await next.respond(to: request)
+        }
+        guard let origin = request.headers.first(name: .origin) else {
+            // No Origin header — non-browser client, allow through
+            return try await next.respond(to: request)
+        }
+        let allowed = ["http://localhost:\(allowedPort)", "http://127.0.0.1:\(allowedPort)"]
+        guard allowed.contains(origin) else {
+            throw Abort(.forbidden, reason: "CSRF: Origin '\(origin)' not allowed")
+        }
+        return try await next.respond(to: request)
+    }
+}
+
 enum WebApp {
     static func configure(_ app: Application, port: Int) throws {
         // Template engine
@@ -21,6 +43,9 @@ enum WebApp {
 
         app.leaf.configuration.rootDirectory = viewsPath
         app.directory.viewsDirectory = viewsPath
+
+        // CSRF protection — block cross-origin mutating requests before any route handler runs
+        app.middleware.use(OriginCheckMiddleware(allowedPort: port))
 
         // Static files
         app.middleware.use(
