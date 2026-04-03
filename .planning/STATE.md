@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
-status: roadmap_complete
-last_updated: "2026-04-03T20:00:00.000Z"
+status: unknown
+last_updated: "2026-04-03T22:07:24.555Z"
 progress:
-  total_phases: 6
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_phases: 31
+  completed_phases: 28
+  total_plans: 70
+  completed_plans: 69
 ---
 
 # Project State
@@ -75,6 +75,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 | Phase 29-secure-collective-memory-cloudflare-worker-write-proxy-remove-bundled-private-key P01 | 2 | 2 tasks | 4 files |
 | Phase 29 P02 | 8 | 2 tasks | 3 files |
 | Phase 29 P03 | 8 | 2 tasks | 7 files |
+| Phase 31-new-types P02 | 2 | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -154,6 +155,8 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 - [v1.3 roadmap]: OSAllocatedUnfairLock used in AgentControl — Swift 6 concurrency-safe, no new SPM dependency
 - [v1.3 roadmap]: Post-loop save is the single save path — shouldAbort closure fire-and-forget pattern eliminated entirely
 - [v1.3 roadmap]: Event log at ~/.cellar/logs/<gameId>-<timestamp>.jsonl — JSONL format for append-only streaming writes
+- [Phase 31-new-types]: import os required explicitly for OSAllocatedUnfairLock — Foundation does not re-export it in current Swift toolchain
+- [Phase 31-new-types]: AgentControl pattern: private State struct + OSAllocatedUnfairLock(initialState:) for lock-protected mutable state without @unchecked Sendable
 
 ### Roadmap Evolution
 

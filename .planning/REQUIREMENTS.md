@@ -16,12 +16,12 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 - [ ] **BUG-01**: Memory saves reliably when user clicks "Game Works" in web UI — no race condition, no fire-and-forget
 - [ ] **BUG-02**: Stop button halts agent within 1 iteration of being clicked — not blocked by in-flight API calls
 - [ ] **BUG-03**: Agent cannot exit the loop without saving when it has a working config — no endTurn escape hatch
-- [ ] **BUG-04**: Zero data races between web routes and agent loop — thread-safe control channel replaces bare vars
+- [x] **BUG-04**: Zero data races between web routes and agent loop — thread-safe control channel replaces bare vars
 
 ### Architecture
 
 - [ ] **ARCH-01**: Tool execution returns typed `ToolResult` enum (success/stop/error) — eliminates string matching for control flow
-- [ ] **ARCH-02**: Thread-safe `AgentControl` class with lock-protected flags replaces `@unchecked Sendable` bare vars on AgentTools
+- [x] **ARCH-02**: Thread-safe `AgentControl` class with lock-protected flags replaces `@unchecked Sendable` bare vars on AgentTools
 - [ ] **ARCH-03**: `LoopState` struct consolidates all mutable loop state (12 scattered vars → 1 struct)
 - [ ] **ARCH-04**: Main loop body is ≤150 lines with no inline budget/spin/logging logic
 
@@ -63,9 +63,9 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 | BUG-01 | Phase 34 | Pending |
 | BUG-02 | Phase 35 | Pending |
 | BUG-03 | Phase 33 | Pending |
-| BUG-04 | Phase 31 | Pending |
+| BUG-04 | Phase 31 | Complete |
 | ARCH-01 | Phase 31 | Pending |
-| ARCH-02 | Phase 31 | Pending |
+| ARCH-02 | Phase 31 | Complete |
 | ARCH-03 | Phase 31 | Pending |
 | ARCH-04 | Phase 33 | Pending |
 | MW-01 | Phase 32 | Pending |
