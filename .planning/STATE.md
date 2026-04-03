@@ -144,6 +144,7 @@ Progress: [████████████████████] ~96% (1
 - Phase 25 added (2026-04-02): Kimi model support — add Kimi (Moonshot AI) as AI provider alongside Claude and Deepseek
 - Phase 26 added (2026-04-02): ISO disc image support — mount .iso/.bin/.cue in cellar add, detect installer, run through existing pipeline
 - Phase 27 added (2026-04-02): Distribution — GitHub Releases + Install Script — single-command install via curl|bash, release CI cleanup
+- Phase 28 added (2026-04-02): Fix Collective Memory Prompt Injection — remove reasoning from prompt, allowlist env/registry, sanitize fields, CSRF protection, .env permissions
 
 ### Pending Todos
 

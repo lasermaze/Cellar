@@ -326,3 +326,13 @@ Plans:
 Plans:
 - [ ] 27-01-PLAN.md -- Release workflow cleanup: remove Homebrew step, add checksum + smoke test, enable auto release notes
 - [ ] 27-02-PLAN.md -- install.sh script: macOS detection, GitHub API version fetch, download, checksum verify, PATH update, idempotent
+
+### Phase 28: Fix Collective Memory Prompt Injection Vulnerability
+
+**Goal:** Close prompt injection attack chain in collective memory — remove reasoning from agent prompt, allowlist env keys and registry prefixes on read+write, sanitize all injectable fields, update system prompt to treat memory as untrusted, add CSRF protection, set .env file permissions.
+**Requirements**: Remove reasoning injection, env key allowlist (shared read+write), registry prefix validation, field truncation/sanitization, system prompt update, CSRF Origin middleware, .env chmod 600
+**Depends on:** Phase 27
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 28 to break down)
