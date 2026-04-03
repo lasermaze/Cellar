@@ -9,3 +9,13 @@ DerivedData/
 # Credential files — never commit
 *.pem
 github-app.json
+
+# Game installers and disc images — never commit
+*.exe
+*.bin
+*.iso
+*.img
+*.msi
+*.cue
+*.mdf
+*.nrg
