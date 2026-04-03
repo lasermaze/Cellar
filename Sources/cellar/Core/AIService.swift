@@ -1071,6 +1071,12 @@ struct AIService {
             case .completed:
                 stopReasonStr = "unknown"
                 reason = "[STOP:unknown]"
+            case .userAborted:
+                stopReasonStr = "user_aborted"
+                reason = "[STOP:user_aborted] The user stopped the agent."
+            case .userConfirmed:
+                stopReasonStr = "user_confirmed"
+                reason = "[STOP:user_confirmed] The user confirmed the agent's recommendation."
             }
 
             let handoff = tools.captureHandoff(
