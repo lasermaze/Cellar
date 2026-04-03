@@ -35,14 +35,17 @@ jobs:
           echo "ARCHIVE=$ARCHIVE" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Smoke test
+      - name: Verify build artifacts
         run: |
-          # ArgumentParser exits non-zero for --help; just verify the binary runs and prints usage
-          cd .build/universal && ./cellar --help 2>&1 | head -5 || true
           # Verify it's actually a universal binary
           file .build/universal/cellar | grep -q "universal"
+          echo "✓ Universal binary confirmed"
           # Verify resource bundle is present
           test -d .build/universal/cellar_cellar.bundle
+          echo "✓ Resource bundle present"
+          # Verify bundle has templates
+          test -d .build/universal/cellar_cellar.bundle/Resources/Views
+          echo "✓ Leaf templates present"
 
       - name: Generate checksum
         run: shasum -a 256 "$ARCHIVE" > "${ARCHIVE}.sha256"
