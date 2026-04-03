@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-03T22:48:11.298Z"
+last_updated: "2026-04-03T23:00:48.670Z"
 progress:
-  total_phases: 34
-  completed_phases: 32
-  total_plans: 74
-  completed_plans: 74
+  total_phases: 35
+  completed_phases: 33
+  total_plans: 75
+  completed_plans: 75
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 34 (Update AgentTools) — complete
+Phase: 35 (Wire It Together) — complete
 Plan: P01 complete (all plans done)
-Status: Phase 34 complete — ready for Phase 35
-Last activity: 2026-04-02 — P01 complete: AgentTools.execute() rewritten to return ToolResult, AgentControl wired in, TaskState enum removed, fire-and-forget save race eliminated
+Status: Phase 35 complete — swift build passes, all arch pieces wired
+Last activity: 2026-04-02 — P01 complete: AIService.runAgentLoop() rewritten with AgentControl, MiddlewareContext, middleware chain, post-loop save; LaunchController stop/confirm use AgentControl.abort()/confirm(); stale taskState refs removed from LaunchTools/SaveTools
 
 Progress: [████████████████████] 100%
 
@@ -81,6 +81,7 @@ Progress: [████████████████████] 100%
 | Phase 32-middleware-system P02 | 1 | 2 tasks | 2 files |
 | Phase 33-rewrite-the-loop P01 | 134 | 2 tasks | 1 files |
 | Phase 34-update-agenttools P01 | 8 | 2 tasks | 1 files |
+| Phase 35-wire-it-together PP01 | 2 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -174,6 +175,7 @@ Progress: [████████████████████] 100%
 - [Phase 33-rewrite-the-loop]: Middleware hooks (beforeTool/afterTool/afterStep) called in executeTools helper — budget/spin logic fully extracted
 - [Phase 34-update-agenttools]: execute() returns .stop(reason: .userConfirmedWorking) on userForceConfirmed — actual save deferred to post-loop in AIService (Phase 35)
 - [Phase 34-update-agenttools]: TaskState enum fully removed from AgentTools — loop control is now entirely via ToolResult return values and AgentControl
+- [Phase 35]: if case pattern matching used for AgentStopReason equality — enum has associated values, no Equatable conformance
 
 ### Roadmap Evolution
 

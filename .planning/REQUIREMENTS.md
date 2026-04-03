@@ -14,7 +14,7 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 ### Bug Fixes
 
 - [x] **BUG-01**: Memory saves reliably when user clicks "Game Works" in web UI — no race condition, no fire-and-forget
-- [ ] **BUG-02**: Stop button halts agent within 1 iteration of being clicked — not blocked by in-flight API calls
+- [x] **BUG-02**: Stop button halts agent within 1 iteration of being clicked — not blocked by in-flight API calls
 - [x] **BUG-03**: Agent cannot exit the loop without saving when it has a working config — no endTurn escape hatch
 - [x] **BUG-04**: Zero data races between web routes and agent loop — thread-safe control channel replaces bare vars
 
@@ -41,10 +41,10 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 
 ### Integration
 
-- [ ] **INT-01**: `AIService.runAgentLoop()` creates middleware chain, event log, and AgentControl; performs post-loop save with `await`
-- [ ] **INT-02**: `ActiveAgents` stores `AgentControl` alongside `AgentTools` — web routes use control for stop/confirm
-- [ ] **INT-03**: LaunchController stop/confirm routes use `AgentControl.abort()`/`.confirm()` instead of setting bare vars
-- [ ] **INT-04**: `prepareStep` hook available for per-iteration adjustments (context trimming, message injection)
+- [x] **INT-01**: `AIService.runAgentLoop()` creates middleware chain, event log, and AgentControl; performs post-loop save with `await`
+- [x] **INT-02**: `ActiveAgents` stores `AgentControl` alongside `AgentTools` — web routes use control for stop/confirm
+- [x] **INT-03**: LaunchController stop/confirm routes use `AgentControl.abort()`/`.confirm()` instead of setting bare vars
+- [x] **INT-04**: `prepareStep` hook available for per-iteration adjustments (context trimming, message injection)
 
 ## Out of Scope
 
@@ -61,7 +61,7 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | BUG-01 | Phase 34 | Complete |
-| BUG-02 | Phase 35 | Pending |
+| BUG-02 | Phase 35 | Complete |
 | BUG-03 | Phase 33 | Complete |
 | BUG-04 | Phase 31 | Complete |
 | ARCH-01 | Phase 31 | Complete |
@@ -76,10 +76,10 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 | LOG-02 | Phase 32 | Complete |
 | LOG-03 | Phase 36 | Pending |
 | LOG-04 | Phase 36 | Pending |
-| INT-01 | Phase 35 | Pending |
-| INT-02 | Phase 35 | Pending |
-| INT-03 | Phase 35 | Pending |
-| INT-04 | Phase 35 | Pending |
+| INT-01 | Phase 35 | Complete |
+| INT-02 | Phase 35 | Complete |
+| INT-03 | Phase 35 | Complete |
+| INT-04 | Phase 35 | Complete |
 
 **Coverage:**
 - v1.3 requirements: 20 total
