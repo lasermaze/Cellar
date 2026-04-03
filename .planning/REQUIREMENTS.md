@@ -13,7 +13,7 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 
 ### Bug Fixes
 
-- [ ] **BUG-01**: Memory saves reliably when user clicks "Game Works" in web UI — no race condition, no fire-and-forget
+- [x] **BUG-01**: Memory saves reliably when user clicks "Game Works" in web UI — no race condition, no fire-and-forget
 - [ ] **BUG-02**: Stop button halts agent within 1 iteration of being clicked — not blocked by in-flight API calls
 - [x] **BUG-03**: Agent cannot exit the loop without saving when it has a working config — no endTurn escape hatch
 - [x] **BUG-04**: Zero data races between web routes and agent loop — thread-safe control channel replaces bare vars
@@ -60,7 +60,7 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BUG-01 | Phase 34 | Pending |
+| BUG-01 | Phase 34 | Complete |
 | BUG-02 | Phase 35 | Pending |
 | BUG-03 | Phase 33 | Complete |
 | BUG-04 | Phase 31 | Complete |

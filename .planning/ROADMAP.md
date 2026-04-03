@@ -64,7 +64,7 @@
 - [x] **Phase 31: New Types** — ToolResult enum, AgentControl, LoopState, expanded AgentStopReason (completed 2026-04-03)
 - [x] **Phase 32: Middleware System** — AgentMiddleware protocol, BudgetTracker, SpinDetector, EventLogger, JSONL event log (completed 2026-04-03)
 - [x] **Phase 33: Rewrite the Loop** — New run() signature, extracted helpers, clean endTurn semantics, ≤150-line body (completed 2026-04-03)
-- [ ] **Phase 34: Update AgentTools** — execute() returns ToolResult, remove bare vars, post-loop save logic
+- [x] **Phase 34: Update AgentTools** — execute() returns ToolResult, remove bare vars, post-loop save logic (completed 2026-04-03)
 - [ ] **Phase 35: Wire It Together** — AIService, ActiveAgents, LaunchController, prepareStep integration
 - [ ] **Phase 36: Event Log Resume and SessionHandoff Integration** — Resume summary from event log, SessionHandoff fallback
 
@@ -466,6 +466,6 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19 �
 | 31. New Types | 2/2 | Complete    | 2026-04-03 | - |
 | 32. Middleware System | 2/2 | Complete    | 2026-04-03 | - |
 | 33. Rewrite the Loop | 1/1 | Complete    | 2026-04-03 | - |
-| 34. Update AgentTools | v1.3 | 0/TBD | Not started | - |
+| 34. Update AgentTools | 1/1 | Complete   | 2026-04-03 | - |
 | 35. Wire It Together | v1.3 | 0/TBD | Not started | - |
 | 36. Event Log Resume and SessionHandoff | v1.3 | 0/TBD | Not started | - |

@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-03T22:37:12.789Z"
+last_updated: "2026-04-03T22:46:00.623Z"
 progress:
-  total_phases: 33
-  completed_phases: 31
-  total_plans: 73
-  completed_plans: 73
+  total_phases: 34
+  completed_phases: 32
+  total_plans: 74
+  completed_plans: 74
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 32 (Middleware System) — complete
-Plan: P02 complete (all plans done)
-Status: Phase 32 complete — ready for Phase 33
-Last activity: 2026-04-03 — P02 complete: AgentEventLog JSONL writer and EventLogger middleware added; all 3 middleware classes now in AgentMiddleware.swift
+Phase: 34 (Update AgentTools) — complete
+Plan: P01 complete (all plans done)
+Status: Phase 34 complete — ready for Phase 35
+Last activity: 2026-04-02 — P01 complete: AgentTools.execute() rewritten to return ToolResult, AgentControl wired in, TaskState enum removed, fire-and-forget save race eliminated
 
-Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
+Progress: [████████████████████] 100%
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 | Phase 32-middleware-system P01 | 2 | 2 tasks | 1 files |
 | Phase 32-middleware-system P02 | 1 | 2 tasks | 2 files |
 | Phase 33-rewrite-the-loop P01 | 134 | 2 tasks | 1 files |
+| Phase 34-update-agenttools P01 | 8 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -171,6 +172,8 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 - [Phase 33-rewrite-the-loop]: LoopState changed from private to file-internal so PrepareStepHook typealias can reference it
 - [Phase 33-rewrite-the-loop]: endTurn returns immediately — no tug-of-war, canStop, or consecutiveContinuations
 - [Phase 33-rewrite-the-loop]: Middleware hooks (beforeTool/afterTool/afterStep) called in executeTools helper — budget/spin logic fully extracted
+- [Phase 34-update-agenttools]: execute() returns .stop(reason: .userConfirmedWorking) on userForceConfirmed — actual save deferred to post-loop in AIService (Phase 35)
+- [Phase 34-update-agenttools]: TaskState enum fully removed from AgentTools — loop control is now entirely via ToolResult return values and AgentControl
 
 ### Roadmap Evolution
 
