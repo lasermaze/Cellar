@@ -571,53 +571,60 @@ final class AgentTools: @unchecked Sendable {
 
     // MARK: - Dispatch
 
-    /// Dispatch a tool call by name. Returns a JSON string result. Never throws.
-    func execute(toolName: String, input: JSONValue) async -> String {
-        // Check web control flags before executing any tool
-        if shouldAbort {
-            return "{\"error\": \"Agent stopped by user.\", \"STOP\": true}"
-        }
-        if userForceConfirmed && toolName != "save_success" && toolName != "save_recipe" {
-            // User confirmed game works — force save and stop
-            taskState = .userConfirmedOk
-            let saveInput: JSONValue = .object([
-                "game_name": .string(entry.name),
-                "resolution_narrative": .string("User confirmed game is working from web UI.")
-            ])
-            _ = saveSuccess(input: saveInput)
-            // Force savedAfterConfirm regardless of save result (save may fail on permissions)
-            taskState = .savedAfterConfirm
-            return "{\"user_override\": \"User confirmed game is working from web UI. Config saved. Stop now.\", \"STOP\": true}"
+    /// Dispatch a tool call by name. Returns a typed ToolResult. Never throws.
+    func execute(toolName: String, input: JSONValue) async -> ToolResult {
+        // Check control flags
+        if control.shouldAbort {
+            return .stop(
+                content: jsonResult(["error": "Agent stopped by user."]),
+                reason: .userAborted
+            )
         }
 
-        let result: String
+        // User confirmed — signal stop but DON'T save here.
+        // Save happens after the loop, in AIService.runAgentLoop().
+        if control.userForceConfirmed && toolName != "save_success" && toolName != "save_recipe" {
+            return .stop(
+                content: jsonResult(["user_override": "User confirmed game is working. Stopping."]),
+                reason: .userConfirmedWorking
+            )
+        }
+
+        // Dispatch to tool implementation (all return String, unchanged)
+        let resultString: String
         switch toolName {
-        case "inspect_game":        result = inspectGame(input: input)
-        case "read_log":            result = readLog(input: input)
-        case "read_registry":       result = readRegistry(input: input)
-        case "ask_user":            result = askUser(input: input)
-        case "set_environment":     result = setEnvironment(input: input)
-        case "set_registry":        result = setRegistry(input: input)
-        case "install_winetricks":  result = installWinetricks(input: input)
-        case "place_dll":           result = await placeDLL(input: input)
-        case "launch_game":         result = launchGame(input: input)
-        case "save_recipe":         result = saveRecipe(input: input)
-        case "write_game_file":     result = writeGameFile(input: input)
-        case "read_game_file":      result = readGameFile(input: input)
-        case "query_successdb":     result = querySuccessdb(input: input)
-        case "save_success":        result = saveSuccess(input: input)
-        case "trace_launch":        result = traceLaunch(input: input)
-        case "check_file_access":   result = checkFileAccess(input: input)
-        case "verify_dll_override": result = verifyDllOverride(input: input)
-        case "search_web":          result = await searchWeb(input: input)
-        case "fetch_page":          result = await fetchPage(input: input)
-        case "list_windows":        result = listWindows(input: input)
-        case "query_compatibility": result = await queryCompatibility(input: input)
+        case "inspect_game":        resultString = inspectGame(input: input)
+        case "read_log":            resultString = readLog(input: input)
+        case "read_registry":       resultString = readRegistry(input: input)
+        case "ask_user":            resultString = askUser(input: input)
+        case "set_environment":     resultString = setEnvironment(input: input)
+        case "set_registry":        resultString = setRegistry(input: input)
+        case "install_winetricks":  resultString = installWinetricks(input: input)
+        case "place_dll":           resultString = await placeDLL(input: input)
+        case "launch_game":         resultString = launchGame(input: input)
+        case "save_recipe":         resultString = saveRecipe(input: input)
+        case "write_game_file":     resultString = writeGameFile(input: input)
+        case "read_game_file":      resultString = readGameFile(input: input)
+        case "query_successdb":     resultString = querySuccessdb(input: input)
+        case "save_success":        resultString = saveSuccess(input: input)
+        case "trace_launch":        resultString = traceLaunch(input: input)
+        case "check_file_access":   resultString = checkFileAccess(input: input)
+        case "verify_dll_override": resultString = verifyDllOverride(input: input)
+        case "search_web":          resultString = await searchWeb(input: input)
+        case "fetch_page":          resultString = await fetchPage(input: input)
+        case "list_windows":        resultString = listWindows(input: input)
+        case "query_compatibility": resultString = await queryCompatibility(input: input)
         default:
-            return jsonResult(["error": "Unknown tool: \(toolName)"])
+            return .error(content: jsonResult(["error": "Unknown tool: \(toolName)"]))
         }
 
-        // Track action tools in pendingActions for changes_since_last diff
+        // Track pending actions (same logic as before, extracted into helper)
+        trackPendingAction(toolName: toolName, input: input)
+
+        return .success(content: resultString)
+    }
+
+    private func trackPendingAction(toolName: String, input: JSONValue) {
         switch toolName {
         case "set_environment":
             if let key = input["key"]?.asString, let value = input["value"]?.asString {
@@ -628,22 +635,13 @@ final class AgentTools: @unchecked Sendable {
                 pendingActions.append("set_registry(\(keyPath), \(name))")
             }
         case "install_winetricks":
-            if let verb = input["verb"]?.asString {
-                pendingActions.append("install_winetricks(\(verb))")
-            }
+            if let verb = input["verb"]?.asString { pendingActions.append("install_winetricks(\(verb))") }
         case "place_dll":
-            if let dllName = input["dll_name"]?.asString {
-                pendingActions.append("place_dll(\(dllName))")
-            }
+            if let dllName = input["dll_name"]?.asString { pendingActions.append("place_dll(\(dllName))") }
         case "write_game_file":
-            if let path = input["relative_path"]?.asString {
-                pendingActions.append("write_game_file(\(path))")
-            }
-        default:
-            break
+            if let path = input["relative_path"]?.asString { pendingActions.append("write_game_file(\(path))") }
+        default: break
         }
-
-        return result
     }
 
     // MARK: - JSON Helper
