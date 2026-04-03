@@ -46,6 +46,12 @@ enum GameController {
             let installerName = installerURL.deletingPathExtension().lastPathComponent
             let gameId = slugify(installerName)
             let gameName = installerName.replacingOccurrences(of: "_", with: " ")
+
+            // Check if game already exists
+            if let _ = try? CellarStore.findGame(id: gameId) {
+                throw Abort(.conflict, reason: "Game '\(gameName)' is already installed. Use the library to launch it.")
+            }
+
             let encodedPath = input.installPath.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? input.installPath
 
             return req.redirect(to: "/games/install?gameId=\(gameId)&gameName=\(gameName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? gameName)&installPath=\(encodedPath)")
