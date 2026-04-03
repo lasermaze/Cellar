@@ -1,0 +1,478 @@
+export interface Env {
+  GITHUB_APP_PEM: string;
+  GITHUB_APP_ID: string;
+  GITHUB_INSTALLATION_ID: string;
+  CELLAR_MEMORY_REPO: string;
+}
+
+// ---------------------------------------------------------------------------
+// Constants — must mirror Swift AgentTools.allowedEnvKeys exactly
+// ---------------------------------------------------------------------------
+
+const ALLOWED_ENV_KEYS = new Set([
+  "WINEDEBUG",
+  "WINEDLLOVERRIDES",
+  "WINEPREFIX",
+  "STAGING_SHARED_MEMORY",
+  "STAGING_WRITECOPY",
+  "MESA_GL_VERSION_OVERRIDE",
+  "__GL_THREADED_OPTIMIZATIONS",
+  "DXVK_HUD",
+  "DXVK_LOG_LEVEL",
+  "PROTON_USE_WINED3D",
+  "SDL_VIDEODRIVER",
+  "PULSE_LATENCY_MSEC",
+  "__GLX_VENDOR_LIBRARY_NAME",
+]);
+
+const VALID_DLL_MODES = new Set(["n", "b", "n,b", "b,n", ""]);
+
+const ALLOWED_REGISTRY_PREFIXES = [
+  "HKEY_CURRENT_USER\\",
+  "HKEY_LOCAL_MACHINE\\",
+];
+
+// ---------------------------------------------------------------------------
+// Rate limiting — in-memory per Worker instance (resets on restart, acceptable)
+// ---------------------------------------------------------------------------
+
+const rateLimitMap = new Map<string, number[]>();
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const cutoff = now - 60 * 60 * 1000; // 1 hour
+  const timestamps = (rateLimitMap.get(ip) ?? []).filter((t) => t > cutoff);
+  if (timestamps.length >= 10) return true;
+  timestamps.push(now);
+  rateLimitMap.set(ip, timestamps);
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// Slugify — mirrors Swift slugify() behavior
+// ---------------------------------------------------------------------------
+
+function slugify(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+// ---------------------------------------------------------------------------
+// Base64url helpers for JWT
+// ---------------------------------------------------------------------------
+
+function base64url(data: ArrayBuffer): string {
+  const bytes = new Uint8Array(data);
+  let binary = "";
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
+}
+
+function base64urlFromString(str: string): string {
+  return base64url(new TextEncoder().encode(str).buffer as ArrayBuffer);
+}
+
+// ---------------------------------------------------------------------------
+// JWT generation using SubtleCrypto RS256 (no npm deps)
+// ---------------------------------------------------------------------------
+
+async function makeJWT(pemKey: string, appId: string): Promise<string> {
+  // Strip PEM headers (handles both PKCS8 "PRIVATE KEY" and PKCS1 "RSA PRIVATE KEY")
+  const stripped = pemKey
+    .replace(/-----BEGIN (RSA )?PRIVATE KEY-----/g, "")
+    .replace(/-----END (RSA )?PRIVATE KEY-----/g, "")
+    .replace(/\s+/g, "");
+
+  const binaryDer = Uint8Array.from(atob(stripped), (c) => c.charCodeAt(0));
+
+  const cryptoKey = await crypto.subtle.importKey(
+    "pkcs8",
+    binaryDer.buffer as ArrayBuffer,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: "RS256", typ: "JWT" };
+  const payload = { iss: appId, iat: now - 60, exp: now + 510 };
+
+  const headerB64 = base64urlFromString(JSON.stringify(header));
+  const payloadB64 = base64urlFromString(JSON.stringify(payload));
+  const signingInput = `${headerB64}.${payloadB64}`;
+
+  const signature = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    cryptoKey,
+    new TextEncoder().encode(signingInput)
+  );
+
+  return `${signingInput}.${base64url(signature)}`;
+}
+
+// ---------------------------------------------------------------------------
+// Validation — mirrors Swift sanitizeEntry() exactly
+// ---------------------------------------------------------------------------
+
+interface DllOverride {
+  dll: string;
+  mode: string;
+  placement?: string;
+  source?: string;
+}
+
+interface RegistryEntry {
+  key: string;
+  valueName: string;
+  data: string;
+  purpose?: string;
+}
+
+interface CollectiveMemoryEntry {
+  schemaVersion: number;
+  gameId: string;
+  gameName: string;
+  config: {
+    environment: Record<string, string>;
+    dllOverrides: DllOverride[];
+    registry: RegistryEntry[];
+    launchArgs: string[];
+    setupDeps: string[];
+  };
+  environment: {
+    arch: string;
+    wineVersion: string;
+    macosVersion: string;
+    wineFlavor: string;
+  };
+  environmentHash: string;
+  reasoning: string;
+  engine?: string;
+  graphicsApi?: string;
+  confirmations: number;
+  lastConfirmed: string;
+}
+
+function validateAndSanitize(entry: unknown): CollectiveMemoryEntry | string {
+  if (typeof entry !== "object" || entry === null) return "entry must be an object";
+  const e = entry as Record<string, unknown>;
+
+  // Required top-level fields
+  if (typeof e.gameId !== "string" || !e.gameId) return "missing gameId";
+  if (typeof e.gameName !== "string" || !e.gameName) return "missing gameName";
+  if (typeof e.environmentHash !== "string" || !e.environmentHash)
+    return "missing environmentHash";
+  if (typeof e.config !== "object" || e.config === null) return "missing config";
+  if (typeof e.environment !== "object" || e.environment === null)
+    return "missing environment";
+
+  const env = e.environment as Record<string, unknown>;
+  if (typeof env.arch !== "string") return "missing environment.arch";
+  if (typeof env.wineVersion !== "string") return "missing environment.wineVersion";
+  if (typeof env.macosVersion !== "string") return "missing environment.macosVersion";
+  if (typeof env.wineFlavor !== "string") return "missing environment.wineFlavor";
+
+  const cfg = e.config as Record<string, unknown>;
+
+  // Sanitize environment keys — filter to allowlist, truncate values to 200 chars
+  const rawEnv = (cfg.environment ?? {}) as Record<string, unknown>;
+  const sanitizedEnv: Record<string, string> = {};
+  for (const [k, v] of Object.entries(rawEnv)) {
+    if (ALLOWED_ENV_KEYS.has(k) && typeof v === "string") {
+      sanitizedEnv[k] = v.slice(0, 200);
+    }
+  }
+
+  // Sanitize dllOverrides — drop invalid modes, truncate dll/source
+  const rawDlls = Array.isArray(cfg.dllOverrides) ? cfg.dllOverrides : [];
+  const sanitizedDlls: DllOverride[] = rawDlls
+    .filter(
+      (d): d is Record<string, unknown> =>
+        typeof d === "object" && d !== null
+    )
+    .filter((d) => VALID_DLL_MODES.has(String(d.mode ?? "")))
+    .map((d) => ({
+      dll: String(d.dll ?? "").slice(0, 50),
+      mode: String(d.mode ?? ""),
+      ...(d.placement !== undefined ? { placement: String(d.placement) } : {}),
+      ...(d.source !== undefined ? { source: String(d.source).slice(0, 100) } : {}),
+    }));
+
+  // Sanitize registry — drop entries with invalid key prefixes, truncate fields
+  const rawReg = Array.isArray(cfg.registry) ? cfg.registry : [];
+  const sanitizedReg: RegistryEntry[] = rawReg
+    .filter(
+      (r): r is Record<string, unknown> =>
+        typeof r === "object" && r !== null
+    )
+    .filter((r) =>
+      ALLOWED_REGISTRY_PREFIXES.some((prefix) =>
+        String(r.key ?? "").startsWith(prefix)
+      )
+    )
+    .map((r) => ({
+      key: String(r.key ?? "").slice(0, 200),
+      valueName: String(r.valueName ?? "").slice(0, 100),
+      data: String(r.data ?? "").slice(0, 200),
+      ...(r.purpose !== undefined ? { purpose: String(r.purpose) } : {}),
+    }));
+
+  // Sanitize launchArgs — cap at 5 entries, 100 chars each
+  const rawArgs = Array.isArray(cfg.launchArgs) ? cfg.launchArgs : [];
+  const sanitizedArgs = rawArgs
+    .slice(0, 5)
+    .map((a) => String(a).slice(0, 100));
+
+  // Sanitize setupDeps — only /^[a-z0-9_]{1,50}$/ strings
+  const rawDeps = Array.isArray(cfg.setupDeps) ? cfg.setupDeps : [];
+  const sanitizedDeps = rawDeps
+    .filter((d) => typeof d === "string" && /^[a-z0-9_]{1,50}$/.test(d));
+
+  return {
+    schemaVersion: typeof e.schemaVersion === "number" ? e.schemaVersion : 1,
+    gameId: e.gameId as string,
+    gameName: e.gameName as string,
+    config: {
+      environment: sanitizedEnv,
+      dllOverrides: sanitizedDlls,
+      registry: sanitizedReg,
+      launchArgs: sanitizedArgs,
+      setupDeps: sanitizedDeps,
+    },
+    environment: {
+      arch: env.arch as string,
+      wineVersion: env.wineVersion as string,
+      macosVersion: env.macosVersion as string,
+      wineFlavor: env.wineFlavor as string,
+    },
+    environmentHash: e.environmentHash as string,
+    reasoning: typeof e.reasoning === "string" ? e.reasoning : "",
+    ...(typeof e.engine === "string" ? { engine: e.engine } : {}),
+    ...(typeof e.graphicsApi === "string" ? { graphicsApi: e.graphicsApi } : {}),
+    confirmations: typeof e.confirmations === "number" ? e.confirmations : 1,
+    lastConfirmed:
+      typeof e.lastConfirmed === "string"
+        ? e.lastConfirmed
+        : new Date().toISOString(),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// GitHub Contents API helpers
+// ---------------------------------------------------------------------------
+
+async function getInstallationToken(env: Env): Promise<string> {
+  const jwt = await makeJWT(env.GITHUB_APP_PEM, env.GITHUB_APP_ID);
+  const resp = await fetch(
+    `https://api.github.com/app/installations/${env.GITHUB_INSTALLATION_ID}/access_tokens`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+        Accept: "application/vnd.github+json",
+        "User-Agent": "cellar-memory-proxy/1.0",
+      },
+    }
+  );
+  if (!resp.ok) {
+    throw new Error(`Failed to get installation token: ${resp.status}`);
+  }
+  const data = (await resp.json()) as { token: string };
+  return data.token;
+}
+
+async function writeEntryToGitHub(
+  entry: CollectiveMemoryEntry,
+  token: string,
+  repo: string,
+  attempt = 0
+): Promise<void> {
+  const slug = slugify(entry.gameId);
+  const path = `entries/${slug}.json`;
+  const apiBase = `https://api.github.com/repos/${repo}/contents/${path}`;
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "Content-Type": "application/json",
+    "User-Agent": "cellar-memory-proxy/1.0",
+  };
+
+  // GET existing file
+  const getResp = await fetch(apiBase, { headers });
+  let sha: string | undefined;
+  let entries: CollectiveMemoryEntry[] = [];
+
+  if (getResp.ok) {
+    const existing = (await getResp.json()) as { sha: string; content: string };
+    sha = existing.sha;
+    const decoded = atob(existing.content.replace(/\s/g, ""));
+    try {
+      entries = JSON.parse(decoded) as CollectiveMemoryEntry[];
+    } catch {
+      entries = [];
+    }
+  } else if (getResp.status === 404) {
+    entries = [];
+  } else {
+    throw new Error(`GitHub GET failed: ${getResp.status}`);
+  }
+
+  // Merge: increment confirmation if matching environmentHash, otherwise append
+  const existingIdx = entries.findIndex(
+    (e) => e.environmentHash === entry.environmentHash
+  );
+  if (existingIdx >= 0) {
+    entries[existingIdx].confirmations =
+      (entries[existingIdx].confirmations ?? 1) + 1;
+    entries[existingIdx].lastConfirmed = new Date().toISOString();
+  } else {
+    entries.push(entry);
+  }
+
+  // Encode and PUT
+  const content = btoa(
+    unescape(encodeURIComponent(JSON.stringify(entries, null, 2)))
+  );
+  const putBody: Record<string, unknown> = {
+    message: `chore: update memory entry for ${entry.gameName}`,
+    content,
+  };
+  if (sha) putBody.sha = sha;
+
+  const putResp = await fetch(apiBase, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(putBody),
+  });
+
+  if (putResp.status === 409 && attempt === 0) {
+    // Conflict — retry once
+    return writeEntryToGitHub(entry, token, repo, 1);
+  }
+
+  if (!putResp.ok) {
+    throw new Error(`GitHub PUT failed: ${putResp.status}`);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Contribute handler
+// ---------------------------------------------------------------------------
+
+async function handleContribute(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  const cors = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Content-Type": "application/json",
+  };
+
+  // Body size cap — 50KB
+  const contentLength = Number(request.headers.get("Content-Length") ?? 0);
+  if (contentLength > 51200) {
+    return new Response(
+      JSON.stringify({ status: "error", message: "request body too large" }),
+      { status: 413, headers: cors }
+    );
+  }
+
+  // Parse body
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return new Response(
+      JSON.stringify({ status: "error", message: "invalid JSON" }),
+      { status: 400, headers: cors }
+    );
+  }
+
+  if (typeof body !== "object" || body === null) {
+    return new Response(
+      JSON.stringify({ status: "error", message: "body must be an object" }),
+      { status: 400, headers: cors }
+    );
+  }
+
+  const rawEntry = (body as Record<string, unknown>).entry;
+  if (!rawEntry) {
+    return new Response(
+      JSON.stringify({ status: "error", message: "missing entry field" }),
+      { status: 400, headers: cors }
+    );
+  }
+
+  // Validate and sanitize
+  const result = validateAndSanitize(rawEntry);
+  if (typeof result === "string") {
+    return new Response(
+      JSON.stringify({ status: "error", message: result }),
+      { status: 400, headers: cors }
+    );
+  }
+  const entry = result;
+
+  // Rate limit: 10 writes/hr/IP
+  const ip =
+    request.headers.get("CF-Connecting-IP") ??
+    request.headers.get("X-Forwarded-For") ??
+    "unknown";
+  if (isRateLimited(ip)) {
+    return new Response(
+      JSON.stringify({ status: "error", message: "rate limit exceeded" }),
+      { status: 429, headers: cors }
+    );
+  }
+
+  // Write to GitHub via installation token
+  try {
+    const token = await getInstallationToken(env);
+    await writeEntryToGitHub(entry, token, env.CELLAR_MEMORY_REPO);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return new Response(
+      JSON.stringify({ status: "error", message: msg }),
+      { status: 502, headers: cors }
+    );
+  }
+
+  return new Response(JSON.stringify({ status: "ok" }), {
+    status: 200,
+    headers: cors,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Main fetch handler
+// ---------------------------------------------------------------------------
+
+export default {
+  async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url);
+    const cors = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+    };
+
+    // Preflight
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: cors });
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/contribute") {
+      return handleContribute(request, env);
+    }
+
+    return new Response(JSON.stringify({ status: "error", message: "not found" }), {
+      status: 404,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+  },
+};
