@@ -18,15 +18,23 @@ jobs:
 
       - name: Build universal binary
         run: |
-          swift build -c release --arch x86_64 --arch arm64
+          # Build each arch separately to avoid xcodebuild _RopeModule bug
+          swift build -c release --arch arm64
+          swift build -c release --arch x86_64
+          # Merge into universal binary with lipo
+          mkdir -p .build/universal
+          lipo -create \
+            .build/arm64-apple-macosx/release/cellar \
+            .build/x86_64-apple-macosx/release/cellar \
+            -output .build/universal/cellar
           VERSION="${GITHUB_REF_NAME#v}"
           ARCHIVE="cellar-${VERSION}-macos.tar.gz"
-          tar -czf "$ARCHIVE" -C .build/apple/Products/Release cellar
+          tar -czf "$ARCHIVE" -C .build/universal cellar
           echo "ARCHIVE=$ARCHIVE" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Smoke test
-        run: .build/apple/Products/Release/cellar --help
+        run: .build/universal/cellar --help
 
       - name: Generate checksum
         run: shasum -a 256 "$ARCHIVE" > "${ARCHIVE}.sha256"
