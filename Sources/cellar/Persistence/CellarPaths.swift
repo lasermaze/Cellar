@@ -123,6 +123,20 @@ struct CellarPaths {
     /// Default collective memory repository identifier (owner/repo).
     static let defaultMemoryRepo = "lasermaze/cellar-memory"
 
+    /// The collective memory repository identifier (owner/repo).
+    /// Reads CELLAR_MEMORY_REPO from process environment, falls back to default.
+    static var memoryRepo: String {
+        ProcessInfo.processInfo.environment["CELLAR_MEMORY_REPO"] ?? defaultMemoryRepo
+    }
+
+    /// Directory for cached collective memory entries.
+    static let memoryCacheDir: URL = base.appendingPathComponent("cache/memory")
+
+    /// Cache file path for a given game slug.
+    static func memoryCacheFile(for slug: String) -> URL {
+        memoryCacheDir.appendingPathComponent("\(slug).json")
+    }
+
     // Diagnostics directory: ~/.cellar/diagnostics/
     static let diagnosticsDir: URL = base.appendingPathComponent("diagnostics")
 

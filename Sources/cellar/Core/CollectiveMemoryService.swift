@@ -4,7 +4,8 @@ import Foundation
 /// for a given game. The single public entry point is `fetchBestEntry(for:wineURL:)`.
 ///
 /// All errors are swallowed — the function returns nil when no compatible entry is available,
-/// when auth is not configured, or when any network/parsing failure occurs.
+/// or when any network/parsing failure occurs. A local file cache at ~/.cellar/cache/memory/
+/// provides offline resilience with a 1-hour TTL.
 struct CollectiveMemoryService {
 
     // MARK: - Public API
@@ -20,49 +21,93 @@ struct CollectiveMemoryService {
         for gameName: String,
         wineURL: URL
     ) async -> String? {
-        // Step 1: Auth check
-        let authResult = await GitHubAuthService.shared.getToken()
-        guard case .token(let token) = authResult else {
-            return nil
-        }
-
-        // Step 2: Detect local Wine version
+        // Step 1: Detect local Wine version
         guard let localWineVersion = detectWineVersion(wineURL: wineURL) else {
             fputs("[CollectiveMemoryService] Could not detect Wine version for environment fingerprint\n", stderr)
             return nil
         }
 
-        // Step 3: Detect Wine flavor
+        // Step 2: Detect Wine flavor
         let localFlavor = detectWineFlavor(wineURL: wineURL)
 
-        // Step 4: Build GitHub Contents API request
+        // Step 3: Build slug and cache path
         let slug = slugify(gameName)
-        let urlString = "https://api.github.com/repos/\(GitHubAuthService.shared.memoryRepo)/contents/entries/\(slug).json"
+        let cacheFile = CellarPaths.memoryCacheFile(for: slug)
+
+        // Step 4: Serve from cache if fresh (< 1 hour old)
+        if isCacheFresh(cacheFile), let cachedData = loadFromCache(cacheFile) {
+            return decodeAndFormat(data: cachedData, gameName: gameName, localWineVersion: localWineVersion, localFlavor: localFlavor)
+        }
+
+        // Step 5: Build GitHub Contents API request (anonymous — public repo)
+        let urlString = "https://api.github.com/repos/\(CellarPaths.memoryRepo)/contents/entries/\(slug).json"
         guard let url = URL(string: urlString) else {
             return nil
         }
 
         var request = URLRequest(url: url)
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/vnd.github.v3.raw", forHTTPHeaderField: "Accept")
         request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
         request.timeoutInterval = 5
 
-        // Step 5: Async fetch
+        // Step 6: Async fetch
         guard let (data, statusCode) = await performFetch(request: request) else {
             fputs("[CollectiveMemoryService] Network error fetching collective memory for '\(gameName)'\n", stderr)
+            // Fallback to stale cache on network error
+            if let staleData = loadFromCache(cacheFile) {
+                return decodeAndFormat(data: staleData, gameName: gameName, localWineVersion: localWineVersion, localFlavor: localFlavor)
+            }
             return nil
         }
 
-        // 404 = no entry yet, normal flow; any other 4xx/5xx = log and skip
+        // 404 = no entry yet, normal flow; 403/429 = rate limited — serve stale cache
         guard statusCode == 200 else {
-            if statusCode != 404 {
+            if statusCode == 403 || statusCode == 429 {
+                fputs("[CollectiveMemoryService] HTTP \(statusCode) (rate limited) fetching collective memory for '\(gameName)' — serving stale cache if available\n", stderr)
+                if let staleData = loadFromCache(cacheFile) {
+                    return decodeAndFormat(data: staleData, gameName: gameName, localWineVersion: localWineVersion, localFlavor: localFlavor)
+                }
+            } else if statusCode != 404 {
                 fputs("[CollectiveMemoryService] HTTP \(statusCode) fetching collective memory for '\(gameName)'\n", stderr)
             }
             return nil
         }
 
-        // Step 6: Decode entries array
+        // Step 7: Cache the successful response
+        try? FileManager.default.createDirectory(at: CellarPaths.memoryCacheDir, withIntermediateDirectories: true)
+        try? data.write(to: cacheFile, options: .atomic)
+
+        // Step 8: Decode and format
+        return decodeAndFormat(data: data, gameName: gameName, localWineVersion: localWineVersion, localFlavor: localFlavor)
+    }
+
+    // MARK: - Private Cache Helpers
+
+    /// Returns true if the cache file exists and was modified less than 3600 seconds ago.
+    private static func isCacheFresh(_ url: URL) -> Bool {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let modDate = attrs[.modificationDate] as? Date else {
+            return false
+        }
+        return Date().timeIntervalSince(modDate) < 3600
+    }
+
+    /// Read cache file contents, returning nil on any failure.
+    private static func loadFromCache(_ url: URL) -> Data? {
+        try? Data(contentsOf: url)
+    }
+
+    // MARK: - Private Decode + Format Helper
+
+    /// Decode, filter, score, rank, and format a collective memory JSON payload.
+    /// Returns nil if the data is malformed, empty, or has no arch-compatible entries.
+    private static func decodeAndFormat(
+        data: Data,
+        gameName: String,
+        localWineVersion: String,
+        localFlavor: String
+    ) -> String? {
+        // Decode entries array
         let entries: [CollectiveMemoryEntry]
         do {
             entries = try JSONDecoder().decode([CollectiveMemoryEntry].self, from: data)
@@ -75,7 +120,7 @@ struct CollectiveMemoryService {
             return nil
         }
 
-        // Step 7: Filter by arch (hard incompatible)
+        // Filter by arch (hard incompatible)
         #if arch(arm64)
         let localArch = "arm64"
         #else
@@ -87,7 +132,7 @@ struct CollectiveMemoryService {
             return nil
         }
 
-        // Step 8: Score each entry by environment similarity
+        // Score each entry by environment similarity
         let localMajor = majorVersion(from: localWineVersion) ?? 0
         let localMacosMajor = macosMajorVersion()
 
@@ -127,18 +172,17 @@ struct CollectiveMemoryService {
         let ranked = scored.sorted { $0.score > $1.score }
         let best = ranked[0]
 
-        // Step 9: Assess staleness and flavor mismatch for warnings
+        // Assess staleness and flavor mismatch for warnings
         let entryMajor = majorVersion(from: best.entry.environment.wineVersion) ?? 0
         let isStale = (localMajor - entryMajor) > 1
         let flavorMismatch = best.entry.environment.wineFlavor != localFlavor
 
-        // Step 10: Pick fallback (second-best with a different config, if available)
+        // Pick fallback (second-best with a different config, if available)
         let fallback: CollectiveMemoryEntry? = ranked.dropFirst().first(where: { candidate in
-            // Only include as fallback if it has a meaningfully different config
             candidate.entry.environmentHash != best.entry.environmentHash
         })?.entry
 
-        // Step 11: Format and return context block
+        // Format and return context block
         return formatMemoryContext(
             best.entry,
             score: best.score,
