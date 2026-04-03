@@ -561,7 +561,7 @@ struct KimiAgentProvider: AgentLoopProvider {
         let encoder = JSONEncoder()
         let bodyData = try encoder.encode(requestBody)
 
-        var urlRequest = URLRequest(url: URL(string: "https://api.moonshot.cn/v1/chat/completions")!)
+        var urlRequest = URLRequest(url: URL(string: "https://api.moonshot.ai/v1/chat/completions")!)
         urlRequest.httpMethod = "POST"
         urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
