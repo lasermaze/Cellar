@@ -187,3 +187,42 @@ final class SpinDetector: AgentMiddleware {
         return nudgeMsg
     }
 }
+
+// MARK: - EventLogger
+
+/// Middleware that writes tool lifecycle and step events to an AgentEventLog (JSONL).
+///
+/// Logs:
+/// - `.toolInvoked` in `beforeTool` (after allowing the tool to run)
+/// - `.toolCompleted` in `afterTool` with a 200-char summary of the result
+/// - `.stepCompleted` in `afterStep` with the current estimated cost
+final class EventLogger: AgentMiddleware {
+    let eventLog: AgentEventLog
+
+    init(eventLog: AgentEventLog) {
+        self.eventLog = eventLog
+    }
+
+    func beforeTool(name: String, input: JSONValue, context: MiddlewareContext) -> ToolResult? {
+        eventLog.append(.toolInvoked(name: name, iteration: context.iterationCount))
+        return nil
+    }
+
+    func afterTool(name: String, input: JSONValue, result: ToolResult, context: MiddlewareContext) {
+        let summary: String
+        switch result {
+        case .success(let content):
+            summary = String(content.prefix(200))
+        case .stop(_, let reason):
+            summary = "STOP: \(reason)"
+        case .error(let content):
+            summary = "ERROR: \(String(content.prefix(200)))"
+        }
+        eventLog.append(.toolCompleted(name: name, summary: summary, iteration: context.iterationCount))
+    }
+
+    func afterStep(context: MiddlewareContext) -> String? {
+        eventLog.append(.stepCompleted(iteration: context.iterationCount, cost: context.estimatedCost))
+        return nil
+    }
+}
