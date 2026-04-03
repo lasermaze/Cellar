@@ -60,32 +60,32 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BUG-01 | TBD | Pending |
-| BUG-02 | TBD | Pending |
-| BUG-03 | TBD | Pending |
-| BUG-04 | TBD | Pending |
-| ARCH-01 | TBD | Pending |
-| ARCH-02 | TBD | Pending |
-| ARCH-03 | TBD | Pending |
-| ARCH-04 | TBD | Pending |
-| MW-01 | TBD | Pending |
-| MW-02 | TBD | Pending |
-| MW-03 | TBD | Pending |
-| MW-04 | TBD | Pending |
-| LOG-01 | TBD | Pending |
-| LOG-02 | TBD | Pending |
-| LOG-03 | TBD | Pending |
-| LOG-04 | TBD | Pending |
-| INT-01 | TBD | Pending |
-| INT-02 | TBD | Pending |
-| INT-03 | TBD | Pending |
-| INT-04 | TBD | Pending |
+| BUG-01 | Phase 34 | Pending |
+| BUG-02 | Phase 35 | Pending |
+| BUG-03 | Phase 33 | Pending |
+| BUG-04 | Phase 31 | Pending |
+| ARCH-01 | Phase 31 | Pending |
+| ARCH-02 | Phase 31 | Pending |
+| ARCH-03 | Phase 31 | Pending |
+| ARCH-04 | Phase 33 | Pending |
+| MW-01 | Phase 32 | Pending |
+| MW-02 | Phase 32 | Pending |
+| MW-03 | Phase 32 | Pending |
+| MW-04 | Phase 32 | Pending |
+| LOG-01 | Phase 32 | Pending |
+| LOG-02 | Phase 32 | Pending |
+| LOG-03 | Phase 36 | Pending |
+| LOG-04 | Phase 36 | Pending |
+| INT-01 | Phase 35 | Pending |
+| INT-02 | Phase 35 | Pending |
+| INT-03 | Phase 35 | Pending |
+| INT-04 | Phase 35 | Pending |
 
 **Coverage:**
 - v1.3 requirements: 20 total
-- Mapped to phases: 0
-- Unmapped: 20
+- Mapped to phases: 20
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-03*
-*Last updated: 2026-04-03 after v1.3 milestone start*
+*Last updated: 2026-04-03 after v1.3 roadmap created*

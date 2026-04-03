@@ -4,7 +4,8 @@
 
 - ✅ **v1.0 Research-Diagnose-Adapt** — Phases 1–7 (shipped 2026-03-28)
 - ✅ **v1.1 Agentic Independence** — Phases 8–12 (shipped 2026-03-30)
-- 🚧 **v1.2 Collective Agent Memory** — Phases 13–18 (in progress)
+- ✅ **v1.2 Collective Agent Memory** — Phases 13–30 (shipped 2026-04-03)
+- 🚧 **v1.3 Agent Loop Rewrite** — Phases 31–36 (in progress)
 
 ## Phases
 
@@ -32,16 +33,40 @@
 
 </details>
 
-### 🚧 v1.2 Collective Agent Memory (In Progress)
-
-**Milestone Goal:** Build a shared knowledge layer so that when any Cellar agent solves a game, every other agent benefits — an agent-first collective memory backed by a Git repo.
+<details>
+<summary>✅ v1.2 Collective Agent Memory (Phases 13–30) — SHIPPED 2026-04-03</summary>
 
 - [x] **Phase 13: GitHub App Authentication** — RS256 JWT generation, installation token exchange, automatic refresh before expiry (completed 2026-03-30)
 - [x] **Phase 14: Memory Entry Schema** — Lock the collective memory entry schema and establish the repo structure before any community writes (completed 2026-03-31)
 - [x] **Phase 15: Read Path** — Agent queries collective memory before diagnosis; environment-aware fit assessment before applying any stored config (completed 2026-03-31)
 - [x] **Phase 16: Write Path** — Agent pushes configs after confirmed success; confidence accumulation with deduplication; opt-in contribution prompt (completed 2026-03-31)
 - [x] **Phase 17: Web Memory UI** — Browser views for collective memory stats and per-game memory entries (completed 2026-03-31)
-- [x] **Phase 18: Deepseek API Support** — Add Deepseek as an additional AI provider alongside Claude; users choose which provider for recipe generation, log interpretation, and the agent loop (completed 2026-03-31)
+- [x] **Phase 18: Deepseek API Support** — Add Deepseek as an additional AI provider alongside Claude (completed 2026-03-31)
+- [x] **Phase 19: Import Lutris and ProtonDB compatibility databases** — Unified compatibility lookup tool with pre-diagnosis context injection (completed 2026-03-31)
+- [x] **Phase 20: Smarter Wine log parsing and structured diagnostics** — Subsystem-grouped diagnostic engine with causal chains, noise filtering, trend tracking (completed 2026-03-31)
+- [x] **Phase 21: Pre-flight dependency check from PE imports** — (completed)
+- [x] **Phase 22: Seamless macOS UX** — Pre-flight permissions, game removal, actionable errors, first-run setup (completed 2026-04-01)
+- [x] **Phase 23: Homebrew tap distribution with launcher .app** — Zero-friction install via brew, CI-built binary, post-install .app wrapper (completed 2026-04-02)
+- [x] **Phase 24: Architecture and Code Quality Cleanup** — Async/await migration, AgentTools decomposition, KnownDLLRegistry expansion (completed 2026-04-02)
+- [x] **Phase 25: Kimi model support** — Add Kimi (Moonshot AI) as AI provider (completed 2026-04-02)
+- [x] **Phase 26: ISO disc image support for game installation** — Mount .iso/.bin/.cue, detect installer, run through existing pipeline (completed 2026-04-02)
+- [x] **Phase 27: Distribution — GitHub Releases and Install Script** — Single-command install via curl|bash, release CI cleanup (completed 2026-04-02)
+- [x] **Phase 28: Fix Collective Memory Prompt Injection Vulnerability** — Sanitize fields, allowlist env/registry, CSRF protection, .env permissions (completed 2026-04-02)
+- [x] **Phase 29: Secure collective memory — Cloudflare Worker write proxy, remove bundled private key** — Public repo anonymous reads, server-side validation, GitHubAuthService deleted (completed 2026-04-03)
+- [x] **Phase 30: Smart game name matching** — (placeholder, unused)
+
+</details>
+
+### 🚧 v1.3 Agent Loop Rewrite (In Progress)
+
+**Milestone Goal:** Fix critical bugs in the agent loop (race conditions, unresponsive stop, lost saves) and modernize the architecture with typed results, thread-safe control, a middleware system, and structured event logging — so the loop is correct, observable, and maintainable.
+
+- [ ] **Phase 31: New Types** — ToolResult enum, AgentControl, LoopState, expanded AgentStopReason
+- [ ] **Phase 32: Middleware System** — AgentMiddleware protocol, BudgetTracker, SpinDetector, EventLogger, JSONL event log
+- [ ] **Phase 33: Rewrite the Loop** — New run() signature, extracted helpers, clean endTurn semantics, ≤150-line body
+- [ ] **Phase 34: Update AgentTools** — execute() returns ToolResult, remove bare vars, post-loop save logic
+- [ ] **Phase 35: Wire It Together** — AIService, ActiveAgents, LaunchController, prepareStep integration
+- [ ] **Phase 36: Event Log Resume and SessionHandoff Integration** — Resume summary from event log, SessionHandoff fallback
 
 ## Phase Details
 
@@ -178,26 +203,6 @@ Plans:
 **Plans:** 1/1 plans complete
 Plans:
 - [ ] 17-01-PLAN.md — MemoryStatsService, MemoryController, memory.leaf + memory-game.leaf templates, nav link
-
-## Progress
-
-**Execution Order:**
-Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18
-
-| Phase | Milestone | Plans Complete | Status | Completed |
-|-------|-----------|----------------|--------|-----------|
-| 1–7. v1.0 phases | v1.0 | All complete | Complete | 2026-03-28 |
-| 8. Loop Resilience | v1.1 | 2/2 | Complete | 2026-03-29 |
-| 9. Engine Detection and Pre-configuration | v1.1 | 2/2 | Complete | 2026-03-29 |
-| 10. Dialog Detection | v1.1 | 2/2 | Complete | 2026-03-29 |
-| 11. Smarter Research | v1.1 | 3/3 | Complete | 2026-03-29 |
-| 12. Web Interface for Game Management | v1.1 | 4/4 | Complete | 2026-03-30 |
-| 13. GitHub App Authentication | 2/2 | Complete    | 2026-03-30 | - |
-| 14. Memory Entry Schema | 1/1 | Complete    | 2026-03-31 | - |
-| 15. Read Path | 2/2 | Complete    | 2026-03-31 | - |
-| 16. Write Path | 2/2 | Complete   | 2026-03-31 | - |
-| 17. Web Memory UI | 1/1 | Complete    | 2026-03-31 | - |
-| 18. Deepseek API Support | 2/2 | Complete    | 2026-03-31 | - |
 
 ### Phase 18: Deepseek API Support
 **Goal**: Users can choose Deepseek as an alternative AI provider to Claude for recipe generation, log interpretation, and the full agent loop — with provider selection in config and the web settings UI
@@ -347,3 +352,115 @@ Plans:
 
 Plans:
 - [x] TBD (run /gsd:plan-phase 29 to break down) (completed 2026-04-03)
+
+### Phase 30: Smart game name matching — strip version numbers and prefixes from installer filenames
+
+**Goal:** [To be planned — placeholder, unused in v1.2]
+**Requirements**: TBD
+**Depends on:** Phase 29
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 30 to break down)
+
+### Phase 31: New Types
+**Goal**: The foundational types for the new agent loop architecture exist and compile — ToolResult enum, AgentControl thread-safe channel, LoopState struct, and expanded AgentStopReason replace the old string matching and bare-var patterns
+**Depends on**: Phase 30
+**Requirements**: ARCH-01, ARCH-02, ARCH-03, BUG-04
+**Success Criteria** (what must be TRUE):
+  1. Tool execution results are expressed as a `ToolResult` enum (success/stop/error) — no string matching on "STOP": true anywhere in the control flow
+  2. Web routes can call `AgentControl.abort()` and `AgentControl.confirm()` from any thread without data races — the underlying flags are protected by a lock
+  3. All mutable loop state (iteration count, token totals, cost, max tokens) lives in one `LoopState` struct — no scattered local vars across the loop body
+  4. `AgentStopReason` includes userAborted, userConfirmed, budgetExhausted, maxIterations, completed, and apiError cases — callers distinguish why the loop stopped
+**Plans**: TBD
+
+### Phase 32: Middleware System
+**Goal**: The middleware system and JSONL event log exist as independent, composable units — BudgetTracker, SpinDetector, and EventLogger are implemented against the AgentMiddleware protocol, and the event log appends structured records to disk
+**Depends on**: Phase 31
+**Requirements**: MW-01, MW-02, MW-03, MW-04, LOG-01, LOG-02
+**Success Criteria** (what must be TRUE):
+  1. The `AgentMiddleware` protocol is defined with `beforeTool`, `afterTool`, and `afterStep` hooks — any middleware can be added or removed without touching the loop body
+  2. After an agent session, the JSONL file at `~/.cellar/logs/<gameId>-<timestamp>.jsonl` contains one record per event including sessionStarted, llmCalled, toolInvoked, toolCompleted, budgetWarning, spinDetected, and sessionEnded
+  3. `BudgetTracker` middleware fires warnings at 50% and 80% of the budget ceiling and halts at 100% — the loop body contains none of this threshold logic
+  4. `SpinDetector` middleware identifies repeating tool call patterns and injects a pivot nudge message — spin detection is not inline in the loop
+**Plans**: TBD
+
+### Phase 33: Rewrite the Loop
+**Goal**: The main agent loop body is ≤150 lines, delegates all cross-cutting concerns to middleware, handles endTurn as a clean stop with no tug-of-war, and provides a prepareStep hook for per-iteration adjustments
+**Depends on**: Phase 32
+**Requirements**: ARCH-04, BUG-03
+**Success Criteria** (what must be TRUE):
+  1. `AgentLoop.run()` is ≤150 lines — no inline budget tracking, spin detection, or logging logic anywhere in the body
+  2. When the LLM returns `endTurn`, the loop exits immediately — there is no retry-on-endTurn logic and no scenario where the agent is forced to continue after deciding to stop
+  3. The `prepareStep` hook is called at the start of each iteration before the LLM call — callers can inject messages or trim context without modifying the loop
+  4. The new loop signature accepts `AgentControl` and a middleware chain — it does not read bare vars from AgentTools
+**Plans**: TBD
+
+### Phase 34: Update AgentTools
+**Goal**: AgentTools.execute() returns a typed ToolResult, all bare synchronization vars (shouldAbort, userForceConfirmed, taskState) are removed, and the post-loop save is the single save path with no fire-and-forget
+**Depends on**: Phase 33
+**Requirements**: ARCH-01, BUG-01
+**Success Criteria** (what must be TRUE):
+  1. `AgentTools.execute()` returns `ToolResult` — no caller reads a raw String and pattern-matches on "STOP" anywhere
+  2. AgentTools has no `shouldAbort`, `userForceConfirmed`, or `taskState` vars — these are gone from the type entirely
+  3. When a user clicks "Game Works" in the web UI, the memory save completes with `await` before the session ends — no fire-and-forget Task, no race between two save paths
+**Plans**: TBD
+
+### Phase 35: Wire It Together
+**Goal**: AIService, ActiveAgents, and LaunchController are updated to use AgentControl and the middleware chain — web routes call AgentControl methods, the stop button halts the agent within one iteration, and prepareStep is available for context injection
+**Depends on**: Phase 34
+**Requirements**: INT-01, INT-02, INT-03, INT-04, BUG-02
+**Success Criteria** (what must be TRUE):
+  1. `AIService.runAgentLoop()` creates the middleware chain, event log, and AgentControl; performs post-loop save with `await`; no fire-and-forget anywhere in the call site
+  2. `ActiveAgents` stores `AgentControl` alongside `AgentTools` — web routes call `control.abort()` and `control.confirm()` to stop or confirm the agent
+  3. When a user clicks the stop button, the agent loop exits within one iteration — it is not blocked by an in-flight API call that takes 10–30 seconds
+  4. `prepareStep` hook is wired and callable from AIService for context trimming and message injection before each iteration
+**Plans**: TBD
+
+### Phase 36: Event Log Resume and SessionHandoff Integration
+**Goal**: The JSONL event log can generate a resume summary for injection into the next session's initial message, and SessionHandoff remains as a working fallback when no event log exists
+**Depends on**: Phase 35
+**Requirements**: LOG-03, LOG-04
+**Success Criteria** (what must be TRUE):
+  1. When a game session is resumed, the initial message includes a summary derived from the JSONL event log — tools called, outcomes, configs tried, and what the agent was doing when the session ended
+  2. When no event log exists for a game (first session, or log deleted), SessionHandoff provides the resume context — the session starts with the handoff summary instead of an empty context
+  3. The event log resume summary is richer than the SessionHandoff snapshot — it reflects the full sequence of tool calls and outcomes, not just the final state
+**Plans**: TBD
+
+## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26 → 27 → 28 → 29 → 30 → 31 → 32 → 33 → 34 → 35 → 36
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+|-------|-----------|----------------|--------|-----------|
+| 1–7. v1.0 phases | v1.0 | All complete | Complete | 2026-03-28 |
+| 8. Loop Resilience | v1.1 | 2/2 | Complete | 2026-03-29 |
+| 9. Engine Detection and Pre-configuration | v1.1 | 2/2 | Complete | 2026-03-29 |
+| 10. Dialog Detection | v1.1 | 2/2 | Complete | 2026-03-29 |
+| 11. Smarter Research | v1.1 | 3/3 | Complete | 2026-03-29 |
+| 12. Web Interface for Game Management | v1.1 | 4/4 | Complete | 2026-03-30 |
+| 13. GitHub App Authentication | v1.2 | 2/2 | Complete | 2026-03-30 |
+| 14. Memory Entry Schema | v1.2 | 1/1 | Complete | 2026-03-31 |
+| 15. Read Path | v1.2 | 2/2 | Complete | 2026-03-31 |
+| 16. Write Path | v1.2 | 2/2 | Complete | 2026-03-31 |
+| 17. Web Memory UI | v1.2 | 1/1 | Complete | 2026-03-31 |
+| 18. Deepseek API Support | v1.2 | 2/2 | Complete | 2026-03-31 |
+| 19. Import Lutris and ProtonDB | v1.2 | 2/2 | Complete | 2026-03-31 |
+| 20. Smarter Wine log parsing | v1.2 | 2/2 | Complete | 2026-03-31 |
+| 21. Pre-flight dependency check | v1.2 | — | Complete | — |
+| 22. Seamless macOS UX | v1.2 | 3/3 | Complete | 2026-04-01 |
+| 23. Homebrew tap distribution | v1.2 | 2/2 | Complete | 2026-04-02 |
+| 24. Architecture cleanup | v1.2 | 3/3 | Complete | 2026-04-02 |
+| 25. Kimi model support | v1.2 | 2/2 | Complete | 2026-04-02 |
+| 26. ISO disc image support | v1.2 | 2/2 | Complete | 2026-04-02 |
+| 27. Distribution — GitHub Releases | v1.2 | 2/2 | Complete | 2026-04-02 |
+| 28. Fix prompt injection | v1.2 | 2/2 | Complete | 2026-04-02 |
+| 29. Secure collective memory | v1.2 | 3/3 | Complete | 2026-04-03 |
+| 30. Smart game name matching | v1.2 | 0 | Unused placeholder | — |
+| 31. New Types | v1.3 | 0/TBD | Not started | - |
+| 32. Middleware System | v1.3 | 0/TBD | Not started | - |
+| 33. Rewrite the Loop | v1.3 | 0/TBD | Not started | - |
+| 34. Update AgentTools | v1.3 | 0/TBD | Not started | - |
+| 35. Wire It Together | v1.3 | 0/TBD | Not started | - |
+| 36. Event Log Resume and SessionHandoff | v1.3 | 0/TBD | Not started | - |

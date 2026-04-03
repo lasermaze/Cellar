@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
-status: defining_requirements
-last_updated: "2026-04-03T19:30:00.000Z"
+status: roadmap_complete
+last_updated: "2026-04-03T20:00:00.000Z"
 progress:
-  total_phases: 0
+  total_phases: 6
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 31 (New Types) — not started
 Plan: —
-Status: Defining requirements for v1.3
-Last activity: 2026-04-03 — Milestone v1.3 started
+Status: Roadmap complete, ready for planning
+Last activity: 2026-04-03 — v1.3 roadmap created (6 phases, 20 requirements)
 
 Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 
@@ -149,6 +149,11 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 - [Phase 29-02]: decodeAndFormat() helper shared between cache-hit and network-200 paths — avoids duplicating decode/rank/format pipeline
 - [Phase 29-03]: CELLAR_MEMORY_PROXY_URL env var overrides production Worker URL — consistent with other CellarPaths env var patterns
 - [Phase 29-03]: ProxyPayload wrapper struct encodes {"entry": ...} matching Worker's expected request body shape
+- [v1.3 roadmap]: Tool implementations (SaveTools, DiagnosticTools, etc.) unchanged — ToolResult wrapping happens in AgentTools.execute(), not in tool files
+- [v1.3 roadmap]: AgentLoopProvider protocol and all provider implementations (Anthropic/Deepseek/Kimi) unchanged — loop mechanics change, not provider contract
+- [v1.3 roadmap]: OSAllocatedUnfairLock used in AgentControl — Swift 6 concurrency-safe, no new SPM dependency
+- [v1.3 roadmap]: Post-loop save is the single save path — shouldAbort closure fire-and-forget pattern eliminated entirely
+- [v1.3 roadmap]: Event log at ~/.cellar/logs/<gameId>-<timestamp>.jsonl — JSONL format for append-only streaming writes
 
 ### Roadmap Evolution
 
@@ -164,15 +169,17 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 - Phase 27 added (2026-04-02): Distribution — GitHub Releases + Install Script — single-command install via curl|bash, release CI cleanup
 - Phase 28 added (2026-04-02): Fix Collective Memory Prompt Injection — remove reasoning from prompt, allowlist env/registry, sanitize fields, CSRF protection, .env permissions
 - Phase 29 added (2026-04-03): Secure collective memory — Cloudflare Worker write proxy, remove bundled private key, anonymous public reads, server-side validation
+- Phases 31–36 added (2026-04-03): v1.3 Agent Loop Rewrite — typed results, thread-safe control, middleware system, JSONL event log, clean endTurn semantics
+
 ### Pending Todos
 
 None.
 
 ### Blockers/Concerns
 
-None — Phase 29 resolved the token proxy deferral: private key is no longer in the binary, all writes route through the Cloudflare Worker proxy.
+None.
 
 ## Session Continuity
 
-Last session: 2026-04-02
-Stopped at: Completed 29-03-PLAN.md — private key removed from binary, all writes route through Cloudflare Worker proxy, GitHubAuthService and all credential types deleted, swift build clean.
+Last session: 2026-04-03
+Stopped at: v1.3 roadmap created — 6 phases (31–36), 20 requirements mapped, ready for `/gsd:plan-phase 31`
