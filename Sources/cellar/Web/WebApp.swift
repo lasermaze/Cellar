@@ -32,27 +32,33 @@ enum WebApp {
         // Template engine
         app.views.use(.leaf)
 
-        // Resolve views directory — prefer source tree (avoids LeafKit .build sandbox rejection),
+        // Resolve resource directories — prefer source tree (avoids LeafKit .build sandbox rejection),
         // fall back to bundle resources for deployed binaries
         let sourceViews = FileManager.default.currentDirectoryPath + "/Sources/cellar/Resources/Views"
+        let sourcePublic = FileManager.default.currentDirectoryPath + "/Sources/cellar/Resources/Public"
         let viewsPath: String
+        let publicPath: String
         if FileManager.default.fileExists(atPath: sourceViews + "/base.leaf") {
             viewsPath = sourceViews + "/"
+            publicPath = sourcePublic + "/"
         } else if let resourcePath = Bundle.module.resourcePath {
             viewsPath = resourcePath + "/Views/"
+            publicPath = resourcePath + "/Public/"
         } else {
             fatalError("Cannot find Leaf template directory")
         }
 
         app.leaf.configuration.rootDirectory = viewsPath
         app.directory.viewsDirectory = viewsPath
+        app.directory.publicDirectory = publicPath
 
         // CSRF protection — block cross-origin mutating requests before any route handler runs
         app.middleware.use(OriginCheckMiddleware(allowedPort: port))
 
-        // Static files
+        // Static files — use resolved publicPath (not default working directory,
+        // which may be inside ~/.cellar/ and get rejected as a dotfile path)
         app.middleware.use(
-            FileMiddleware(publicDirectory: app.directory.publicDirectory)
+            FileMiddleware(publicDirectory: publicPath)
         )
 
         // Server config — localhost only, no auth needed
