@@ -37,7 +37,7 @@ if [ -n "${CELLAR_VERSION:-}" ]; then
 else
   info "Fetching latest Cellar release..."
   API_RESPONSE=$(curl -fsSL "https://api.github.com/repos/lasermaze/Cellar/releases/latest" 2>/dev/null || echo "")
-  VERSION=$(echo "$API_RESPONSE" | grep -o '"tag_name":"[^"]*"' | sed 's/"tag_name":"//;s/"//' || echo "")
+  VERSION=$(echo "$API_RESPONSE" | grep -o '"tag_name": *"[^"]*"' | sed 's/"tag_name": *"//;s/"//' || echo "")
   if [ -z "$VERSION" ]; then
     error "Could not determine latest version from GitHub API."
     error "This may mean no release has been published yet."
