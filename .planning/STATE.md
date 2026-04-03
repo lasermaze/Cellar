@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-04-03T18:52:29.849Z"
+last_updated: "2026-04-03T18:56:09.647Z"
 progress:
   total_phases: 29
-  completed_phases: 27
+  completed_phases: 28
   total_plans: 68
-  completed_plans: 67
+  completed_plans: 68
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 ## Current Position
 
-Phase: 29 of 29 (Secure Collective Memory — Cloudflare Worker Write Proxy) — In Progress
-Plan: 1 of 1 complete
-Status: Phase 29 Plan 01 complete — Cloudflare Worker write proxy with server-side validation, RS256 JWT via SubtleCrypto, rate limiting, and GitHub Contents API GET+merge+PUT.
-Last activity: 2026-04-03 — Phase 29 Plan 01: Cloudflare Worker write proxy for collective memory
+Phase: 29 of 29 (Secure Collective Memory — Cloudflare Worker Write Proxy) — Complete
+Plan: 3 of 3 complete
+Status: Phase 29 complete — Cloudflare Worker write proxy deployed, read path updated with CELLAR_MEMORY_REPO env var, private key removed from binary, GitHubAuthService deleted, all writes route through proxy.
+Last activity: 2026-04-02 — Phase 29 Plan 03: Remove bundled private key and simplify write path to POST to proxy
 
-Progress: [████████████████████] ~98% (29-01 complete; 29-02 and 29-03 remaining)
+Progress: [████████████████████] 100% (all 29 phases complete)
 
 ## Performance Metrics
 
@@ -74,6 +74,7 @@ Progress: [████████████████████] ~98% (2
 | Phase 28-fix-collective-memory-prompt-injection-vulnerability P01 | 4 | 2 tasks | 2 files |
 | Phase 29-secure-collective-memory-cloudflare-worker-write-proxy-remove-bundled-private-key P01 | 2 | 2 tasks | 4 files |
 | Phase 29 P02 | 8 | 2 tasks | 3 files |
+| Phase 29 P03 | 8 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -146,6 +147,8 @@ Progress: [████████████████████] ~98% (2
 - [Phase 29-02]: CellarPaths.memoryRepo reads CELLAR_MEMORY_REPO env var with defaultMemoryRepo fallback — consistent with existing CellarPaths pattern
 - [Phase 29-02]: Stale cache served on 403/429 and network failure — rate-limit resilience more important than freshness for read path
 - [Phase 29-02]: decodeAndFormat() helper shared between cache-hit and network-200 paths — avoids duplicating decode/rank/format pipeline
+- [Phase 29-03]: CELLAR_MEMORY_PROXY_URL env var overrides production Worker URL — consistent with other CellarPaths env var patterns
+- [Phase 29-03]: ProxyPayload wrapper struct encodes {"entry": ...} matching Worker's expected request body shape
 
 ### Roadmap Evolution
 
@@ -167,11 +170,9 @@ None.
 
 ### Blockers/Concerns
 
-- Phase 13: Token proxy architecture deferred — CLI ships the GitHub App private key directly. Document rotation procedure before Phase 13 ships.
-- Phase 14: Collective memory repo org/name (assumed cellar-community/memory) and GitHub App ID/installation ID need a concrete decision before Phase 13 auth code is finalized.
-- Phase 16: Confidence deduplication mechanism (per-environment-hash, stored in entry JSON) needs concrete design before Phase 16 begins.
+None — Phase 29 resolved the token proxy deferral: private key is no longer in the binary, all writes route through the Cloudflare Worker proxy.
 
 ## Session Continuity
 
 Last session: 2026-04-02
-Stopped at: Completed 25-01-PLAN.md — Kimi (Moonshot AI) added as AI provider: .kimi enum case, KimiAgentProvider at api.moonshot.cn, KIMI_API_KEY auto-detect, all 4 AIService operation routes wired.
+Stopped at: Completed 29-03-PLAN.md — private key removed from binary, all writes route through Cloudflare Worker proxy, GitHubAuthService and all credential types deleted, swift build clean.

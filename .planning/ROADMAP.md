@@ -343,7 +343,7 @@ Plans:
 **Goal:** Remove the bundled GitHub App private key from the binary. Make the memory repo public (anonymous reads, no auth). Route writes through a Cloudflare Worker that holds the key as a secret and validates entries server-side. Delete GitHubAuthService and all bundled credentials.
 **Requirements**: Public repo anonymous reads, Cloudflare Worker write proxy with server-side validation, remove github-app.pem and github-app.json from binary, delete GitHubAuthService, local read cache with TTL, configurable proxy URL
 **Depends on:** Phase 28
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 29 to break down)
+- [x] TBD (run /gsd:plan-phase 29 to break down) (completed 2026-04-03)
