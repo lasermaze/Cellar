@@ -332,7 +332,8 @@ Plans:
 **Goal:** Close prompt injection attack chain in collective memory — remove reasoning from agent prompt, allowlist env keys and registry prefixes on read+write, sanitize all injectable fields, update system prompt to treat memory as untrusted, add CSRF protection, set .env file permissions.
 **Requirements**: Remove reasoning injection, env key allowlist (shared read+write), registry prefix validation, field truncation/sanitization, system prompt update, CSRF Origin middleware, .env chmod 600
 **Depends on:** Phase 27
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 28 to break down)
+- [ ] 28-01-PLAN.md — Shared env allowlist, reasoning removal, sanitizeEntry() helper, write-side env+registry validation
+- [ ] 28-02-PLAN.md — System prompt hardening, CSRF Origin middleware, .env chmod 600
