@@ -383,7 +383,10 @@ Plans:
   2. After an agent session, the JSONL file at `~/.cellar/logs/<gameId>-<timestamp>.jsonl` contains one record per event including sessionStarted, llmCalled, toolInvoked, toolCompleted, budgetWarning, spinDetected, and sessionEnded
   3. `BudgetTracker` middleware fires warnings at 50% and 80% of the budget ceiling and halts at 100% — the loop body contains none of this threshold logic
   4. `SpinDetector` middleware identifies repeating tool call patterns and injects a pivot nudge message — spin detection is not inline in the loop
-**Plans**: TBD
+**Plans:** 2 plans
+Plans:
+- [ ] 32-01-PLAN.md — AgentMiddleware protocol, MiddlewareContext, BudgetTracker, SpinDetector
+- [ ] 32-02-PLAN.md — AgentEventLog JSONL writer, AgentLogEntry enum, EventLogger middleware
 
 ### Phase 33: Rewrite the Loop
 **Goal**: The main agent loop body is ≤150 lines, delegates all cross-cutting concerns to middleware, handles endTurn as a clean stop with no tug-of-war, and provides a prepareStep hook for per-iteration adjustments
