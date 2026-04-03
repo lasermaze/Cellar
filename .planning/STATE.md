@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-04-03T04:58:35.414Z"
+last_updated: "2026-04-03T04:59:16.359Z"
 progress:
   total_phases: 28
-  completed_phases: 26
+  completed_phases: 27
   total_plans: 65
-  completed_plans: 64
+  completed_plans: 65
 ---
 
 # Project State
@@ -71,6 +71,7 @@ Progress: [████████████████████] ~96% (1
 | Phase 27-distribution-github-releases-install-script P01 | 1 | 1 tasks | 1 files |
 | Phase 27-distribution-github-releases-install-script P02 | 1 | 1 tasks | 1 files |
 | Phase 28-fix-collective-memory-prompt-injection-vulnerability P02 | 174 | 2 tasks | 3 files |
+| Phase 28-fix-collective-memory-prompt-injection-vulnerability P01 | 4 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -135,6 +136,8 @@ Progress: [████████████████████] ~96% (1
 - [Phase 28-02]: OriginCheckMiddleware uses [HTTPMethod] array instead of Set — HTTPMethod does not conform to Hashable in Vapor
 - [Phase 28-02]: OriginCheckMiddleware registered before FileMiddleware so CSRF check runs before any route handler
 - [Phase 28-02]: chmod return value ignored — best-effort inside a throwing function context
+- [Phase 28-fix-collective-memory-prompt-injection-vulnerability]: AgentTools.allowedEnvKeys defined as static let on AgentTools extension — shared between setEnvironment() write path and CollectiveMemoryService.sanitizeEntry() read path
+- [Phase 28-fix-collective-memory-prompt-injection-vulnerability]: reasoning field preserved in CollectiveMemoryEntry struct but never injected into agent prompt lines — sanitizeEntry() strips all WorkingConfig injection vectors before formatMemoryContext() runs
 
 ### Roadmap Evolution
 
