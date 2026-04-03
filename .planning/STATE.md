@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-04-03T18:51:52.521Z"
+last_updated: "2026-04-03T18:52:29.849Z"
 progress:
   total_phases: 29
   completed_phases: 27
@@ -73,6 +73,7 @@ Progress: [████████████████████] ~98% (2
 | Phase 28-fix-collective-memory-prompt-injection-vulnerability P02 | 174 | 2 tasks | 3 files |
 | Phase 28-fix-collective-memory-prompt-injection-vulnerability P01 | 4 | 2 tasks | 2 files |
 | Phase 29-secure-collective-memory-cloudflare-worker-write-proxy-remove-bundled-private-key P01 | 2 | 2 tasks | 4 files |
+| Phase 29 P02 | 8 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -142,6 +143,9 @@ Progress: [████████████████████] ~98% (2
 - [Phase 29-secure-collective-memory-cloudflare-worker-write-proxy-remove-bundled-private-key]: CELLAR_MEMORY_REPO default lasermaze/cellar-memory in wrangler.toml [vars] — overridable without code changes
 - [Phase 29-secure-collective-memory-cloudflare-worker-write-proxy-remove-bundled-private-key]: Worker rate limiting uses in-memory Map (resets on restart) — acceptable at this scale, avoids KV billing
 - [Phase 29-secure-collective-memory-cloudflare-worker-write-proxy-remove-bundled-private-key]: makeJWT() strips both PKCS8 and PKCS1 PEM headers — resilient to key format from wrangler secret
+- [Phase 29-02]: CellarPaths.memoryRepo reads CELLAR_MEMORY_REPO env var with defaultMemoryRepo fallback — consistent with existing CellarPaths pattern
+- [Phase 29-02]: Stale cache served on 403/429 and network failure — rate-limit resilience more important than freshness for read path
+- [Phase 29-02]: decodeAndFormat() helper shared between cache-hit and network-200 paths — avoids duplicating decode/rank/format pipeline
 
 ### Roadmap Evolution
 
