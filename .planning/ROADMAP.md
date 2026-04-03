@@ -383,7 +383,7 @@ Plans:
   2. After an agent session, the JSONL file at `~/.cellar/logs/<gameId>-<timestamp>.jsonl` contains one record per event including sessionStarted, llmCalled, toolInvoked, toolCompleted, budgetWarning, spinDetected, and sessionEnded
   3. `BudgetTracker` middleware fires warnings at 50% and 80% of the budget ceiling and halts at 100% — the loop body contains none of this threshold logic
   4. `SpinDetector` middleware identifies repeating tool call patterns and injects a pivot nudge message — spin detection is not inline in the loop
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 Plans:
 - [ ] 32-01-PLAN.md — AgentMiddleware protocol, MiddlewareContext, BudgetTracker, SpinDetector
 - [ ] 32-02-PLAN.md — AgentEventLog JSONL writer, AgentLogEntry enum, EventLogger middleware
@@ -462,7 +462,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19 �
 | 29. Secure collective memory | v1.2 | 3/3 | Complete | 2026-04-03 |
 | 30. Smart game name matching | v1.2 | 0 | Unused placeholder | — |
 | 31. New Types | 2/2 | Complete    | 2026-04-03 | - |
-| 32. Middleware System | v1.3 | 0/TBD | Not started | - |
+| 32. Middleware System | 1/2 | In Progress|  | - |
 | 33. Rewrite the Loop | v1.3 | 0/TBD | Not started | - |
 | 34. Update AgentTools | v1.3 | 0/TBD | Not started | - |
 | 35. Wire It Together | v1.3 | 0/TBD | Not started | - |

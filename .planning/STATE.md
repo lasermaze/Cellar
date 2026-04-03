@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-03T22:10:34.689Z"
+last_updated: "2026-04-03T22:19:33.001Z"
 progress:
-  total_phases: 31
+  total_phases: 32
   completed_phases: 29
-  total_plans: 70
-  completed_plans: 70
+  total_plans: 72
+  completed_plans: 71
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 31 (New Types) — in progress
+Phase: 32 (Middleware System) — in progress
 Plan: P01 complete
-Status: Executing phase 31
-Last activity: 2026-04-02 — P01 complete: ToolResult, LoopState, AgentStopReason types added to AgentLoop.swift
+Status: Executing phase 32
+Last activity: 2026-04-02 — P01 complete: AgentMiddleware protocol, MiddlewareContext, BudgetTracker, SpinDetector added to new AgentMiddleware.swift
 
 Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 
@@ -77,6 +77,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 | Phase 29 P03 | 8 | 2 tasks | 7 files |
 | Phase 31-new-types P02 | 2 | 1 tasks | 2 files |
 | Phase 31 PP01 | 101 | 2 tasks | 1 files |
+| Phase 32-middleware-system P01 | 2 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -161,6 +162,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 - [Phase 31-P01]: ToolResult placed at file scope after AgentEvent — consistent with other top-level type definitions
 - [Phase 31-P01]: LoopState is private file-scope struct before AgentLoop — accessible by AgentLoop but not public API
 - [Phase 31-P01]: StopReason sub-enum uses .userConfirmedWorking (not .userConfirmed) to distinguish from AgentStopReason.userConfirmed
+- [Phase 32-middleware-system]: MiddlewareContext is a final class (reference type) so all middleware share mutation across a single step
 
 ### Roadmap Evolution
 

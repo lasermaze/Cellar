@@ -27,9 +27,9 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 
 ### Middleware
 
-- [ ] **MW-01**: `AgentMiddleware` protocol with `beforeTool`, `afterTool`, `afterStep` hooks
-- [ ] **MW-02**: `BudgetTracker` middleware handles 50%/80%/100% budget thresholds — extracted from loop body
-- [ ] **MW-03**: `SpinDetector` middleware detects repeating tool patterns and injects pivot nudges — extracted from loop body
+- [x] **MW-01**: `AgentMiddleware` protocol with `beforeTool`, `afterTool`, `afterStep` hooks
+- [x] **MW-02**: `BudgetTracker` middleware handles 50%/80%/100% budget thresholds — extracted from loop body
+- [x] **MW-03**: `SpinDetector` middleware detects repeating tool patterns and injects pivot nudges — extracted from loop body
 - [ ] **MW-04**: `EventLogger` middleware writes tool invocations and results to structured JSONL event log
 
 ### Event Log
@@ -68,9 +68,9 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 | ARCH-02 | Phase 31 | Complete |
 | ARCH-03 | Phase 31 | Complete |
 | ARCH-04 | Phase 33 | Pending |
-| MW-01 | Phase 32 | Pending |
-| MW-02 | Phase 32 | Pending |
-| MW-03 | Phase 32 | Pending |
+| MW-01 | Phase 32 | Complete |
+| MW-02 | Phase 32 | Complete |
+| MW-03 | Phase 32 | Complete |
 | MW-04 | Phase 32 | Pending |
 | LOG-01 | Phase 32 | Pending |
 | LOG-02 | Phase 32 | Pending |
