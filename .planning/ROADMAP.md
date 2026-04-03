@@ -315,3 +315,13 @@ Plans:
 Plans:
 - [ ] 26-01-PLAN.md -- DiscImageHandler struct: mount/discover/detach logic for .iso/.bin/.cue via hdiutil
 - [ ] 26-02-PLAN.md -- AddCommand integration: disc image detection, routing, volume label naming, defer cleanup
+
+### Phase 27: Distribution — GitHub Releases + Install Script
+
+**Goal:** Make Cellar installable with a single command — clean up release CI workflow (checksum, smoke test, remove Homebrew step), create install.sh script (detect system, download, verify, install to ~/.cellar/bin, update PATH).
+**Requirements**: Release workflow cleanup (checksum + smoke test), install.sh script (system detection, download, checksum verify, PATH update, idempotent), no Swift source changes
+**Depends on:** Phase 26
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 27 to break down)
