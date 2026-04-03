@@ -277,6 +277,80 @@ struct CollectiveMemoryService {
         return lines
     }
 
+    /// Sanitize a collective memory entry by validating and truncating all injectable fields.
+    /// Drops disallowed env keys, invalid DLL modes, and registry keys with unexpected prefixes.
+    /// Logs dropped values to stderr without blocking.
+    private static func sanitizeEntry(_ entry: CollectiveMemoryEntry) -> CollectiveMemoryEntry {
+        // Sanitize environment: filter against allowlist, truncate values to 200 chars
+        let sanitizedEnv = entry.config.environment.reduce(into: [String: String]()) { result, pair in
+            let (key, value) = pair
+            guard AgentTools.allowedEnvKeys.contains(key) else {
+                fputs("[CollectiveMemoryService] Dropping disallowed env key: \(key)\n", stderr)
+                return
+            }
+            result[key] = String(value.prefix(200))
+        }
+
+        // Sanitize DLL overrides: validate mode, truncate dll/source fields
+        let validDLLModes: Set<String> = ["n", "b", "n,b", "b,n", ""]
+        let sanitizedDLLOverrides = entry.config.dllOverrides.compactMap { override -> DLLOverrideRecord? in
+            guard validDLLModes.contains(override.mode) else {
+                fputs("[CollectiveMemoryService] Dropping DLL override with invalid mode '\(override.mode)' for '\(override.dll)'\n", stderr)
+                return nil
+            }
+            return DLLOverrideRecord(
+                dll: String(override.dll.prefix(50)),
+                mode: override.mode,
+                placement: override.placement,
+                source: override.source.map { String($0.prefix(100)) }
+            )
+        }
+
+        // Sanitize registry: validate HKEY prefix, truncate fields
+        let allowedRegistryPrefixes: [String] = ["HKEY_CURRENT_USER\\", "HKEY_LOCAL_MACHINE\\"]
+        let sanitizedRegistry = entry.config.registry.compactMap { record -> RegistryRecord? in
+            let truncatedKey = String(record.key.prefix(200))
+            guard allowedRegistryPrefixes.contains(where: { truncatedKey.hasPrefix($0) }) else {
+                fputs("[CollectiveMemoryService] Dropping registry record with disallowed key prefix: \(record.key)\n", stderr)
+                return nil
+            }
+            return RegistryRecord(
+                key: truncatedKey,
+                valueName: String(record.valueName.prefix(100)),
+                data: String(record.data.prefix(200)),
+                purpose: record.purpose
+            )
+        }
+
+        // Sanitize launch args: max 5 entries, each max 100 chars
+        let sanitizedLaunchArgs = Array(entry.config.launchArgs.prefix(5)).map { String($0.prefix(100)) }
+
+        // Sanitize setupDeps: filter against known winetricks verbs
+        let sanitizedSetupDeps = entry.config.setupDeps.filter { AIService.agentValidWinetricksVerbs.contains($0) }
+
+        let sanitizedConfig = WorkingConfig(
+            environment: sanitizedEnv,
+            dllOverrides: sanitizedDLLOverrides,
+            registry: sanitizedRegistry,
+            launchArgs: sanitizedLaunchArgs,
+            setupDeps: sanitizedSetupDeps
+        )
+
+        return CollectiveMemoryEntry(
+            schemaVersion: entry.schemaVersion,
+            gameId: entry.gameId,
+            gameName: entry.gameName,
+            config: sanitizedConfig,
+            environment: entry.environment,
+            environmentHash: entry.environmentHash,
+            reasoning: entry.reasoning,
+            engine: entry.engine,
+            graphicsApi: entry.graphicsApi,
+            confirmations: entry.confirmations,
+            lastConfirmed: entry.lastConfirmed
+        )
+    }
+
     /// Build the formatted collective memory context block for agent injection.
     private static func formatMemoryContext(
         _ entry: CollectiveMemoryEntry,
@@ -288,6 +362,10 @@ struct CollectiveMemoryService {
         fallback: CollectiveMemoryEntry?,
         totalEntries: Int
     ) -> String {
+        // Sanitize entries before any formatting — strips injection vectors
+        let entry = sanitizeEntry(entry)
+        let fallback = fallback.map { sanitizeEntry($0) }
+
         var lines: [String] = []
 
         lines.append("--- COLLECTIVE MEMORY ---")
@@ -311,10 +389,6 @@ struct CollectiveMemoryService {
         lines.append("Working Config:")
         lines.append(contentsOf: formatConfigBlock(entry))
 
-        lines.append("")
-        lines.append("Agent's Reasoning (from prior session):")
-        lines.append("  \"\(entry.reasoning)\"")
-
         // Fallback entry — different config the agent can try if the best match fails
         if let fallback = fallback {
             lines.append("")
@@ -323,10 +397,6 @@ struct CollectiveMemoryService {
             lines.append("")
             lines.append("Working Config:")
             lines.append(contentsOf: formatConfigBlock(fallback))
-            if !fallback.reasoning.isEmpty {
-                lines.append("")
-                lines.append("Reasoning: \"\(fallback.reasoning)\"")
-            }
         }
 
         lines.append("--- END COLLECTIVE MEMORY ---")
