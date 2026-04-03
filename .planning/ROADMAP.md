@@ -321,7 +321,8 @@ Plans:
 **Goal:** Make Cellar installable with a single command — clean up release CI workflow (checksum, smoke test, remove Homebrew step), create install.sh script (detect system, download, verify, install to ~/.cellar/bin, update PATH).
 **Requirements**: Release workflow cleanup (checksum + smoke test), install.sh script (system detection, download, checksum verify, PATH update, idempotent), no Swift source changes
 **Depends on:** Phase 26
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 27 to break down)
+- [ ] 27-01-PLAN.md -- Release workflow cleanup: remove Homebrew step, add checksum + smoke test, enable auto release notes
+- [ ] 27-02-PLAN.md -- install.sh script: macOS detection, GitHub API version fetch, download, checksum verify, PATH update, idempotent
