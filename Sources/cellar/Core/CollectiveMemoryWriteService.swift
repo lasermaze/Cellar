@@ -1,15 +1,25 @@
 import Foundation
 
-/// Stateless service that pushes a working game configuration to the collective memory GitHub repo.
-/// The single public entry point is `push(record:gameName:wineURL:)`.
+/// Stateless service that pushes a working game configuration to the collective memory
+/// via the Cloudflare Worker write proxy. The private key never ships with the binary.
 ///
-/// All errors are swallowed — the function returns without side effects when auth is unavailable,
-/// when any network/parsing failure occurs, or when a conflict cannot be resolved after one retry.
+/// The single public entry point is `push(record:gameName:wineURL:)`.
+/// All errors are swallowed — the function returns without side effects when the proxy
+/// is unreachable, returns an error status, or any network/encoding failure occurs.
 struct CollectiveMemoryWriteService {
+
+    // MARK: - Proxy URL
+
+    /// Proxy URL for collective memory writes.
+    /// Reads CELLAR_MEMORY_PROXY_URL from environment, falls back to production Worker.
+    private static var proxyURL: String {
+        ProcessInfo.processInfo.environment["CELLAR_MEMORY_PROXY_URL"]
+            ?? "https://cellar-memory-proxy.cellar-community.workers.dev/api/contribute"
+    }
 
     // MARK: - Public API
 
-    /// Push a working game configuration to the collective memory repo.
+    /// Push a working game configuration to the collective memory repo via the proxy.
     /// Never throws. All errors are caught and logged internally.
     ///
     /// - Parameters:
@@ -17,31 +27,24 @@ struct CollectiveMemoryWriteService {
     ///   - gameName: The display name of the game.
     ///   - wineURL: URL to the wine binary (used to detect Wine version and flavor).
     static func push(record: SuccessRecord, gameName: String, wineURL: URL) async {
-        // Step 1: Auth check
-        let authResult = await GitHubAuthService.shared.getToken()
-        guard case .token(let token) = authResult else {
-            // Auth not configured — silent skip
-            return
-        }
-
-        // Step 2: Detect Wine version
+        // Step 1: Detect Wine version
         guard let wineVersion = detectWineVersion(wineURL: wineURL) else {
             logPushEvent("WARN", gameId: record.gameId, "Could not detect Wine version, skipping push")
             return
         }
 
-        // Step 3: Detect Wine flavor
+        // Step 2: Detect Wine flavor
         let wineFlavor = detectWineFlavor(wineURL: wineURL)
 
-        // Step 4: Build environment fingerprint
+        // Step 3: Build environment fingerprint
         let fingerprint = EnvironmentFingerprint.current(wineVersion: wineVersion, wineFlavor: wineFlavor)
         let environmentHash = fingerprint.computeHash()
 
-        // Step 5: Build ISO8601 timestamp
+        // Step 4: Build ISO8601 timestamp
         let formatter = ISO8601DateFormatter()
         let lastConfirmed = formatter.string(from: Date())
 
-        // Step 6: Transform SuccessRecord -> CollectiveMemoryEntry
+        // Step 5: Transform SuccessRecord -> CollectiveMemoryEntry
         let workingConfig = WorkingConfig(
             environment: record.environment,
             dllOverrides: record.dllOverrides,
@@ -64,27 +67,15 @@ struct CollectiveMemoryWriteService {
             lastConfirmed: lastConfirmed
         )
 
-        // Step 7: Push to GitHub
-        do {
-            try await pushEntry(entry: entry, token: token)
-        } catch {
-            fputs("[CollectiveMemoryWriteService] Push failed for '\(record.gameId)': \(error)\n", stderr)
-            logPushEvent("ERROR", gameId: record.gameId, "Push failed: \(error)")
-        }
+        // Step 6: POST to proxy
+        await postToProxy(entry: entry)
     }
 
-    /// Sync all local success records to collective memory.
-    /// The write service handles deduplication: same environmentHash increments
-    /// confirmations, different hash appends a new entry, new game creates the file.
+    /// Sync all local success records to collective memory via the proxy.
     /// Returns (synced, failed) counts.
     static func syncAll(wineURL: URL) async -> (synced: Int, failed: Int) {
         let config = CellarConfig.load()
         guard config.contributeMemory == true else {
-            return (0, 0)
-        }
-
-        let authResult = await GitHubAuthService.shared.getToken()
-        guard case .token = authResult else {
             return (0, 0)
         }
 
@@ -115,181 +106,52 @@ struct CollectiveMemoryWriteService {
         return (synced: synced, failed: failed)
     }
 
-    // MARK: - Private: GitHub Contents API Flow
+    // MARK: - Private: Proxy POST
 
-    /// GET + merge + PUT flow against GitHub Contents API.
-    /// Throws on unrecoverable errors; caller wraps in do/catch.
-    private static func pushEntry(entry: CollectiveMemoryEntry, token: String) async throws {
-        let slug = slugify(entry.gameName)
-        let urlString = "https://api.github.com/repos/\(GitHubAuthService.shared.memoryRepo)/contents/entries/\(slug).json"
-        guard let url = URL(string: urlString) else {
-            logPushEvent("ERROR", gameId: entry.gameId, "Invalid URL for slug: \(slug)")
+    /// POST entry JSON to the Cloudflare Worker proxy.
+    private static func postToProxy(entry: CollectiveMemoryEntry) async {
+        guard let url = URL(string: proxyURL) else {
+            logPushEvent("ERROR", gameId: entry.gameId, "Invalid proxy URL: \(proxyURL)")
             return
         }
 
-        // First attempt
-        let firstAttempt = await performMergeAndPut(entry: entry, token: token, url: url)
-        if firstAttempt == .ok { return }
-
-        // 409 conflict: one retry
-        if firstAttempt == .conflict {
-            logPushEvent("INFO", gameId: entry.gameId, "409 conflict on first PUT, retrying with re-fetch")
-            let retryResult = await performMergeAndPut(entry: entry, token: token, url: url)
-            if retryResult == .conflict {
-                logPushEvent("WARN", gameId: entry.gameId, "409 conflict on retry, giving up")
-            }
-            // Otherwise ok or error — both handled internally
-        }
-        // .error is logged inside performMergeAndPut already
-    }
-
-    private enum MergeResult { case ok, conflict, error }
-
-    /// Perform a single GET → merge → PUT cycle. Returns result type.
-    private static func performMergeAndPut(
-        entry: CollectiveMemoryEntry,
-        token: String,
-        url: URL
-    ) async -> MergeResult {
-        // GET with standard JSON Accept (returns sha + base64 content)
-        var getRequest = URLRequest(url: url)
-        getRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        getRequest.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        getRequest.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
-        getRequest.timeoutInterval = 5
-
-        let sha: String?
-        var mergedEntries: [CollectiveMemoryEntry]
-        var commitMessage: String
-
-        logPushEvent("INFO", gameId: entry.gameId, "GET \(url.absoluteString)")
-        if let (data, statusCode) = await performRequest(request: getRequest) {
-            logPushEvent("INFO", gameId: entry.gameId, "GET status: \(statusCode)")
-            switch statusCode {
-            case 200:
-                // Decode existing file
-                guard let contentsResponse = try? JSONDecoder().decode(GitHubContentsResponse.self, from: data) else {
-                    logPushEvent("ERROR", gameId: entry.gameId, "Failed to decode GitHub contents response")
-                    return .error
-                }
-                sha = contentsResponse.sha
-
-                // Decode base64 (GitHub wraps at 60 chars per RFC 2045 — strip newlines first)
-                let cleanBase64 = contentsResponse.content.replacingOccurrences(of: "\n", with: "")
-                guard let fileData = Data(base64Encoded: cleanBase64),
-                      let existingEntries = try? JSONDecoder().decode([CollectiveMemoryEntry].self, from: fileData) else {
-                    logPushEvent("ERROR", gameId: entry.gameId, "Failed to decode existing entries")
-                    return .error
-                }
-
-                // Merge: find by environmentHash
-                if let idx = existingEntries.firstIndex(where: { $0.environmentHash == entry.environmentHash }) {
-                    // Increment confirmation
-                    let existing = existingEntries[idx]
-                    let formatter = ISO8601DateFormatter()
-                    let updated = CollectiveMemoryEntry(
-                        schemaVersion: existing.schemaVersion,
-                        gameId: existing.gameId,
-                        gameName: existing.gameName,
-                        config: existing.config,
-                        environment: existing.environment,
-                        environmentHash: existing.environmentHash,
-                        reasoning: existing.reasoning,
-                        engine: existing.engine,
-                        graphicsApi: existing.graphicsApi,
-                        confirmations: existing.confirmations + 1,
-                        lastConfirmed: formatter.string(from: Date())
-                    )
-                    var entries = existingEntries
-                    entries[idx] = updated
-                    mergedEntries = entries
-                    commitMessage = "Update \(entry.gameName) (+1 confirmation)"
-                } else {
-                    // Append new environment entry
-                    mergedEntries = existingEntries + [entry]
-                    commitMessage = "Update \(entry.gameName) (new environment)"
-                }
-
-            case 404:
-                // New file
-                sha = nil
-                mergedEntries = [entry]
-                commitMessage = "Add \(entry.gameName) entry"
-
-            default:
-                logPushEvent("WARN", gameId: entry.gameId, "Unexpected GET status: \(statusCode)")
-                return .error
-            }
-        } else {
-            fputs("[CollectiveMemoryWriteService] Network error during push for '\(entry.gameId)'\n", stderr)
-            logPushEvent("ERROR", gameId: entry.gameId, "Network error on GET")
-            return .error
-        }
-
-        // Encode entries array to base64
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        guard let fileData = try? encoder.encode(mergedEntries) else {
-            fputs("[CollectiveMemoryWriteService] Failed to encode entry for '\(entry.gameId)'\n", stderr)
-            logPushEvent("ERROR", gameId: entry.gameId, "Failed to encode entries array")
-            return .error
-        }
-        let base64Content = fileData.base64EncodedString()
 
-        // Build PUT body (sha omitted for new files)
-        var putBody: [String: Any] = [
-            "message": commitMessage,
-            "content": base64Content
-        ]
-        if let sha = sha {
-            putBody["sha"] = sha
+        // Wrap in {"entry": ...} as expected by the Worker
+        struct ProxyPayload: Encodable {
+            let entry: CollectiveMemoryEntry
+        }
+        guard let bodyData = try? encoder.encode(ProxyPayload(entry: entry)) else {
+            logPushEvent("ERROR", gameId: entry.gameId, "Failed to encode entry for proxy")
+            return
         }
 
-        guard let putBodyData = try? JSONSerialization.data(withJSONObject: putBody) else {
-            logPushEvent("ERROR", gameId: entry.gameId, "Failed to serialize PUT body")
-            return .error
-        }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = bodyData
+        request.timeoutInterval = 10
 
-        var putRequest = URLRequest(url: url)
-        putRequest.httpMethod = "PUT"
-        putRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        putRequest.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-        putRequest.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
-        putRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        putRequest.httpBody = putBodyData
-        putRequest.timeoutInterval = 5
+        logPushEvent("INFO", gameId: entry.gameId, "POST \(url.absoluteString)")
 
-        logPushEvent("INFO", gameId: entry.gameId, "PUT \(url.absoluteString)")
-        if let (_, statusCode) = await performRequest(request: putRequest) {
-            switch statusCode {
-            case 200, 201:
-                logPushEvent("INFO", gameId: entry.gameId, "Push succeeded: \(commitMessage)")
-                return .ok
-            case 409:
-                fputs("[CollectiveMemoryWriteService] Conflict on push for '\(entry.gameId)' — retrying\n", stderr)
-                return .conflict
-            default:
-                fputs("[CollectiveMemoryWriteService] HTTP \(statusCode) on push for '\(entry.gameId)'\n", stderr)
-                logPushEvent("WARN", gameId: entry.gameId, "PUT returned \(statusCode): \(commitMessage)")
-                return .error
-            }
-        } else {
-            fputs("[CollectiveMemoryWriteService] Network error during push for '\(entry.gameId)'\n", stderr)
-            logPushEvent("ERROR", gameId: entry.gameId, "Network error on PUT")
-            return .error
-        }
-    }
-
-    // MARK: - Private: HTTP
-
-    /// Perform an async HTTP request.
-    /// Returns (data, statusCode) on any HTTP response, nil on network error.
-    private static func performRequest(request: URLRequest) async -> (data: Data, statusCode: Int)? {
-        guard let (data, response) = try? await URLSession.shared.data(for: request),
+        guard let (_, response) = try? await URLSession.shared.data(for: request),
               let http = response as? HTTPURLResponse else {
-            return nil
+            fputs("[CollectiveMemoryWriteService] Network error posting to proxy for '\(entry.gameId)'\n", stderr)
+            logPushEvent("ERROR", gameId: entry.gameId, "Network error on POST to proxy")
+            return
         }
-        return (data, http.statusCode)
+
+        switch http.statusCode {
+        case 200, 201:
+            logPushEvent("INFO", gameId: entry.gameId, "Push succeeded via proxy (HTTP \(http.statusCode))")
+        case 429:
+            fputs("[CollectiveMemoryWriteService] Rate limited by proxy for '\(entry.gameId)'\n", stderr)
+            logPushEvent("WARN", gameId: entry.gameId, "Proxy rate limit (429) — skipping")
+        default:
+            fputs("[CollectiveMemoryWriteService] HTTP \(http.statusCode) from proxy for '\(entry.gameId)'\n", stderr)
+            logPushEvent("WARN", gameId: entry.gameId, "Proxy returned HTTP \(http.statusCode)")
+        }
     }
 
     // MARK: - Private: Wine Detection
@@ -372,13 +234,5 @@ struct CollectiveMemoryWriteService {
         } else {
             try? lineData.write(to: logFile, options: .atomic)
         }
-    }
-
-    // MARK: - Internal Types
-
-    /// GitHub Contents API response for a single file (GET with standard JSON Accept).
-    private struct GitHubContentsResponse: Codable {
-        let sha: String
-        let content: String
     }
 }
