@@ -27,18 +27,22 @@ jobs:
             .build/arm64-apple-macosx/release/cellar \
             .build/x86_64-apple-macosx/release/cellar \
             -output .build/universal/cellar
+          # Copy resource bundle alongside binary (Leaf templates, static assets)
+          cp -R .build/arm64-apple-macosx/release/cellar_cellar.bundle .build/universal/
           VERSION="${GITHUB_REF_NAME#v}"
           ARCHIVE="cellar-${VERSION}-macos.tar.gz"
-          tar -czf "$ARCHIVE" -C .build/universal cellar
+          tar -czf "$ARCHIVE" -C .build/universal cellar cellar_cellar.bundle
           echo "ARCHIVE=$ARCHIVE" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       - name: Smoke test
         run: |
           # ArgumentParser exits non-zero for --help; just verify the binary runs and prints usage
-          .build/universal/cellar --help 2>&1 | head -5 || true
+          cd .build/universal && ./cellar --help 2>&1 | head -5 || true
           # Verify it's actually a universal binary
           file .build/universal/cellar | grep -q "universal"
+          # Verify resource bundle is present
+          test -d .build/universal/cellar_cellar.bundle
 
       - name: Generate checksum
         run: shasum -a 256 "$ARCHIVE" > "${ARCHIVE}.sha256"

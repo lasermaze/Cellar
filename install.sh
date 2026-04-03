@@ -75,8 +75,9 @@ mkdir -p "$INSTALL_DIR"
 tar -xzf "$TMPDIR/$ARCHIVE" -C "$INSTALL_DIR"
 chmod +x "$INSTALL_DIR/cellar"
 
-# Step 7 — Remove quarantine
+# Step 7 — Remove quarantine (binary + resource bundle)
 xattr -rd com.apple.quarantine "$INSTALL_DIR/cellar" 2>/dev/null || true
+xattr -rd com.apple.quarantine "$INSTALL_DIR/cellar_cellar.bundle" 2>/dev/null || true
 
 # Step 8 — PATH update (idempotent)
 case "$SHELL" in
