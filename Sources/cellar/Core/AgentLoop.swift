@@ -79,6 +79,52 @@ enum ToolResult: Sendable {
     }
 }
 
+// MARK: - LoopState
+
+/// All mutable state for one agent loop run.
+private struct LoopState {
+    var iterationCount = 0
+    var allText: [String] = []
+    var currentMaxTokens: Int
+    let maxTokensCeiling: Int
+    var totalInputTokens = 0
+    var totalOutputTokens = 0
+    let pricing: (input: Double, output: Double)
+    let budgetCeiling: Double
+
+    init(maxTokens: Int, maxTokensCeiling: Int, pricing: (input: Double, output: Double), budgetCeiling: Double) {
+        self.currentMaxTokens = maxTokens
+        self.maxTokensCeiling = maxTokensCeiling
+        self.pricing = pricing
+        self.budgetCeiling = budgetCeiling
+    }
+
+    var estimatedCost: Double {
+        Double(totalInputTokens) * pricing.input + Double(totalOutputTokens) * pricing.output
+    }
+
+    var budgetFraction: Double {
+        budgetCeiling > 0 ? estimatedCost / budgetCeiling : 0
+    }
+
+    mutating func addTokens(input: Int, output: Int) {
+        totalInputTokens += input
+        totalOutputTokens += output
+    }
+
+    func makeResult(completed: Bool, stopReason: AgentStopReason) -> AgentLoopResult {
+        AgentLoopResult(
+            finalText: allText.joined(separator: "\n"),
+            iterationsUsed: iterationCount,
+            completed: completed,
+            stopReason: stopReason,
+            totalInputTokens: totalInputTokens,
+            totalOutputTokens: totalOutputTokens,
+            estimatedCostUSD: estimatedCost
+        )
+    }
+}
+
 // MARK: - AgentLoop
 
 /// Drives the provider tool-use send-execute-return cycle.
