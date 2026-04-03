@@ -22,24 +22,17 @@ jobs:
           echo "ARCHIVE=$ARCHIVE" >> $GITHUB_ENV
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
+      - name: Smoke test
+        run: .build/apple/Products/Release/cellar --help
+
+      - name: Generate checksum
+        run: shasum -a 256 "$ARCHIVE" > "${ARCHIVE}.sha256"
+
       - name: Upload to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.ARCHIVE }}
+          files: |
+            ${{ env.ARCHIVE }}
+            ${{ env.ARCHIVE }}.sha256
+          generate_release_notes: true
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update Homebrew formula
-        run: |
-          SHA=$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')
-          REPO="${{ github.repository }}"
-          sed -i '' \
-            -e "s|url \".*\"|url \"https://github.com/${REPO}/releases/download/${GITHUB_REF_NAME}/cellar-${VERSION}-macos.tar.gz\"|" \
-            -e "s|sha256 \".*\"|sha256 \"${SHA}\"|" \
-            -e "s|version \".*\"|version \"${VERSION}\"|" \
-            -e "s|root_url \".*\"|root_url \"https://github.com/${REPO}/releases/download/${GITHUB_REF_NAME}\"|" \
-            Formula/cellar.rb
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/cellar.rb
-          git commit -m "chore: update formula to v${VERSION}" || true
-          git push origin HEAD:main
