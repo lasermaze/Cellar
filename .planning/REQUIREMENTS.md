@@ -20,9 +20,9 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 
 ### Architecture
 
-- [ ] **ARCH-01**: Tool execution returns typed `ToolResult` enum (success/stop/error) — eliminates string matching for control flow
+- [x] **ARCH-01**: Tool execution returns typed `ToolResult` enum (success/stop/error) — eliminates string matching for control flow
 - [x] **ARCH-02**: Thread-safe `AgentControl` class with lock-protected flags replaces `@unchecked Sendable` bare vars on AgentTools
-- [ ] **ARCH-03**: `LoopState` struct consolidates all mutable loop state (12 scattered vars → 1 struct)
+- [x] **ARCH-03**: `LoopState` struct consolidates all mutable loop state (12 scattered vars → 1 struct)
 - [ ] **ARCH-04**: Main loop body is ≤150 lines with no inline budget/spin/logging logic
 
 ### Middleware
@@ -64,9 +64,9 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 | BUG-02 | Phase 35 | Pending |
 | BUG-03 | Phase 33 | Pending |
 | BUG-04 | Phase 31 | Complete |
-| ARCH-01 | Phase 31 | Pending |
+| ARCH-01 | Phase 31 | Complete |
 | ARCH-02 | Phase 31 | Complete |
-| ARCH-03 | Phase 31 | Pending |
+| ARCH-03 | Phase 31 | Complete |
 | ARCH-04 | Phase 33 | Pending |
 | MW-01 | Phase 32 | Pending |
 | MW-02 | Phase 32 | Pending |

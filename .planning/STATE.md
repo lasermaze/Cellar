@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-03T22:07:24.555Z"
+last_updated: "2026-04-03T22:08:04.184Z"
 progress:
   total_phases: 31
-  completed_phases: 28
+  completed_phases: 29
   total_plans: 70
-  completed_plans: 69
+  completed_plans: 70
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 31 (New Types) — not started
-Plan: —
-Status: Roadmap complete, ready for planning
-Last activity: 2026-04-03 — v1.3 roadmap created (6 phases, 20 requirements)
+Phase: 31 (New Types) — in progress
+Plan: P01 complete
+Status: Executing phase 31
+Last activity: 2026-04-02 — P01 complete: ToolResult, LoopState, AgentStopReason types added to AgentLoop.swift
 
 Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 
@@ -76,6 +76,7 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 | Phase 29 P02 | 8 | 2 tasks | 3 files |
 | Phase 29 P03 | 8 | 2 tasks | 7 files |
 | Phase 31-new-types P02 | 2 | 1 tasks | 2 files |
+| Phase 31 PP01 | 101 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -157,6 +158,9 @@ Progress: [░░░░░░░░░░░░░░░░░░░░] 0%
 - [v1.3 roadmap]: Event log at ~/.cellar/logs/<gameId>-<timestamp>.jsonl — JSONL format for append-only streaming writes
 - [Phase 31-new-types]: import os required explicitly for OSAllocatedUnfairLock — Foundation does not re-export it in current Swift toolchain
 - [Phase 31-new-types]: AgentControl pattern: private State struct + OSAllocatedUnfairLock(initialState:) for lock-protected mutable state without @unchecked Sendable
+- [Phase 31-P01]: ToolResult placed at file scope after AgentEvent — consistent with other top-level type definitions
+- [Phase 31-P01]: LoopState is private file-scope struct before AgentLoop — accessible by AgentLoop but not public API
+- [Phase 31-P01]: StopReason sub-enum uses .userConfirmedWorking (not .userConfirmed) to distinguish from AgentStopReason.userConfirmed
 
 ### Roadmap Evolution
 
@@ -184,5 +188,5 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-03
-Stopped at: v1.3 roadmap created — 6 phases (31–36), 20 requirements mapped, ready for `/gsd:plan-phase 31`
+Last session: 2026-04-02
+Stopped at: Phase 31 P01 complete — new types (ToolResult, LoopState, AgentStopReason expansion) added to AgentLoop.swift

@@ -61,7 +61,7 @@
 
 **Milestone Goal:** Fix critical bugs in the agent loop (race conditions, unresponsive stop, lost saves) and modernize the architecture with typed results, thread-safe control, a middleware system, and structured event logging — so the loop is correct, observable, and maintainable.
 
-- [ ] **Phase 31: New Types** — ToolResult enum, AgentControl, LoopState, expanded AgentStopReason
+- [x] **Phase 31: New Types** — ToolResult enum, AgentControl, LoopState, expanded AgentStopReason (completed 2026-04-03)
 - [ ] **Phase 32: Middleware System** — AgentMiddleware protocol, BudgetTracker, SpinDetector, EventLogger, JSONL event log
 - [ ] **Phase 33: Rewrite the Loop** — New run() signature, extracted helpers, clean endTurn semantics, ≤150-line body
 - [ ] **Phase 34: Update AgentTools** — execute() returns ToolResult, remove bare vars, post-loop save logic
@@ -458,7 +458,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19 �
 | 28. Fix prompt injection | v1.2 | 2/2 | Complete | 2026-04-02 |
 | 29. Secure collective memory | v1.2 | 3/3 | Complete | 2026-04-03 |
 | 30. Smart game name matching | v1.2 | 0 | Unused placeholder | — |
-| 31. New Types | 1/2 | In Progress|  | - |
+| 31. New Types | 2/2 | Complete   | 2026-04-03 | - |
 | 32. Middleware System | v1.3 | 0/TBD | Not started | - |
 | 33. Rewrite the Loop | v1.3 | 0/TBD | Not started | - |
 | 34. Update AgentTools | v1.3 | 0/TBD | Not started | - |
