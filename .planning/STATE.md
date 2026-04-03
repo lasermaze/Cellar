@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Collective Agent Memory
 status: unknown
-last_updated: "2026-04-03T05:02:23.283Z"
+last_updated: "2026-04-03T18:51:52.521Z"
 progress:
-  total_phases: 28
+  total_phases: 29
   completed_phases: 27
-  total_plans: 65
-  completed_plans: 65
+  total_plans: 68
+  completed_plans: 67
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-03-30)
 
 ## Current Position
 
-Phase: 26 of 26 (ISO Disc Image Support) — In Progress
-Plan: 1 of 2 complete
-Status: Phase 26 Plan 01 complete — DiscImageHandler struct with hdiutil mount/discover/detach for .iso/.bin/.cue disc images.
-Last activity: 2026-04-02 — Phase 26 Plan 01: DiscImageHandler with mount, discover, and detach methods
+Phase: 29 of 29 (Secure Collective Memory — Cloudflare Worker Write Proxy) — In Progress
+Plan: 1 of 1 complete
+Status: Phase 29 Plan 01 complete — Cloudflare Worker write proxy with server-side validation, RS256 JWT via SubtleCrypto, rate limiting, and GitHub Contents API GET+merge+PUT.
+Last activity: 2026-04-03 — Phase 29 Plan 01: Cloudflare Worker write proxy for collective memory
 
-Progress: [████████████████████] ~96% (1 of 2 plans in phase 26 complete)
+Progress: [████████████████████] ~98% (29-01 complete; 29-02 and 29-03 remaining)
 
 ## Performance Metrics
 
@@ -72,6 +72,7 @@ Progress: [████████████████████] ~96% (1
 | Phase 27-distribution-github-releases-install-script P02 | 1 | 1 tasks | 1 files |
 | Phase 28-fix-collective-memory-prompt-injection-vulnerability P02 | 174 | 2 tasks | 3 files |
 | Phase 28-fix-collective-memory-prompt-injection-vulnerability P01 | 4 | 2 tasks | 2 files |
+| Phase 29-secure-collective-memory-cloudflare-worker-write-proxy-remove-bundled-private-key P01 | 2 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -138,6 +139,9 @@ Progress: [████████████████████] ~96% (1
 - [Phase 28-02]: chmod return value ignored — best-effort inside a throwing function context
 - [Phase 28-fix-collective-memory-prompt-injection-vulnerability]: AgentTools.allowedEnvKeys defined as static let on AgentTools extension — shared between setEnvironment() write path and CollectiveMemoryService.sanitizeEntry() read path
 - [Phase 28-fix-collective-memory-prompt-injection-vulnerability]: reasoning field preserved in CollectiveMemoryEntry struct but never injected into agent prompt lines — sanitizeEntry() strips all WorkingConfig injection vectors before formatMemoryContext() runs
+- [Phase 29-secure-collective-memory-cloudflare-worker-write-proxy-remove-bundled-private-key]: CELLAR_MEMORY_REPO default lasermaze/cellar-memory in wrangler.toml [vars] — overridable without code changes
+- [Phase 29-secure-collective-memory-cloudflare-worker-write-proxy-remove-bundled-private-key]: Worker rate limiting uses in-memory Map (resets on restart) — acceptable at this scale, avoids KV billing
+- [Phase 29-secure-collective-memory-cloudflare-worker-write-proxy-remove-bundled-private-key]: makeJWT() strips both PKCS8 and PKCS1 PEM headers — resilient to key format from wrangler secret
 
 ### Roadmap Evolution
 
