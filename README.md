@@ -14,14 +14,21 @@ curl -fsSL https://raw.githubusercontent.com/lasermaze/Cellar/main/install.sh | 
 
 That's it. One command, no Xcode or Swift toolchain required. The installer downloads a pre-built universal binary, verifies its checksum, and adds it to your PATH.
 
-Then run `cellar` to check dependencies and get started:
+Then get started in 3 steps:
 
 ```bash
-cellar              # Check dependencies, install Wine if needed
-cellar add game.iso # Add a game from installer or disc image
-cellar launch game  # Launch with AI agent
-cellar serve        # Open the web UI
+# 1. Set up an AI API key (pick any provider)
+export ANTHROPIC_API_KEY="sk-ant-..."   # or DEEPSEEK_API_KEY or KIMI_API_KEY
+
+# 2. Check dependencies and install Wine
+cellar
+
+# 3. Add and launch a game
+cellar add game.iso   # or game.exe — disc images work too
+cellar launch game    # AI agent takes over
 ```
+
+> **You need an API key to use the AI agent.** Without one, `cellar launch` falls back to recipe-only mode (no automatic diagnosis or fixing). Get a key from [Anthropic](https://console.anthropic.com/), [DeepSeek](https://platform.deepseek.com/), or [Kimi](https://platform.moonshot.ai/). Or set it via the web UI: `cellar serve` → Settings.
 
 Cellar accepts `.exe` installers and `.iso`/`.bin`/`.cue` disc images — it mounts disc images automatically.
 
