@@ -397,7 +397,9 @@ Plans:
   2. When the LLM returns `endTurn`, the loop exits immediately — there is no retry-on-endTurn logic and no scenario where the agent is forced to continue after deciding to stop
   3. The `prepareStep` hook is called at the start of each iteration before the LLM call — callers can inject messages or trim context without modifying the loop
   4. The new loop signature accepts `AgentControl` and a middleware chain — it does not read bare vars from AgentTools
-**Plans**: TBD
+**Plans:** 1 plan
+Plans:
+- [ ] 33-01-PLAN.md — Rewrite AgentLoop: new types, new run() signature, extracted helpers, clean endTurn, middleware integration
 
 ### Phase 34: Update AgentTools
 **Goal**: AgentTools.execute() returns a typed ToolResult, all bare synchronization vars (shouldAbort, userForceConfirmed, taskState) are removed, and the post-loop save is the single save path with no fire-and-forget
