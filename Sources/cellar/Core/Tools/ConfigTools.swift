@@ -4,6 +4,26 @@ import Foundation
 
 extension AgentTools {
 
+    // MARK: Allowlisted Wine environment variable keys
+
+    /// The set of environment variable keys the agent is permitted to set.
+    /// Shared between the write path (setEnvironment) and the read path (CollectiveMemoryService.sanitizeEntry).
+    static let allowedEnvKeys: Set<String> = [
+        "WINEDLLOVERRIDES",
+        "WINEFSYNC",
+        "WINEESYNC",
+        "WINEDEBUG",
+        "WINE_CPU_TOPOLOGY",
+        "WINE_LARGE_ADDRESS_AWARE",
+        "WINED3D_DISABLE_CSMT",
+        "MESA_GL_VERSION_OVERRIDE",
+        "MESA_GLSL_VERSION_OVERRIDE",
+        "STAGING_SHARED_MEMORY",
+        "DXVK_HUD",
+        "DXVK_FRAME_RATE",
+        "__GL_THREADED_OPTIMIZATIONS"
+    ]
+
     // MARK: 5. set_environment
 
     func setEnvironment(input: JSONValue) -> String {
@@ -12,6 +32,11 @@ extension AgentTools {
         }
         guard let value = input["value"]?.asString else {
             return jsonResult(["error": "value is required"])
+        }
+
+        guard AgentTools.allowedEnvKeys.contains(key) else {
+            let allowed = AgentTools.allowedEnvKeys.sorted().joined(separator: ", ")
+            return jsonResult(["error": "Environment key '\(key)' not allowed. Allowed keys: \(allowed)"])
         }
 
         accumulatedEnv[key] = value
@@ -26,6 +51,14 @@ extension AgentTools {
 
     // MARK: 6. set_registry
 
+    /// Allowed HKEY prefix paths for registry edits.
+    private static let allowedRegistryPrefixes: [String] = [
+        "HKEY_CURRENT_USER\\Software\\Wine",
+        "HKEY_CURRENT_USER\\Software\\",
+        "HKEY_LOCAL_MACHINE\\Software\\Wine",
+        "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\DirectX"
+    ]
+
     func setRegistry(input: JSONValue) -> String {
         guard let keyPath = input["key_path"]?.asString, !keyPath.isEmpty else {
             return jsonResult(["error": "key_path is required"])
@@ -37,9 +70,19 @@ extension AgentTools {
             return jsonResult(["error": "data is required"])
         }
 
+        // Normalize forward slashes to backslashes for consistency
+        let normalizedKeyPath = keyPath.replacingOccurrences(of: "/", with: "\\")
+
+        // Validate registry key prefix
+        let isAllowed = AgentTools.allowedRegistryPrefixes.contains(where: { normalizedKeyPath.hasPrefix($0) })
+        guard isAllowed else {
+            let allowed = AgentTools.allowedRegistryPrefixes.joined(separator: ", ")
+            return jsonResult(["error": "Registry key '\(keyPath)' must start with an allowed prefix: \(allowed)"])
+        }
+
         // Build .reg file content
         var regContent = "Windows Registry Editor Version 5.00\n\n"
-        regContent += "[\(keyPath)]\n"
+        regContent += "[\(normalizedKeyPath)]\n"
         regContent += "\"\(valueName)\"=\(data)\n"
 
         let tempFile = URL(fileURLWithPath: NSTemporaryDirectory() + UUID().uuidString + ".reg")
@@ -49,7 +92,7 @@ extension AgentTools {
             try? FileManager.default.removeItem(at: tempFile)
             return jsonResult([
                 "status": "ok",
-                "key_path": keyPath,
+                "key_path": normalizedKeyPath,
                 "value_name": valueName,
                 "data": data
             ])
