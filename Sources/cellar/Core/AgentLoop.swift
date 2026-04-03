@@ -82,7 +82,7 @@ enum ToolResult: Sendable {
 // MARK: - LoopState
 
 /// All mutable state for one agent loop run.
-private struct LoopState {
+struct LoopState {
     var iterationCount = 0
     var allText: [String] = []
     var currentMaxTokens: Int
@@ -125,19 +125,21 @@ private struct LoopState {
     }
 }
 
+// MARK: - StepModification + PrepareStepHook
+
+/// Modifications returned by the prepareStep hook before each LLM API call.
+struct StepModification {
+    var trimMessages: Bool = false
+    var injectMessage: String? = nil
+    var maxTokensOverride: Int? = nil
+}
+
+/// Hook called before each LLM API call. Returns optional modifications for the step.
+typealias PrepareStepHook = (Int, LoopState) -> StepModification?
+
 // MARK: - AgentLoop
 
 /// Drives the provider tool-use send-execute-return cycle.
-///
-/// Usage:
-/// ```swift
-/// let provider = AnthropicAgentProvider(apiKey: key, model: "...", tools: [myTool], systemPrompt: "...")
-/// var loop = AgentLoop(provider: provider)
-/// let result = loop.run(initialMessage: "...", toolExecutor: { name, input in
-///     // execute tool, return result string
-///     return "tool output"
-/// })
-/// ```
 struct AgentLoop {
 
     // MARK: Properties
@@ -147,6 +149,8 @@ struct AgentLoop {
     let maxTokens: Int
     let budgetCeiling: Double
     let onOutput: (@Sendable (AgentEvent) -> Void)?
+    let middleware: [AgentMiddleware]
+    let prepareStep: PrepareStepHook?
 
     // MARK: Init
 
@@ -155,12 +159,16 @@ struct AgentLoop {
         maxIterations: Int = 20,
         maxTokens: Int = 4096,
         budgetCeiling: Double = 5.00,
+        middleware: [AgentMiddleware] = [],
+        prepareStep: PrepareStepHook? = nil,
         onOutput: (@Sendable (AgentEvent) -> Void)? = nil
     ) {
         self.provider = provider
         self.maxIterations = maxIterations
         self.maxTokens = maxTokens
         self.budgetCeiling = budgetCeiling
+        self.middleware = middleware
+        self.prepareStep = prepareStep
         self.onOutput = onOutput
     }
 
@@ -193,290 +201,231 @@ struct AgentLoop {
 
     // MARK: Run
 
-    /// Execute the agent loop with an initial user message.
-    ///
-    /// - Parameters:
-    ///   - initialMessage: The first user message to send.
-    ///   - toolExecutor: Closure called for each tool use. Receives tool name and input JSONValue. Returns result string.
-    /// - Returns: AgentLoopResult with finalText, iterationsUsed, and completed flag.
     mutating func run(
         initialMessage: String,
-        toolExecutor: (String, JSONValue) async -> String,
-        canStop: (() -> Bool)? = nil,
-        shouldAbort: (() -> Bool)? = nil
+        toolExecutor: (String, JSONValue) async -> ToolResult,
+        control: AgentControl,
+        middlewareContext: MiddlewareContext
     ) async -> AgentLoopResult {
-        var iterationCount = 0
-        var allText: [String] = []
+        var state = LoopState(
+            maxTokens: min(maxTokens, provider.maxOutputTokensLimit),
+            maxTokensCeiling: provider.maxOutputTokensLimit,
+            pricing: provider.pricingPerToken(),
+            budgetCeiling: budgetCeiling
+        )
 
-        // Resilience state
-        var currentMaxTokens = min(maxTokens, provider.maxOutputTokensLimit)
-        let maxTokensCeiling = provider.maxOutputTokensLimit
-        var totalInputTokens = 0
-        var totalOutputTokens = 0
-        var hasAlertedAt50 = false
-        var hasWarnedAt80 = false
-        var hasSentBudgetHalt = false
-        var hasSentBudgetWarningMessage = false
-        var consecutiveContinuations = 0
-
-        // Spin detection state — track recent action tool calls to detect repetitive patterns
-        let actionTools: Set<String> = ["set_environment", "set_registry", "install_winetricks", "place_dll", "write_game_file", "launch_game"]
-        var recentActionTools: [String] = []  // rolling window of last 8 action tool calls
-        var hasSentPivotNudge = false
-
-        // Pricing from provider
-        let pricing = provider.pricingPerToken()
-        let inputPricePerToken = pricing.input
-        let outputPricePerToken = pricing.output
-
-        func estimatedCost() -> Double {
-            Double(totalInputTokens) * inputPricePerToken + Double(totalOutputTokens) * outputPricePerToken
-        }
-
-        func makeResult(text: String, iterations: Int, completed: Bool, stopReason: AgentStopReason) -> AgentLoopResult {
-            let result = AgentLoopResult(
-                finalText: text,
-                iterationsUsed: iterations,
-                completed: completed,
-                stopReason: stopReason,
-                totalInputTokens: totalInputTokens,
-                totalOutputTokens: totalOutputTokens,
-                estimatedCostUSD: estimatedCost()
-            )
-            emit(.cost(inputTokens: totalInputTokens, outputTokens: totalOutputTokens, usd: estimatedCost()))
-            emit(.completed(result))
-            return result
-        }
-
-        // Step 1: Append initial user message
         provider.appendUserMessage(initialMessage)
 
-        // Step 2: Main loop
-        while iterationCount < maxIterations {
-            // Check user abort before making API call
-            if shouldAbort?() == true {
+        while state.iterationCount < maxIterations {
+            // ── Check control flags ──
+            if control.shouldAbort {
                 emit(.status("[Agent aborted by user]"))
-                return makeResult(text: allText.joined(separator: "\n"), iterations: iterationCount, completed: true, stopReason: .completed)
+                return state.makeResult(completed: false, stopReason: .userAborted)
+            }
+            if control.userForceConfirmed {
+                emit(.status("[User confirmed — stopping agent]"))
+                return state.makeResult(completed: true, stopReason: .userConfirmed)
             }
 
-            iterationCount += 1
+            state.iterationCount += 1
+            middlewareContext.iterationCount = state.iterationCount
 
-            // Step 2a: Call provider API with retry
-            emit(.iteration(number: iterationCount, total: maxIterations))
+            // ── prepareStep hook ──
+            if let modification = prepareStep?(state.iterationCount, state) {
+                if let msg = modification.injectMessage {
+                    provider.appendUserMessage(msg)
+                }
+                if let override = modification.maxTokensOverride {
+                    state.currentMaxTokens = override
+                }
+            }
+
+            // ── Call LLM provider ──
+            emit(.iteration(number: state.iterationCount, total: maxIterations))
             let response: AgentLoopProviderResponse
             do {
-                response = try await provider.callWithRetry(maxTokens: currentMaxTokens, emit: emit)
-            } catch let error as AgentLoopError {
-                if case .apiUnavailable = error {
-                    emit(.error("API unavailable after 3 attempts. Your game state is unchanged."))
-                } else {
-                    emit(.error("Agent API error (iteration \(iterationCount)): \(error.localizedDescription)"))
-                }
-                return makeResult(
-                    text: allText.joined(separator: "\n") + "\n\(error.localizedDescription)",
-                    iterations: iterationCount,
-                    completed: false,
-                    stopReason: .apiError(error.localizedDescription)
-                )
+                response = try await provider.callWithRetry(maxTokens: state.currentMaxTokens, emit: emit)
             } catch {
-                emit(.error("Agent API error (iteration \(iterationCount)): \(error.localizedDescription)"))
-                return makeResult(
-                    text: allText.joined(separator: "\n") + "\n\(error.localizedDescription)",
-                    iterations: iterationCount,
-                    completed: false,
-                    stopReason: .apiError(error.localizedDescription)
-                )
+                return handleAPIError(error, state: &state)
             }
 
-            // Step 2b: Accumulate token usage
-            totalInputTokens += response.inputTokens
-            totalOutputTokens += response.outputTokens
+            // ── Track tokens + cost ──
+            state.addTokens(input: response.inputTokens, output: response.outputTokens)
+            middlewareContext.estimatedCost = state.estimatedCost
+            emit(.cost(inputTokens: state.totalInputTokens, outputTokens: state.totalOutputTokens, usd: state.estimatedCost))
 
-            // Step 2c: Check budget thresholds
-            let currentCost = estimatedCost()
-            let budgetFraction = budgetCeiling > 0 ? currentCost / budgetCeiling : 0
-
-            if budgetFraction >= 0.5 && !hasAlertedAt50 {
-                emit(.budgetWarning(percentage: 50))
-                emit(.cost(inputTokens: totalInputTokens, outputTokens: totalOutputTokens, usd: currentCost))
-                hasAlertedAt50 = true
+            // ── Budget halt check (100%) ──
+            if let haltResult = await checkBudgetHalt(state: &state, response: response) {
+                return haltResult
             }
 
-            if budgetFraction >= 1.0 && !hasSentBudgetHalt {
-                // Inject halt directive, let agent make one final call to save
-                let stopMsg = "[BUDGET LIMIT REACHED: $\(String(format: "%.2f", budgetCeiling)) session budget exhausted. You must stop now. Call save_success or save_recipe if you have a working configuration, then stop.]"
-                provider.appendAssistantResponse(response)
-                provider.appendUserMessage(stopMsg)
-                hasSentBudgetHalt = true
-                // Make one final API call for the agent to save
-                if let finalResponse = try? await provider.callWithRetry(maxTokens: currentMaxTokens, emit: emit) {
-                    totalInputTokens += finalResponse.inputTokens
-                    totalOutputTokens += finalResponse.outputTokens
-                    for text in finalResponse.textBlocks {
-                        if !text.isEmpty { allText.append(text) }
-                    }
-                }
-                return makeResult(text: allText.joined(separator: "\n"), iterations: iterationCount, completed: false, stopReason: .budgetExhausted)
+            // ── Emit text blocks ──
+            for text in response.textBlocks where !text.isEmpty {
+                emit(.text(text))
+                state.allText.append(text)
             }
 
-            if budgetFraction >= 0.8 && !hasWarnedAt80 {
-                hasWarnedAt80 = true
-            }
-
-            // Step 2d: Print and collect text blocks
-            for text in response.textBlocks {
-                if !text.isEmpty {
-                    emit(.text(text))
-                    allText.append(text)
-                }
-            }
-
-            // Step 2e: Handle stop reason
+            // ── Dispatch on stop reason ──
             switch response.stopReason {
             case .endTurn:
-                let hasContent = !response.textBlocks.isEmpty || !response.toolCalls.isEmpty
-
-                let agentCanStop = canStop?() ?? true  // nil callback = always allow (backward compat)
-
-                if hasContent && !agentCanStop && consecutiveContinuations < 3 {
-                    // Agent tried to stop but task isn't done yet
-                    consecutiveContinuations += 1
-                    emit(.status("[Agent tried to stop, but task is not complete (\(consecutiveContinuations)/3). Continuing...]"))
-                    provider.appendAssistantResponse(response)
-                    provider.appendUserMessage("You cannot stop yet — the game has not been confirmed working by the user, or you haven't saved a success record after confirmation. Continue diagnosing and fixing. Use your tools to investigate and apply a fix, then launch_game again.")
-                } else if hasContent {
-                    return makeResult(text: allText.joined(separator: "\n"), iterations: iterationCount, completed: true, stopReason: .completed)
-                } else {
-                    // Empty end_turn — send continuation prompt
-                    emit(.status("[Agent: empty response, sending continuation...]"))
-                    provider.appendAssistantResponse(response)
-                    provider.appendUserMessage("Please continue. What would you like to do next?")
-                }
+                // Agent chose to stop. Trust it. No tug-of-war.
+                return state.makeResult(completed: true, stopReason: .completed)
 
             case .toolUse:
-                // Agent is doing work — reset stuck-loop counter
-                consecutiveContinuations = 0
-
-                // Reset max_tokens after successful non-truncated response
-                if currentMaxTokens > maxTokens {
-                    currentMaxTokens = maxTokens
-                }
-
-                // Append assistant turn with full content (text + tool_use blocks)
-                provider.appendAssistantResponse(response)
-
-                // Execute each tool call and collect results
-                var results: [(id: String, content: String, isError: Bool)] = []
-                var userStopped = false
-                for call in response.toolCalls {
-                    emit(.toolCall(name: call.name))
-                    let result = await toolExecutor(call.name, call.input)
-                    emit(.toolResult(name: call.name, truncated: String(result.prefix(200))))
-                    results.append((id: call.id, content: result, isError: false))
-
-                    if result.contains("\"STOP\": true") || result.contains("\"STOP\":true") {
-                        userStopped = true
-                        break
+                let outcome = await executeTools(
+                    response: response,
+                    toolExecutor: toolExecutor,
+                    state: &state,
+                    control: control,
+                    middlewareContext: middlewareContext
+                )
+                switch outcome {
+                case .continue:
+                    break
+                case .stopRequested:
+                    if control.userForceConfirmed {
+                        return state.makeResult(completed: true, stopReason: .userConfirmed)
                     }
-
-                    // Track action tools for spin detection
-                    if actionTools.contains(call.name) {
-                        recentActionTools.append(call.name)
-                        if recentActionTools.count > 8 { recentActionTools.removeFirst() }
-                    }
-                }
-
-                // Spin detection: check for repeating action patterns
-                // Look for A→B→A→B or A→A→A patterns in recent action tools
-                var needsPivotNudge = false
-                if !hasSentPivotNudge && recentActionTools.count >= 6 {
-                    // Check for 2-tool repeating cycle (e.g., set_environment → launch_game × 3)
-                    let last6 = Array(recentActionTools.suffix(6))
-                    let pair = [last6[0], last6[1]]
-                    if last6[2] == pair[0] && last6[3] == pair[1] && last6[4] == pair[0] && last6[5] == pair[1] {
-                        needsPivotNudge = true
-                    }
-                    // Check for same action tool called 4+ times in last 6
-                    let counts = Dictionary(grouping: last6, by: { $0 }).mapValues { $0.count }
-                    if let maxCount = counts.values.max(), maxCount >= 4 {
-                        needsPivotNudge = true
-                    }
-                }
-
-                // Check if user force-stopped the agent
-                if userStopped {
-                    emit(.status("[User stopped agent]"))
-                    return makeResult(text: allText.joined(separator: "\n"), iterations: iterationCount, completed: true, stopReason: .completed)
-                }
-
-                // Inject budget warning or pivot nudge as user messages alongside tool results
-                provider.appendToolResults(results)
-
-                if needsPivotNudge && !hasSentPivotNudge {
-                    hasSentPivotNudge = true
-                    let nudgeMsg = "[PIVOT CHECK: You've been repeating similar configuration+launch cycles. Step back: what NEW evidence do you have that this approach will work? If the last 2+ launches had the same symptom, return to research — call search_web with a different query angle and fetch_page on at least 2 new results before launching again.]"
-                    provider.appendUserMessage(nudgeMsg)
-                    emit(.status("[Spin detected — pivot nudge injected]"))
-                }
-
-                if hasWarnedAt80 && !hasSentBudgetWarningMessage {
-                    let cost = estimatedCost()
-                    let pct = budgetCeiling > 0 ? Int(cost / budgetCeiling * 100) : 0
-                    let warnMsg = "[BUDGET WARNING: \(pct)% of session budget used ($\(String(format: "%.2f", cost)) / $\(String(format: "%.2f", budgetCeiling))). Begin wrapping up - save progress and finalize results soon.]"
-                    provider.appendUserMessage(warnMsg)
-                    hasSentBudgetWarningMessage = true
+                    return state.makeResult(completed: false, stopReason: .userAborted)
                 }
 
             case .maxTokens:
-                let hasIncompleteToolUse = !response.toolCalls.isEmpty
-                if hasIncompleteToolUse && currentMaxTokens < maxTokensCeiling {
-                    // Check if doubling would push past 80% budget — if so, use continuation instead
-                    let projectedOutputTokens = totalOutputTokens + (currentMaxTokens * 2)
-                    let projectedCost = Double(totalInputTokens) * inputPricePerToken + Double(projectedOutputTokens) * outputPricePerToken
-                    if budgetCeiling > 0 && projectedCost / budgetCeiling >= 0.8 {
-                        // Budget override: use continuation prompt instead of escalating
-                        emit(.status("[Agent: max_tokens hit, but escalation would exceed budget. Using continuation...]"))
-                        provider.appendAssistantResponse(response)
-                        provider.appendUserMessage("Your response was truncated. Continue.")
-                    } else {
-                        // Safe to escalate — do NOT append truncated response to messages
-                        let newMax = min(currentMaxTokens * 2, maxTokensCeiling)
-                        emit(.status("[Agent: max_tokens hit with incomplete tool_use, retrying with \(newMax)...]"))
-                        currentMaxTokens = newMax
-                        // Do NOT increment iteration count — this is a retry, not a new step
-                        iterationCount -= 1
-                        // Fall through to next iteration with same messages (no append)
-                    }
-                } else if hasIncompleteToolUse {
-                    // At ceiling and still truncated — fall back to continuation
-                    emit(.status("[Agent: max_tokens hit at ceiling (\(maxTokensCeiling)), using continuation...]"))
-                    provider.appendAssistantResponse(response)
-                    provider.appendUserMessage("Your response was truncated. Continue.")
-                } else {
-                    // Text-only truncation — safe to append and continue
-                    emit(.status("[Agent: response truncated, continuing...]"))
-                    provider.appendAssistantResponse(response)
-                    provider.appendUserMessage("Your response was truncated. Continue.")
-                    // Reset max_tokens after text-only truncation
-                    if currentMaxTokens > maxTokens {
-                        currentMaxTokens = maxTokens
-                    }
-                }
+                handleTruncation(response: response, state: &state)
 
             case .other(let reason):
-                // Truly unexpected stop reason — return what we have
                 emit(.error("[Agent: unexpected stop_reason '\(reason)']"))
-                return makeResult(
-                    text: allText.joined(separator: "\n"),
-                    iterations: iterationCount,
-                    completed: false,
-                    stopReason: .apiError("unexpected stop_reason '\(reason)'")
-                )
+                return state.makeResult(completed: false, stopReason: .apiError("unexpected: \(reason)"))
             }
         }
 
-        // Max iterations reached
-        return makeResult(text: allText.joined(separator: "\n"), iterations: iterationCount, completed: false, stopReason: .maxIterations)
+        return state.makeResult(completed: false, stopReason: .maxIterations)
+    }
+
+    // MARK: - Helpers
+
+    private enum ToolOutcome { case `continue`, stopRequested }
+
+    private mutating func executeTools(
+        response: AgentLoopProviderResponse,
+        toolExecutor: (String, JSONValue) async -> ToolResult,
+        state: inout LoopState,
+        control: AgentControl,
+        middlewareContext: MiddlewareContext
+    ) async -> ToolOutcome {
+        provider.appendAssistantResponse(response)
+
+        // Reset max_tokens after successful non-truncated response
+        if state.currentMaxTokens > maxTokens {
+            state.currentMaxTokens = min(maxTokens, provider.maxOutputTokensLimit)
+        }
+
+        var results: [(id: String, content: String, isError: Bool)] = []
+        var stopped = false
+
+        for call in response.toolCalls {
+            emit(.toolCall(name: call.name))
+
+            // Middleware: beforeTool (can short-circuit)
+            var toolResult: ToolResult? = nil
+            for mw in middleware {
+                if let override = mw.beforeTool(name: call.name, input: call.input, context: middlewareContext) {
+                    toolResult = override
+                    break
+                }
+            }
+
+            // Execute tool if middleware didn't short-circuit
+            let result = toolResult ?? await toolExecutor(call.name, call.input)
+            emit(.toolResult(name: call.name, truncated: String(result.content.prefix(200))))
+            results.append((id: call.id, content: result.content, isError: result.isError))
+
+            // Middleware: afterTool
+            for mw in middleware {
+                mw.afterTool(name: call.name, input: call.input, result: result, context: middlewareContext)
+            }
+
+            if result.isStop {
+                stopped = true
+                break
+            }
+        }
+
+        provider.appendToolResults(results)
+
+        if stopped { return .stopRequested }
+
+        // Middleware: afterStep — collect injected messages
+        for mw in middleware {
+            if let message = mw.afterStep(context: middlewareContext) {
+                provider.appendUserMessage(message)
+            }
+        }
+
+        return .continue
+    }
+
+    /// Budget halt at 100%: inject halt message, give agent one final call to save, then stop.
+    private mutating func checkBudgetHalt(state: inout LoopState, response: AgentLoopProviderResponse) async -> AgentLoopResult? {
+        guard state.budgetFraction >= 1.0 else { return nil }
+
+        let ceiling = String(format: "%.2f", budgetCeiling)
+        let stopMsg = "[BUDGET LIMIT REACHED: $\(ceiling) session budget exhausted. You must stop now. Call save_success or save_recipe if you have a working configuration, then stop.]"
+        provider.appendAssistantResponse(response)
+        provider.appendUserMessage(stopMsg)
+
+        // One final API call for agent to save
+        if let finalResponse = try? await provider.callWithRetry(maxTokens: state.currentMaxTokens, emit: emit) {
+            state.addTokens(input: finalResponse.inputTokens, output: finalResponse.outputTokens)
+            for text in finalResponse.textBlocks where !text.isEmpty {
+                state.allText.append(text)
+            }
+        }
+
+        return state.makeResult(completed: false, stopReason: .budgetExhausted)
+    }
+
+    private func handleAPIError(_ error: Error, state: inout LoopState) -> AgentLoopResult {
+        let description = error.localizedDescription
+        if error is AgentLoopError {
+            if case .apiUnavailable = error as! AgentLoopError {
+                emit(.error("API unavailable after 3 attempts. Your game state is unchanged."))
+            } else {
+                emit(.error("Agent API error (iteration \(state.iterationCount)): \(description)"))
+            }
+        } else {
+            emit(.error("Agent API error (iteration \(state.iterationCount)): \(description)"))
+        }
+        state.allText.append(description)
+        return state.makeResult(completed: false, stopReason: .apiError(description))
+    }
+
+    private mutating func handleTruncation(response: AgentLoopProviderResponse, state: inout LoopState) {
+        let hasIncompleteToolUse = !response.toolCalls.isEmpty
+
+        if hasIncompleteToolUse && state.currentMaxTokens < state.maxTokensCeiling {
+            // Check if escalation would blow budget
+            let projectedOutputTokens = state.totalOutputTokens + (state.currentMaxTokens * 2)
+            let projectedCost = Double(state.totalInputTokens) * state.pricing.input + Double(projectedOutputTokens) * state.pricing.output
+            if budgetCeiling > 0 && projectedCost / budgetCeiling >= 0.8 {
+                emit(.status("[Agent: max_tokens hit, but escalation would exceed budget. Using continuation...]"))
+                provider.appendAssistantResponse(response)
+                provider.appendUserMessage("Your response was truncated. Continue.")
+            } else {
+                let newMax = min(state.currentMaxTokens * 2, state.maxTokensCeiling)
+                emit(.status("[Agent: max_tokens hit with incomplete tool_use, retrying with \(newMax)...]"))
+                state.currentMaxTokens = newMax
+                state.iterationCount -= 1  // Retry, don't count as iteration
+            }
+        } else if hasIncompleteToolUse {
+            emit(.status("[Agent: max_tokens hit at ceiling (\(state.maxTokensCeiling)), using continuation...]"))
+            provider.appendAssistantResponse(response)
+            provider.appendUserMessage("Your response was truncated. Continue.")
+        } else {
+            emit(.status("[Agent: response truncated, continuing...]"))
+            provider.appendAssistantResponse(response)
+            provider.appendUserMessage("Your response was truncated. Continue.")
+            if state.currentMaxTokens > maxTokens { state.currentMaxTokens = min(maxTokens, provider.maxOutputTokensLimit) }
+        }
     }
 }
 
