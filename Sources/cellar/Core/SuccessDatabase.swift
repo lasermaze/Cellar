@@ -143,7 +143,7 @@ struct SuccessDatabase {
     }
 
     /// Extract meaningful words from a game identifier, stripping version numbers and common prefixes.
-    private static func extractGameWords(_ input: String) -> [String] {
+    static func extractGameWords(_ input: String) -> [String] {
         let lowered = input.lowercased()
             .replacingOccurrences(of: "-", with: " ")
             .replacingOccurrences(of: "_", with: " ")

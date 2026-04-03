@@ -60,14 +60,20 @@ struct CollectiveMemoryService {
             return nil
         }
 
-        // 404 = no entry yet, normal flow; 403/429 = rate limited — serve stale cache
+        // 404 = exact slug not found — try fuzzy match against repo listing
+        // 403/429 = rate limited — serve stale cache
         guard statusCode == 200 else {
             if statusCode == 403 || statusCode == 429 {
-                fputs("[CollectiveMemoryService] HTTP \(statusCode) (rate limited) fetching collective memory for '\(gameName)' — serving stale cache if available\n", stderr)
+                fputs("[CollectiveMemoryService] HTTP \(statusCode) (rate limited) — serving stale cache if available\n", stderr)
                 if let staleData = loadFromCache(cacheFile) {
                     return decodeAndFormat(data: staleData, gameName: gameName, localWineVersion: localWineVersion, localFlavor: localFlavor)
                 }
-            } else if statusCode != 404 {
+            } else if statusCode == 404 {
+                // Try fuzzy match: list entries directory and find closest match
+                if let matchedData = await fuzzyFetchEntry(gameName: gameName, localWineVersion: localWineVersion, localFlavor: localFlavor) {
+                    return matchedData
+                }
+            } else {
                 fputs("[CollectiveMemoryService] HTTP \(statusCode) fetching collective memory for '\(gameName)'\n", stderr)
             }
             return nil
@@ -79,6 +85,69 @@ struct CollectiveMemoryService {
 
         // Step 8: Decode and format
         return decodeAndFormat(data: data, gameName: gameName, localWineVersion: localWineVersion, localFlavor: localFlavor)
+    }
+
+    // MARK: - Fuzzy Match
+
+    /// When exact slug doesn't match (404), list entries/ directory and find closest match by word overlap.
+    private static func fuzzyFetchEntry(gameName: String, localWineVersion: String, localFlavor: String) async -> String? {
+        let listURL = "https://api.github.com/repos/\(CellarPaths.memoryRepo)/contents/entries"
+        guard let url = URL(string: listURL) else { return nil }
+
+        var request = URLRequest(url: url)
+        request.setValue("application/vnd.github.v3+json", forHTTPHeaderField: "Accept")
+        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+        request.timeoutInterval = 5
+
+        guard let (data, statusCode) = await performFetch(request: request), statusCode == 200 else {
+            return nil
+        }
+
+        // Parse directory listing — array of objects with "name" field
+        struct GHFile: Decodable { let name: String }
+        guard let files = try? JSONDecoder().decode([GHFile].self, from: data) else { return nil }
+
+        let entryNames = files.compactMap { f -> String? in
+            f.name.hasSuffix(".json") ? String(f.name.dropLast(5)) : nil  // strip .json
+        }
+
+        // Score each entry name against the game name using word overlap
+        let queryWords = SuccessDatabase.extractGameWords(slugify(gameName))
+        guard !queryWords.isEmpty else { return nil }
+
+        let bestMatch = entryNames.map { entrySlug -> (String, Double) in
+            let entryWords = SuccessDatabase.extractGameWords(entrySlug)
+            let overlap = queryWords.filter { word in
+                entryWords.contains { $0.contains(word) || word.contains($0) }
+            }
+            let score = Double(overlap.count) / Double(queryWords.count)
+            return (entrySlug, score)
+        }
+        .filter { $0.1 >= 0.5 }
+        .sorted { $0.1 > $1.1 }
+        .first
+
+        guard let (matchedSlug, _) = bestMatch else { return nil }
+
+        // Fetch the matched entry
+        let matchURL = "https://api.github.com/repos/\(CellarPaths.memoryRepo)/contents/entries/\(matchedSlug).json"
+        guard let matchRequestURL = URL(string: matchURL) else { return nil }
+
+        var matchRequest = URLRequest(url: matchRequestURL)
+        matchRequest.setValue("application/vnd.github.v3.raw", forHTTPHeaderField: "Accept")
+        matchRequest.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+        matchRequest.timeoutInterval = 5
+
+        guard let (matchData, matchStatus) = await performFetch(request: matchRequest), matchStatus == 200 else {
+            return nil
+        }
+
+        // Cache under the original slug for next time
+        let cacheFile = CellarPaths.memoryCacheFile(for: slugify(gameName))
+        try? FileManager.default.createDirectory(at: CellarPaths.memoryCacheDir, withIntermediateDirectories: true)
+        try? matchData.write(to: cacheFile, options: .atomic)
+
+        return decodeAndFormat(data: matchData, gameName: gameName, localWineVersion: localWineVersion, localFlavor: localFlavor)
     }
 
     // MARK: - Private Cache Helpers
