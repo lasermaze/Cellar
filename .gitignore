@@ -5,3 +5,7 @@ Package.resolved
 xcuserdata/
 DerivedData/
 .DS_Store
+
+# Credential files — never commit
+*.pem
+github-app.json
