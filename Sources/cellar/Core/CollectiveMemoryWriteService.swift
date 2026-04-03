@@ -14,7 +14,7 @@ struct CollectiveMemoryWriteService {
     /// Reads CELLAR_MEMORY_PROXY_URL from environment, falls back to production Worker.
     private static var proxyURL: String {
         ProcessInfo.processInfo.environment["CELLAR_MEMORY_PROXY_URL"]
-            ?? "https://cellar-memory-proxy.cellar-community.workers.dev/api/contribute"
+            ?? "https://cellar-memory-proxy.sook40.workers.dev/api/contribute"
     }
 
     // MARK: - Public API
