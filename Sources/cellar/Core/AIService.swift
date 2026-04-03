@@ -2,6 +2,125 @@ import Foundation
 
 struct AIService {
 
+    // MARK: - Available Models per Provider
+
+    struct ModelOption: Codable {
+        let id: String
+        let label: String
+    }
+
+    /// Fallback models when API fetch fails. First entry is the default.
+    static let fallbackModels: [String: [ModelOption]] = [
+        "claude": [
+            ModelOption(id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6"),
+            ModelOption(id: "claude-opus-4-6", label: "Claude Opus 4.6"),
+            ModelOption(id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5"),
+        ],
+        "deepseek": [
+            ModelOption(id: "deepseek-chat", label: "DeepSeek V3"),
+            ModelOption(id: "deepseek-reasoner", label: "DeepSeek R1"),
+        ],
+        "kimi": [
+            ModelOption(id: "moonshot-v1-128k", label: "Moonshot v1 128K"),
+            ModelOption(id: "moonshot-v1-32k", label: "Moonshot v1 32K"),
+            ModelOption(id: "moonshot-v1-8k", label: "Moonshot v1 8K"),
+        ],
+    ]
+
+    /// Provider API endpoints for listing models.
+    private static let modelEndpoints: [String: (url: String, keyEnv: String)] = [
+        "claude": ("https://api.anthropic.com/v1/models", "ANTHROPIC_API_KEY"),
+        "deepseek": ("https://api.deepseek.com/v1/models", "DEEPSEEK_API_KEY"),
+        "kimi": ("https://api.moonshot.ai/v1/models", "KIMI_API_KEY"),
+    ]
+
+    /// Fetch available models from provider APIs. Falls back to hardcoded list per provider on failure.
+    /// Only fetches for providers that have a configured API key.
+    static func fetchAvailableModels() async -> [String: [ModelOption]] {
+        let env = loadEnvironment()
+        var result: [String: [ModelOption]] = [:]
+
+        for (provider, endpoint) in modelEndpoints {
+            guard let apiKey = env[endpoint.keyEnv], !apiKey.isEmpty else {
+                // No key — use fallback
+                result[provider] = fallbackModels[provider] ?? []
+                continue
+            }
+
+            do {
+                var request = URLRequest(url: URL(string: endpoint.url)!)
+                request.timeoutInterval = 5
+                if provider == "claude" {
+                    request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+                    request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+                } else {
+                    request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+                }
+
+                let (data, response) = try await URLSession.shared.data(for: request)
+                guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                    result[provider] = fallbackModels[provider] ?? []
+                    continue
+                }
+
+                let models = parseModelsResponse(data: data, provider: provider)
+                result[provider] = models.isEmpty ? (fallbackModels[provider] ?? []) : models
+            } catch {
+                result[provider] = fallbackModels[provider] ?? []
+            }
+        }
+
+        return result
+    }
+
+    /// Parse the /models response. Anthropic has a different format than OpenAI-compatible providers.
+    private static func parseModelsResponse(data: Data, provider: String) -> [ModelOption] {
+        struct OpenAIModelsResponse: Decodable {
+            let data: [OpenAIModel]
+            struct OpenAIModel: Decodable {
+                let id: String
+            }
+        }
+        struct AnthropicModelsResponse: Decodable {
+            let data: [AnthropicModel]
+            struct AnthropicModel: Decodable {
+                let id: String
+                let displayName: String?
+                enum CodingKeys: String, CodingKey {
+                    case id
+                    case displayName = "display_name"
+                }
+            }
+        }
+
+        if provider == "claude" {
+            guard let parsed = try? JSONDecoder().decode(AnthropicModelsResponse.self, from: data) else { return [] }
+            return parsed.data
+                .sorted { $0.id > $1.id }  // newest first
+                .map { ModelOption(id: $0.id, label: $0.displayName ?? $0.id) }
+        } else {
+            guard let parsed = try? JSONDecoder().decode(OpenAIModelsResponse.self, from: data) else { return [] }
+            return parsed.data
+                .sorted { $0.id < $1.id }
+                .map { ModelOption(id: $0.id, label: $0.id) }
+        }
+    }
+
+    /// Resolve the model to use for a given provider key.
+    /// Priority: config.json ai_model > AI_MODEL env var > provider default.
+    static func resolveModel(for providerKey: String) -> String {
+        let config = CellarConfig.load()
+        let env = loadEnvironment()
+
+        // Check config or env for explicit model
+        if let model = config.aiModel ?? env["AI_MODEL"], !model.isEmpty {
+            return model
+        }
+
+        // Default: first model for this provider
+        return fallbackModels[providerKey]?.first?.id ?? "claude-sonnet-4-6"
+    }
+
     // MARK: - Provider Detection
 
     /// Detect which AI provider is configured via environment variables or ~/.cellar/.env file.
@@ -821,25 +940,27 @@ struct AIService {
 
         let config = CellarConfig.load()
 
-        // Create provider with fully built systemPrompt
+        // Create provider with fully built systemPrompt and user-selected model
         let agentProvider: AgentLoopProvider
         switch provider {
         case .anthropic(let apiKey):
             agentProvider = AnthropicAgentProvider(
                 apiKey: apiKey,
-                model: "claude-sonnet-4-6",
+                model: resolveModel(for: "claude"),
                 tools: AgentTools.toolDefinitions,
                 systemPrompt: systemPrompt
             )
         case .deepseek(let apiKey):
             agentProvider = DeepseekAgentProvider(
                 apiKey: apiKey,
+                model: resolveModel(for: "deepseek"),
                 tools: AgentTools.toolDefinitions,
                 systemPrompt: systemPrompt
             )
         case .kimi(let apiKey):
             agentProvider = KimiAgentProvider(
                 apiKey: apiKey,
+                model: resolveModel(for: "kimi"),
                 tools: AgentTools.toolDefinitions,
                 systemPrompt: systemPrompt
             )
@@ -1046,7 +1167,7 @@ struct AIService {
 
     private static func callKimi(apiKey: String, systemPrompt: String, userMessage: String) async throws -> String {
         let requestBody = OpenAIRequest(
-            model: "moonshot-v1-128k",
+            model: resolveModel(for: "kimi"),
             messages: [
                 OpenAIRequest.Message(role: "system", content: systemPrompt),
                 OpenAIRequest.Message(role: "user", content: userMessage)
@@ -1074,7 +1195,7 @@ struct AIService {
 
     private static func callDeepseek(apiKey: String, systemPrompt: String, userMessage: String) async throws -> String {
         let requestBody = OpenAIRequest(
-            model: "deepseek-chat",
+            model: resolveModel(for: "deepseek"),
             messages: [
                 OpenAIRequest.Message(role: "system", content: systemPrompt),
                 OpenAIRequest.Message(role: "user", content: userMessage)
@@ -1102,7 +1223,7 @@ struct AIService {
 
     private static func callAnthropic(apiKey: String, systemPrompt: String, userMessage: String) async throws -> String {
         let requestBody = AnthropicRequest(
-            model: "claude-opus-4-6",
+            model: resolveModel(for: "claude"),
             maxTokens: 1024,
             system: systemPrompt,
             messages: [AnthropicRequest.Message(role: "user", content: userMessage)]

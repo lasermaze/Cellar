@@ -14,6 +14,7 @@ enum SettingsController {
             let kimiKey = env["KIMI_API_KEY"] ?? ""
             let aiProvider = env["AI_PROVIDER"] ?? ""
             let config = CellarConfig.load()
+            let aiModel = config.aiModel ?? ""
             let contributeMemory = config.contributeMemory ?? false
             let successCount = SuccessDatabase.loadAll().count
             return try await req.view.render("settings", SettingsContext(
@@ -27,6 +28,8 @@ enum SettingsController {
                 hasDeepseekKey: !deepseekKey.isEmpty,
                 hasKimiKey: !kimiKey.isEmpty,
                 aiProvider: aiProvider,
+                aiModel: aiModel,
+                availableModels: await AIService.fetchAvailableModels(),
                 contributeMemory: contributeMemory,
                 successCount: successCount,
                 syncResult: ""
@@ -60,6 +63,7 @@ enum SettingsController {
             let kimiKey = env["KIMI_API_KEY"] ?? ""
             let aiProvider = env["AI_PROVIDER"] ?? ""
             let config = CellarConfig.load()
+            let aiModel = config.aiModel ?? ""
             let contributeMemory = config.contributeMemory ?? false
             let successCount = SuccessDatabase.loadAll().count
 
@@ -79,6 +83,8 @@ enum SettingsController {
                 hasDeepseekKey: !deepseekKey.isEmpty,
                 hasKimiKey: !kimiKey.isEmpty,
                 aiProvider: aiProvider,
+                aiModel: aiModel,
+                availableModels: await AIService.fetchAvailableModels(),
                 contributeMemory: contributeMemory,
                 successCount: successCount,
                 syncResult: message
@@ -133,6 +139,14 @@ enum SettingsController {
             }
 
             try writeEnvFile(env)
+
+            // Save model selection to config.json
+            if let modelValue = input.aiModel {
+                var config = CellarConfig.load()
+                config.aiModel = modelValue.isEmpty ? nil : modelValue
+                try CellarConfig.save(config)
+            }
+
             return req.redirect(to: "/settings")
         }
     }
@@ -195,6 +209,8 @@ enum SettingsController {
         let hasDeepseekKey: Bool
         let hasKimiKey: Bool
         let aiProvider: String  // current value: "claude", "deepseek", "kimi", or "" (auto-detect)
+        let aiModel: String    // current model ID, or "" for provider default
+        let availableModels: [String: [AIService.ModelOption]]
         let contributeMemory: Bool
         let successCount: Int
         let syncResult: String
@@ -206,6 +222,7 @@ enum SettingsController {
         let deepseekKey: String?
         let kimiKey: String?
         let aiProvider: String?
+        let aiModel: String?
     }
 
     struct ConfigInput: Content {

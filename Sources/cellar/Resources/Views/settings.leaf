@@ -18,6 +18,54 @@
           </div>
 
           <div class="form-group">
+            <label for="aiModel">Model</label>
+            <select name="aiModel" id="aiModel">
+              <option value="" #if(aiModel == ""):selected#endif>Provider default</option>
+              #for(model in availableModels.claude):
+                <option value="#(model.id)" data-provider="claude" #if(aiModel == model.id):selected#endif>#(model.label)</option>
+              #endfor
+              #for(model in availableModels.deepseek):
+                <option value="#(model.id)" data-provider="deepseek" #if(aiModel == model.id):selected#endif>#(model.label)</option>
+              #endfor
+              #for(model in availableModels.kimi):
+                <option value="#(model.id)" data-provider="kimi" #if(aiModel == model.id):selected#endif>#(model.label)</option>
+              #endfor
+            </select>
+            <div class="form-hint">Shows models for the selected provider. Pick one or use the default.</div>
+          </div>
+          <script>
+            (function() {
+              var providerSelect = document.getElementById('aiProvider');
+              var modelSelect = document.getElementById('aiModel');
+              var allOptions = Array.from(modelSelect.options);
+              var savedModel = modelSelect.value;
+
+              function filterModels() {
+                var provider = providerSelect.value;
+                var current = modelSelect.value;
+                modelSelect.innerHTML = '';
+                allOptions.forEach(function(opt) {
+                  var p = opt.getAttribute('data-provider');
+                  if (!p || !provider || p === provider) {
+                    modelSelect.appendChild(opt.cloneNode(true));
+                  }
+                });
+                // Restore selection if still visible
+                var found = Array.from(modelSelect.options).some(function(o) { return o.value === current; });
+                modelSelect.value = found ? current : '';
+              }
+
+              providerSelect.addEventListener('change', filterModels);
+              filterModels();
+              // Restore saved model after initial filter
+              if (savedModel) {
+                var exists = Array.from(modelSelect.options).some(function(o) { return o.value === savedModel; });
+                if (exists) modelSelect.value = savedModel;
+              }
+            })();
+          </script>
+
+          <div class="form-group">
             <label for="anthropicKey">
               Anthropic API Key
               #if(hasAnthropicKey):
@@ -81,7 +129,7 @@
             >
           </div>
 
-          <div class="form-hint" style="margin-bottom: 1rem;">Leave a field empty to keep the current key.</div>
+          <div class="form-hint" style="margin-bottom: 1rem;">Leave a field empty to keep the current key. Type "delete" to remove a key.</div>
           <button type="submit" class="btn btn-primary">Save Keys</button>
         </form>
       </div>

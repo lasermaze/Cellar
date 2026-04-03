@@ -4,7 +4,8 @@ import Foundation
 /// Priority: CELLAR_BUDGET env var > config.json > default ($5.00).
 struct CellarConfig: Codable {
     var budgetCeiling: Double
-    var aiProvider: String?  // "claude" | "deepseek" | nil (auto-detect)
+    var aiProvider: String?  // "claude" | "deepseek" | "kimi" | nil (auto-detect)
+    var aiModel: String?     // e.g. "claude-sonnet-4-6", "deepseek-reasoner", "moonshot-v1-32k"
     /// Opt-in to contribute working configs to collective memory.
     /// nil = not asked yet, true = opted in, false = declined.
     var contributeMemory: Bool?
@@ -12,6 +13,7 @@ struct CellarConfig: Codable {
     enum CodingKeys: String, CodingKey {
         case budgetCeiling = "budget"
         case aiProvider = "ai_provider"
+        case aiModel = "ai_model"
         case contributeMemory = "contribute_memory"
     }
 
@@ -22,7 +24,7 @@ struct CellarConfig: Codable {
         // 1. CELLAR_BUDGET env var overrides everything
         if let envVal = ProcessInfo.processInfo.environment["CELLAR_BUDGET"],
            let val = Double(envVal), val > 0 {
-            return CellarConfig(budgetCeiling: val, aiProvider: nil, contributeMemory: nil)
+            return CellarConfig(budgetCeiling: val, aiProvider: nil, aiModel: nil, contributeMemory: nil)
         }
         // 2. Read ~/.cellar/config.json
         let configURL = CellarPaths.configFile
@@ -31,7 +33,7 @@ struct CellarConfig: Codable {
             return config
         }
         // 3. Default
-        return CellarConfig(budgetCeiling: defaultBudgetCeiling, aiProvider: nil, contributeMemory: nil)
+        return CellarConfig(budgetCeiling: defaultBudgetCeiling, aiProvider: nil, aiModel: nil, contributeMemory: nil)
     }
 
     /// Persist this config to ~/.cellar/config.json atomically.
