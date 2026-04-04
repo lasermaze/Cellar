@@ -32,18 +32,37 @@ enum WebApp {
         // Template engine
         app.views.use(.leaf)
 
-        // Resolve resource directories — prefer source tree (avoids LeafKit .build sandbox rejection),
-        // fall back to bundle resources for deployed binaries
+        // Resolve resource directories — prefer source tree for development,
+        // fall back to bundle resources for deployed binaries.
+        // Leaf's security check blocks paths with dotfile components (like ~/.cellar/),
+        // so when running from a dotfile path, copy resources to a safe temp location.
         let sourceViews = FileManager.default.currentDirectoryPath + "/Sources/cellar/Resources/Views"
         let sourcePublic = FileManager.default.currentDirectoryPath + "/Sources/cellar/Resources/Public"
         let viewsPath: String
         let publicPath: String
         if FileManager.default.fileExists(atPath: sourceViews + "/base.leaf") {
+            // Development: source tree
             viewsPath = sourceViews + "/"
             publicPath = sourcePublic + "/"
         } else if let resourcePath = Bundle.module.resourcePath {
-            viewsPath = resourcePath + "/Views/"
-            publicPath = resourcePath + "/Public/"
+            let bundleViews = resourcePath + "/Views/"
+            let bundlePublic = resourcePath + "/Public/"
+            // Check if the bundle path contains a dotfile component (e.g. ~/.cellar/)
+            // Leaf blocks these for security, so copy to a safe temp location
+            let hasDotfileInPath = resourcePath.split(separator: "/").contains { $0.hasPrefix(".") }
+            if hasDotfileInPath {
+                let safeDir = NSTemporaryDirectory() + "cellar-resources"
+                let safeViews = safeDir + "/Views/"
+                let safePublic = safeDir + "/Public/"
+                try? FileManager.default.removeItem(atPath: safeDir)
+                try? FileManager.default.copyItem(atPath: resourcePath + "/Views", toPath: String(safeViews.dropLast()))
+                try? FileManager.default.copyItem(atPath: resourcePath + "/Public", toPath: String(safePublic.dropLast()))
+                viewsPath = safeViews
+                publicPath = safePublic
+            } else {
+                viewsPath = bundleViews
+                publicPath = bundlePublic
+            }
         } else {
             fatalError("Cannot find Leaf template directory")
         }
