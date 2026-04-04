@@ -156,26 +156,47 @@ interface CollectiveMemoryEntry {
   lastConfirmed: string;
 }
 
+// Accept both camelCase and snake_case field names (Swift Codable sends snake_case)
+function pick(obj: Record<string, unknown>, camel: string, snake: string): unknown {
+  return obj[camel] ?? obj[snake];
+}
+
 function validateAndSanitize(entry: unknown): CollectiveMemoryEntry | string {
   if (typeof entry !== "object" || entry === null) return "entry must be an object";
   const e = entry as Record<string, unknown>;
 
-  // Required top-level fields
-  if (typeof e.gameId !== "string" || !e.gameId) return "missing gameId";
-  if (typeof e.gameName !== "string" || !e.gameName) return "missing gameName";
-  if (typeof e.environmentHash !== "string" || !e.environmentHash)
+  // Required top-level fields (accept both camelCase and snake_case)
+  const gameId = pick(e, "gameId", "game_id");
+  const gameName = pick(e, "gameName", "game_name");
+  const environmentHash = pick(e, "environmentHash", "environment_hash");
+  const config = pick(e, "config", "config");
+  const environment = pick(e, "environment", "environment");
+  const schemaVersion = pick(e, "schemaVersion", "schema_version");
+  const reasoning = pick(e, "reasoning", "reasoning");
+  const confirmations = pick(e, "confirmations", "confirmations");
+  const lastConfirmed = pick(e, "lastConfirmed", "last_confirmed");
+  const engine = pick(e, "engine", "engine");
+  const graphicsApi = pick(e, "graphicsApi", "graphics_api");
+
+  if (typeof gameId !== "string" || !gameId) return "missing gameId";
+  if (typeof gameName !== "string" || !gameName) return "missing gameName";
+  if (typeof environmentHash !== "string" || !environmentHash)
     return "missing environmentHash";
-  if (typeof e.config !== "object" || e.config === null) return "missing config";
-  if (typeof e.environment !== "object" || e.environment === null)
+  if (typeof config !== "object" || config === null) return "missing config";
+  if (typeof environment !== "object" || environment === null)
     return "missing environment";
 
-  const env = e.environment as Record<string, unknown>;
-  if (typeof env.arch !== "string") return "missing environment.arch";
-  if (typeof env.wineVersion !== "string") return "missing environment.wineVersion";
-  if (typeof env.macosVersion !== "string") return "missing environment.macosVersion";
-  if (typeof env.wineFlavor !== "string") return "missing environment.wineFlavor";
+  const env = environment as Record<string, unknown>;
+  const envArch = pick(env, "arch", "arch") as string | undefined;
+  const envWineVer = pick(env, "wineVersion", "wine_version") as string | undefined;
+  const envMacosVer = pick(env, "macosVersion", "macos_version") as string | undefined;
+  const envWineFlavor = pick(env, "wineFlavor", "wine_flavor") as string | undefined;
+  if (typeof envArch !== "string") return "missing environment.arch";
+  if (typeof envWineVer !== "string") return "missing environment.wineVersion";
+  if (typeof envMacosVer !== "string") return "missing environment.macosVersion";
+  if (typeof envWineFlavor !== "string") return "missing environment.wineFlavor";
 
-  const cfg = e.config as Record<string, unknown>;
+  const cfg = config as Record<string, unknown>;
 
   // Sanitize environment keys — filter to allowlist, truncate values to 200 chars
   const rawEnv = (cfg.environment ?? {}) as Record<string, unknown>;
@@ -187,14 +208,14 @@ function validateAndSanitize(entry: unknown): CollectiveMemoryEntry | string {
   }
 
   // Sanitize dllOverrides — drop invalid modes, truncate dll/source
-  const rawDlls = Array.isArray(cfg.dllOverrides) ? cfg.dllOverrides : [];
+  const rawDlls = Array.isArray(cfg.dllOverrides ?? cfg.dll_overrides) ? (cfg.dllOverrides ?? cfg.dll_overrides) as unknown[] : [];
   const sanitizedDlls: DllOverride[] = rawDlls
     .filter(
       (d): d is Record<string, unknown> =>
         typeof d === "object" && d !== null
     )
     .filter((d) => VALID_DLL_MODES.has(String(d.mode ?? "")))
-    .map((d) => ({
+    .map((d: any) => ({
       dll: String(d.dll ?? "").slice(0, 50),
       mode: String(d.mode ?? ""),
       ...(d.placement !== undefined ? { placement: String(d.placement) } : {}),
@@ -213,28 +234,30 @@ function validateAndSanitize(entry: unknown): CollectiveMemoryEntry | string {
         String(r.key ?? "").startsWith(prefix)
       )
     )
-    .map((r) => ({
+    .map((r: any) => ({
       key: String(r.key ?? "").slice(0, 200),
-      valueName: String(r.valueName ?? "").slice(0, 100),
+      valueName: String(r.valueName ?? r.value_name ?? "").slice(0, 100),
       data: String(r.data ?? "").slice(0, 200),
       ...(r.purpose !== undefined ? { purpose: String(r.purpose) } : {}),
     }));
 
   // Sanitize launchArgs — cap at 5 entries, 100 chars each
-  const rawArgs = Array.isArray(cfg.launchArgs) ? cfg.launchArgs : [];
+  const rawLaunchArgs = cfg.launchArgs ?? cfg.launch_args;
+  const rawArgs = Array.isArray(rawLaunchArgs) ? rawLaunchArgs : [];
   const sanitizedArgs = rawArgs
     .slice(0, 5)
-    .map((a) => String(a).slice(0, 100));
+    .map((a: any) => String(a).slice(0, 100));
 
   // Sanitize setupDeps — only /^[a-z0-9_]{1,50}$/ strings
-  const rawDeps = Array.isArray(cfg.setupDeps) ? cfg.setupDeps : [];
+  const rawSetupDeps = cfg.setupDeps ?? cfg.setup_deps;
+  const rawDeps = Array.isArray(rawSetupDeps) ? rawSetupDeps : [];
   const sanitizedDeps = rawDeps
-    .filter((d) => typeof d === "string" && /^[a-z0-9_]{1,50}$/.test(d));
+    .filter((d: any) => typeof d === "string" && /^[a-z0-9_]{1,50}$/.test(d));
 
   return {
-    schemaVersion: typeof e.schemaVersion === "number" ? e.schemaVersion : 1,
-    gameId: e.gameId as string,
-    gameName: e.gameName as string,
+    schemaVersion: typeof schemaVersion === "number" ? schemaVersion : 1,
+    gameId: gameId as string,
+    gameName: gameName as string,
     config: {
       environment: sanitizedEnv,
       dllOverrides: sanitizedDlls,
@@ -243,19 +266,19 @@ function validateAndSanitize(entry: unknown): CollectiveMemoryEntry | string {
       setupDeps: sanitizedDeps,
     },
     environment: {
-      arch: env.arch as string,
-      wineVersion: env.wineVersion as string,
-      macosVersion: env.macosVersion as string,
-      wineFlavor: env.wineFlavor as string,
+      arch: envArch as string,
+      wineVersion: envWineVer as string,
+      macosVersion: envMacosVer as string,
+      wineFlavor: envWineFlavor as string,
     },
-    environmentHash: e.environmentHash as string,
-    reasoning: typeof e.reasoning === "string" ? e.reasoning : "",
-    ...(typeof e.engine === "string" ? { engine: e.engine } : {}),
-    ...(typeof e.graphicsApi === "string" ? { graphicsApi: e.graphicsApi } : {}),
-    confirmations: typeof e.confirmations === "number" ? e.confirmations : 1,
+    environmentHash: environmentHash as string,
+    reasoning: typeof reasoning === "string" ? reasoning as string : "",
+    ...(typeof engine === "string" ? { engine: engine as string } : {}),
+    ...(typeof graphicsApi === "string" ? { graphicsApi: graphicsApi as string } : {}),
+    confirmations: typeof confirmations === "number" ? confirmations as number : 1,
     lastConfirmed:
-      typeof e.lastConfirmed === "string"
-        ? e.lastConfirmed
+      typeof lastConfirmed === "string"
+        ? lastConfirmed as string
         : new Date().toISOString(),
   };
 }
