@@ -64,7 +64,8 @@ enum WebApp {
                 let safeViews = safeDir + "/Views/"
                 let safePublic = safeDir + "/Public/"
                 try? FileManager.default.removeItem(atPath: safeDir)
-                try? FileManager.default.copyItem(atPath: resolvedBase + "/Views", toPath: String(safeViews.dropLast()))
+                try FileManager.default.createDirectory(atPath: safeDir, withIntermediateDirectories: true)
+                try FileManager.default.copyItem(atPath: resolvedBase + "/Views", toPath: String(safeViews.dropLast()))
                 try? FileManager.default.copyItem(atPath: resolvedBase + "/Public", toPath: String(safePublic.dropLast()))
                 viewsPath = safeViews
                 publicPath = safePublic
