@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-03T23:04:10.922Z"
+last_updated: "2026-04-04T01:06:50.517Z"
 progress:
-  total_phases: 35
-  completed_phases: 33
-  total_plans: 75
-  completed_plans: 75
+  total_phases: 36
+  completed_phases: 34
+  total_plans: 76
+  completed_plans: 76
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 35 (Wire It Together) — complete
-Plan: P01 complete (all plans done)
-Status: Phase 35 complete — swift build passes, all arch pieces wired
-Last activity: 2026-04-02 — P01 complete: AIService.runAgentLoop() rewritten with AgentControl, MiddlewareContext, middleware chain, post-loop save; LaunchController stop/confirm use AgentControl.abort()/confirm(); stale taskState refs removed from LaunchTools/SaveTools
+Phase: 36 (Event Log Resume) — complete
+Plan: P01 complete (all plans done — final v1.3 phase)
+Status: Phase 36 complete — swift build passes, swift test passes (165 tests), v1.3 complete
+Last activity: 2026-04-02 — P01 complete: AgentEventLog.findMostRecent(gameId:) added; AIService.runAgentLoop() prefers event log resume over SessionHandoff; event log cleaned up on success
 
 Progress: [████████████████████] 100%
 
@@ -82,6 +82,8 @@ Progress: [████████████████████] 100%
 | Phase 33-rewrite-the-loop P01 | 134 | 2 tasks | 1 files |
 | Phase 34-update-agenttools P01 | 8 | 2 tasks | 1 files |
 | Phase 35-wire-it-together PP01 | 2 | 2 tasks | 4 files |
+| Phase 36-event-log-resume P01 | 8 | 2 tasks | 2 files |
+| Phase 36-event-log-resume P01 | 8 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -176,6 +178,8 @@ Progress: [████████████████████] 100%
 - [Phase 34-update-agenttools]: execute() returns .stop(reason: .userConfirmedWorking) on userForceConfirmed — actual save deferred to post-loop in AIService (Phase 35)
 - [Phase 34-update-agenttools]: TaskState enum fully removed from AgentTools — loop control is now entirely via ToolResult return values and AgentControl
 - [Phase 35]: if case pattern matching used for AgentStopReason equality — enum has associated values, no Equatable conformance
+- [Phase 36-event-log-resume]: findMostRecent(gameId:) scans logsDir, filters by prefix/suffix, sorts descending by filename — ISO8601 timestamps sort correctly lexicographically without date parsing
+- [Phase 36-event-log-resume]: Event log preferred over SessionHandoff for resume: richer context (tool history, env changes, launch outcomes). DiagnosticRecord guard checks both are nil to prevent double context injection
 
 ### Roadmap Evolution
 

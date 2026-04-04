@@ -36,8 +36,8 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 
 - [x] **LOG-01**: Append-only JSONL event log at `~/.cellar/logs/<gameId>-<timestamp>.jsonl`
 - [x] **LOG-02**: Events include: sessionStarted, llmCalled, toolInvoked, toolCompleted, envChanged, gameLaunched, spinDetected, budgetWarning, sessionEnded
-- [ ] **LOG-03**: Event log can generate a resume summary for injection into next session's initial message
-- [ ] **LOG-04**: SessionHandoff still works as fallback — event log is preferred when available
+- [x] **LOG-03**: Event log can generate a resume summary for injection into next session's initial message
+- [x] **LOG-04**: SessionHandoff still works as fallback — event log is preferred when available
 
 ### Integration
 
@@ -74,8 +74,8 @@ Requirements for v1.3 Agent Loop Rewrite. Each maps to roadmap phases.
 | MW-04 | Phase 32 | Complete |
 | LOG-01 | Phase 32 | Complete |
 | LOG-02 | Phase 32 | Complete |
-| LOG-03 | Phase 36 | Pending |
-| LOG-04 | Phase 36 | Pending |
+| LOG-03 | Phase 36 | Complete |
+| LOG-04 | Phase 36 | Complete |
 | INT-01 | Phase 35 | Complete |
 | INT-02 | Phase 35 | Complete |
 | INT-03 | Phase 35 | Complete |
