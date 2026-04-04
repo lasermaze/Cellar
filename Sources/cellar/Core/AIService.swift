@@ -1052,11 +1052,22 @@ struct AIService {
 
         // ── POST-LOOP SAVE (the critical fix — BUG-01) ──
         // Runs with await. No fire-and-forget. No race condition.
+        // Save on: user clicked confirm, OR user clicked confirm late (after loop exited with .completed)
         var didSave = false
+        let shouldSave: Bool
         if case .userConfirmed = result.stopReason {
+            shouldSave = true
+        } else if control.userForceConfirmed {
+            // User clicked "Game Works" after the agent naturally completed
+            shouldSave = true
+        } else {
+            shouldSave = false
+        }
+
+        if shouldSave {
             let saveInput: JSONValue = .object([
                 "game_name": .string(entry.name),
-                "resolution_narrative": .string("User confirmed game is working from web UI.")
+                "resolution_narrative": .string("User confirmed game is working.")
             ])
             _ = await tools.execute(toolName: "save_success", input: saveInput)
             didSave = true
