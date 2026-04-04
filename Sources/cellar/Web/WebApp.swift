@@ -45,18 +45,27 @@ enum WebApp {
             viewsPath = sourceViews + "/"
             publicPath = sourcePublic + "/"
         } else if let resourcePath = Bundle.module.resourcePath {
-            let bundleViews = resourcePath + "/Views/"
-            let bundlePublic = resourcePath + "/Public/"
+            // SPM flat bundles (.copy("Resources")) put files under bundle/Resources/,
+            // but Bundle.resourcePath returns the bundle root — not bundle/Resources/.
+            // Check both layouts so this works regardless of bundle structure.
+            let resolvedBase: String
+            if FileManager.default.fileExists(atPath: resourcePath + "/Resources/Views/base.leaf") {
+                resolvedBase = resourcePath + "/Resources"
+            } else {
+                resolvedBase = resourcePath
+            }
+            let bundleViews = resolvedBase + "/Views/"
+            let bundlePublic = resolvedBase + "/Public/"
             // Check if the bundle path contains a dotfile component (e.g. ~/.cellar/)
             // Leaf blocks these for security, so copy to a safe temp location
-            let hasDotfileInPath = resourcePath.split(separator: "/").contains { $0.hasPrefix(".") }
+            let hasDotfileInPath = resolvedBase.split(separator: "/").contains { $0.hasPrefix(".") }
             if hasDotfileInPath {
                 let safeDir = NSTemporaryDirectory() + "cellar-resources"
                 let safeViews = safeDir + "/Views/"
                 let safePublic = safeDir + "/Public/"
                 try? FileManager.default.removeItem(atPath: safeDir)
-                try? FileManager.default.copyItem(atPath: resourcePath + "/Views", toPath: String(safeViews.dropLast()))
-                try? FileManager.default.copyItem(atPath: resourcePath + "/Public", toPath: String(safePublic.dropLast()))
+                try? FileManager.default.copyItem(atPath: resolvedBase + "/Views", toPath: String(safeViews.dropLast()))
+                try? FileManager.default.copyItem(atPath: resolvedBase + "/Public", toPath: String(safePublic.dropLast()))
                 viewsPath = safeViews
                 publicPath = safePublic
             } else {
