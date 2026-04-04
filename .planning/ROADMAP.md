@@ -66,7 +66,7 @@
 - [x] **Phase 33: Rewrite the Loop** — New run() signature, extracted helpers, clean endTurn semantics, ≤150-line body (completed 2026-04-03)
 - [x] **Phase 34: Update AgentTools** — execute() returns ToolResult, remove bare vars, post-loop save logic (completed 2026-04-03)
 - [x] **Phase 35: Wire It Together** — AIService, ActiveAgents, LaunchController, prepareStep integration (completed 2026-04-03)
-- [ ] **Phase 36: Event Log Resume and SessionHandoff Integration** — Resume summary from event log, SessionHandoff fallback
+- [ ] **Phase 36: Event Log Resume and SessionHandoff Integration** — Resume summary from event log, SessionHandoff fallback [LOG-03, LOG-04]
 
 ## Phase Details
 
@@ -430,7 +430,10 @@ Plans:
   1. When a game session is resumed, the initial message includes a summary derived from the JSONL event log — tools called, outcomes, configs tried, and what the agent was doing when the session ended
   2. When no event log exists for a game (first session, or log deleted), SessionHandoff provides the resume context — the session starts with the handoff summary instead of an empty context
   3. The event log resume summary is richer than the SessionHandoff snapshot — it reflects the full sequence of tool calls and outcomes, not just the final state
-**Plans**: TBD
+**Plans**: 1 plan
+
+Plans:
+- [ ] 36-01-PLAN.md — Wire event log resume into AIService with SessionHandoff fallback
 
 ## Progress
 
