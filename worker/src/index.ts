@@ -307,6 +307,74 @@ async function getInstallationToken(env: Env): Promise<string> {
   return data.token;
 }
 
+// Normalize config from either camelCase or snake_case existing entries
+function normalizeConfig(cfg: Record<string, unknown> | undefined): CollectiveMemoryEntry["config"] {
+  if (!cfg) return { environment: {}, dllOverrides: [], registry: [], launchArgs: [], setupDeps: [] };
+  return {
+    environment: (cfg.environment ?? {}) as Record<string, string>,
+    dllOverrides: ((cfg.dllOverrides ?? cfg.dll_overrides ?? []) as any[]).map((d: any) => ({
+      dll: d.dll ?? "", mode: d.mode ?? "",
+      ...(d.placement ? { placement: d.placement } : {}),
+      ...(d.source ? { source: d.source } : {}),
+    })),
+    registry: ((cfg.registry ?? []) as any[]).map((r: any) => ({
+      key: r.key ?? "", valueName: r.valueName ?? r.value_name ?? "", data: r.data ?? "",
+      ...(r.purpose ? { purpose: r.purpose } : {}),
+    })),
+    launchArgs: (cfg.launchArgs ?? cfg.launch_args ?? []) as string[],
+    setupDeps: (cfg.setupDeps ?? cfg.setup_deps ?? []) as string[],
+  };
+}
+
+// Normalize environment from either camelCase or snake_case
+function normalizeEnv(env: Record<string, unknown> | undefined): CollectiveMemoryEntry["environment"] {
+  if (!env) return { arch: "", wineVersion: "", macosVersion: "", wineFlavor: "" };
+  return {
+    arch: (env.arch ?? "") as string,
+    wineVersion: (env.wineVersion ?? env.wine_version ?? "") as string,
+    macosVersion: (env.macosVersion ?? env.macos_version ?? "") as string,
+    wineFlavor: (env.wineFlavor ?? env.wine_flavor ?? "") as string,
+  };
+}
+
+// Convert a CollectiveMemoryEntry to snake_case JSON keys for Swift Codable compatibility
+function toSnakeCaseEntry(e: CollectiveMemoryEntry): Record<string, unknown> {
+  return {
+    schema_version: e.schemaVersion,
+    game_id: e.gameId,
+    game_name: e.gameName,
+    config: {
+      environment: e.config.environment,
+      dll_overrides: e.config.dllOverrides.map(d => ({
+        dll: d.dll,
+        mode: d.mode,
+        ...(d.placement ? { placement: d.placement } : {}),
+        ...(d.source ? { source: d.source } : {}),
+      })),
+      registry: e.config.registry.map(r => ({
+        key: r.key,
+        value_name: r.valueName,
+        data: r.data,
+        ...(r.purpose ? { purpose: r.purpose } : {}),
+      })),
+      launch_args: e.config.launchArgs,
+      setup_deps: e.config.setupDeps,
+    },
+    environment: {
+      arch: e.environment.arch,
+      wine_version: e.environment.wineVersion,
+      macos_version: e.environment.macosVersion,
+      wine_flavor: e.environment.wineFlavor,
+    },
+    environment_hash: e.environmentHash,
+    reasoning: e.reasoning,
+    ...(e.engine ? { engine: e.engine } : {}),
+    ...(e.graphicsApi ? { graphics_api: e.graphicsApi } : {}),
+    confirmations: e.confirmations,
+    last_confirmed: e.lastConfirmed,
+  };
+}
+
 async function writeEntryToGitHub(
   entry: CollectiveMemoryEntry,
   token: string,
@@ -333,7 +401,21 @@ async function writeEntryToGitHub(
     sha = existing.sha;
     const decoded = atob(existing.content.replace(/\s/g, ""));
     try {
-      entries = JSON.parse(decoded) as CollectiveMemoryEntry[];
+      const parsed = JSON.parse(decoded) as Record<string, unknown>[];
+      // Normalize: accept both camelCase and snake_case from existing entries
+      entries = parsed.map(raw => ({
+        schemaVersion: (raw.schemaVersion ?? raw.schema_version ?? 1) as number,
+        gameId: (raw.gameId ?? raw.game_id ?? "") as string,
+        gameName: (raw.gameName ?? raw.game_name ?? "") as string,
+        config: normalizeConfig(raw.config as Record<string, unknown> | undefined),
+        environment: normalizeEnv(raw.environment as Record<string, unknown> | undefined),
+        environmentHash: (raw.environmentHash ?? raw.environment_hash ?? "") as string,
+        reasoning: (raw.reasoning ?? "") as string,
+        engine: (raw.engine ?? undefined) as string | undefined,
+        graphicsApi: (raw.graphicsApi ?? raw.graphics_api ?? undefined) as string | undefined,
+        confirmations: (raw.confirmations ?? 1) as number,
+        lastConfirmed: (raw.lastConfirmed ?? raw.last_confirmed ?? new Date().toISOString()) as string,
+      }));
     } catch {
       entries = [];
     }
@@ -355,9 +437,12 @@ async function writeEntryToGitHub(
     entries.push(entry);
   }
 
+  // Convert to snake_case for Swift Codable compatibility before writing
+  const snakeCaseEntries = entries.map(toSnakeCaseEntry);
+
   // Encode and PUT
   const content = btoa(
-    unescape(encodeURIComponent(JSON.stringify(entries, null, 2)))
+    unescape(encodeURIComponent(JSON.stringify(snakeCaseEntries, null, 2)))
   );
   const putBody: Record<string, unknown> = {
     message: `chore: update memory entry for ${entry.gameName}`,
