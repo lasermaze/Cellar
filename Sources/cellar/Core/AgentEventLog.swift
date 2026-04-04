@@ -73,6 +73,39 @@ final class AgentEventLog {
             }
     }
 
+    /// Find the most recent JSONL event log file for the given game, if one exists.
+    ///
+    /// Scans `CellarPaths.logsDir` for files matching `<gameId>-*.jsonl`, sorts
+    /// descending by filename (ISO8601 timestamps sort lexicographically), and returns
+    /// an `AgentEventLog` pointing at the most recent match. Returns nil if no match
+    /// exists or the logs directory is missing.
+    static func findMostRecent(gameId: String) -> AgentEventLog? {
+        let logsDir = CellarPaths.logsDir
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: logsDir,
+            includingPropertiesForKeys: nil
+        ) else { return nil }
+
+        let prefix = gameId + "-"
+        let suffix = ".jsonl"
+        let matches = contents
+            .filter { url in
+                let name = url.lastPathComponent
+                return name.hasPrefix(prefix) && name.hasSuffix(suffix)
+            }
+            .sorted { $0.lastPathComponent > $1.lastPathComponent }  // descending — most recent first
+
+        guard let mostRecent = matches.first else { return nil }
+        return AgentEventLog(existingFileURL: mostRecent)
+    }
+
+    /// Private init for opening an existing log file (no timestamp generation, no directory creation).
+    private init(existingFileURL: URL) {
+        self.fileURL = existingFileURL
+        self.encoder = JSONEncoder()
+        self.encoder.outputFormatting = .sortedKeys
+    }
+
     /// Build a plain-text resume summary from the event log.
     ///
     /// Returns nil if the log has no events.
