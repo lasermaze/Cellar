@@ -1008,7 +1008,15 @@ struct AIService {
         // Fetch community compatibility data from Lutris + ProtonDB (silent skip on any failure)
         let compatContext = await CompatibilityService.fetchReport(for: entry.name)
 
-        // Check for handoff from a previous incomplete session
+        // Prefer event log resume over SessionHandoff (richer context — tool history, env changes, launch outcomes)
+        let eventLogResume: String?
+        if let previousLog = AgentEventLog.findMostRecent(gameId: gameId) {
+            eventLogResume = previousLog.summarizeForResume()
+        } else {
+            eventLogResume = nil
+        }
+
+        // Check for handoff from a previous incomplete session (fallback when no event log)
         let previousSession = SessionHandoff.read(gameId: gameId)
         if previousSession != nil {
             SessionHandoff.delete(gameId: gameId)
@@ -1023,10 +1031,12 @@ struct AIService {
         if let compatReport = compatContext {
             contextParts.append(compatReport.formatForAgent())
         }
-        if let previousSession = previousSession {
+        if let eventLogResume = eventLogResume {
+            contextParts.append(eventLogResume)
+        } else if let previousSession = previousSession {
             contextParts.append(previousSession.formatForAgent())
         }
-        if previousSession == nil,
+        if eventLogResume == nil && previousSession == nil,
            let diagRecord = DiagnosticRecord.readLatest(gameId: gameId) {
             contextParts.append(diagRecord.formatForAgent())
         }
@@ -1075,6 +1085,10 @@ struct AIService {
                 )
             }
             SessionHandoff.delete(gameId: gameId)
+            // Clean up event log on successful session (no stale logs accumulating)
+            if let oldLog = AgentEventLog.findMostRecent(gameId: gameId) {
+                try? FileManager.default.removeItem(at: oldLog.url)
+            }
             return .success(result.finalText)
         } else if case .userAborted = result.stopReason {
             return .failed("[STOP:user] Agent stopped by user.")
