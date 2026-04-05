@@ -43,7 +43,21 @@ enum GameController {
                 throw Abort(.serviceUnavailable, reason: "Wine is not installed. Visit /status for setup instructions.")
             }
 
-            let installerName = installerURL.deletingPathExtension().lastPathComponent
+            // For disc images, try to get volume label by mounting briefly
+            let discImageExtensions: Set<String> = ["iso", "bin", "cue", "img"]
+            let installerName: String
+            if discImageExtensions.contains(installerURL.pathExtension.lowercased()) {
+                let handler = DiscImageHandler()
+                if let mount = try? handler.mount(imageURL: installerURL) {
+                    let label = handler.volumeLabel(from: mount.mountPoint)
+                    handler.detach(mountResult: mount)
+                    installerName = label ?? installerURL.deletingPathExtension().lastPathComponent
+                } else {
+                    installerName = installerURL.deletingPathExtension().lastPathComponent
+                }
+            } else {
+                installerName = installerURL.deletingPathExtension().lastPathComponent
+            }
             let gameId = slugify(installerName)
             let gameName = installerName.replacingOccurrences(of: "_", with: " ")
 
@@ -220,6 +234,31 @@ enum GameController {
             return
         }
 
+        // Disc image support: mount .iso/.bin/.cue and discover installer
+        let discImageExtensions: Set<String> = ["iso", "bin", "cue", "img"]
+        let inputExtension = installerURL.pathExtension.lowercased()
+        var mountResult: MountResult? = nil
+        var effectiveInstallerURL = installerURL
+
+        defer {
+            if let m = mountResult {
+                DiscImageHandler().detach(mountResult: m)
+            }
+        }
+
+        if discImageExtensions.contains(inputExtension) {
+            let handler = DiscImageHandler()
+            sendSSE(writer: writer, event: "log",
+                    data: "<div class='log-line'>Mounting disc image \(escapeHTML(installerURL.lastPathComponent))...</div>")
+            let mount = try handler.mount(imageURL: installerURL)
+            mountResult = mount
+            sendSSE(writer: writer, event: "log",
+                    data: "<div class='log-line'>Mounted at \(escapeHTML(mount.mountPoint.path))</div>")
+            effectiveInstallerURL = try handler.discoverInstaller(at: mount.mountPoint)
+            sendSSE(writer: writer, event: "log",
+                    data: "<div class='log-line'>Found installer: \(escapeHTML(effectiveInstallerURL.lastPathComponent))</div>")
+        }
+
         // Create bottle
         sendSSE(writer: writer, event: "status",
                 data: "<div>Creating Wine bottle for \(escapeHTML(gameName))...</div>")
@@ -233,16 +272,17 @@ enum GameController {
         sendSSE(writer: writer, event: "status",
                 data: "<div>Running installer inside Wine bottle...</div>")
         sendSSE(writer: writer, event: "log",
-                data: "<div class='log-line'>Installer: \(escapeHTML(installerURL.lastPathComponent))</div>")
+                data: "<div class='log-line'>Installer: \(escapeHTML(effectiveInstallerURL.lastPathComponent))</div>")
 
         let bottleURL = CellarPaths.bottleDir(for: gameId)
         let wineProcess = WineProcess(wineBinary: wineURL, winePrefix: bottleURL)
 
+        let installerPath = effectiveInstallerURL.path
         let result = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<WineResult, Error>) in
             DispatchQueue.global(qos: .userInitiated).async {
                 do {
                     let r = try wineProcess.run(
-                        binary: installerURL.path,
+                        binary: installerPath,
                         arguments: ["/VERYSILENT", "/SP-", "/SUPPRESSMSGBOXES"],
                         environment: [:]
                     )
