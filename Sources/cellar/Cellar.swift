@@ -1,7 +1,7 @@
 import ArgumentParser
 
 @main
-struct Cellar: ParsableCommand {
+struct Cellar: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "cellar",
         abstract: "Wine game launcher for old PC games on macOS",
@@ -9,10 +9,18 @@ struct Cellar: ParsableCommand {
         defaultSubcommand: StatusCommand.self
     )
 
-    static func main() throws {
+    static func main() async {
         CellarPaths.refuseRoot()
         CellarPaths.checkOwnership()
-        var command = try Self.parseAsRoot()
-        try command.run()
+        do {
+            var command = try parseAsRoot()
+            if var asyncCommand = command as? AsyncParsableCommand {
+                try await asyncCommand.run()
+            } else {
+                try command.run()
+            }
+        } catch {
+            exit(withError: error)
+        }
     }
 }
