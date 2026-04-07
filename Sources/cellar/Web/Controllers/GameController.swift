@@ -67,8 +67,9 @@ enum GameController {
             }
 
             let encodedPath = input.installPath.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? input.installPath
+            let archParam = (input.arch == "auto" || input.arch == nil) ? "" : "&arch=\(input.arch!)"
 
-            return req.redirect(to: "/games/install?gameId=\(gameId)&gameName=\(gameName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? gameName)&installPath=\(encodedPath)")
+            return req.redirect(to: "/games/install?gameId=\(gameId)&gameName=\(gameName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? gameName)&installPath=\(encodedPath)\(archParam)")
         }
 
         // GET /games/install -- install progress page
@@ -79,10 +80,12 @@ enum GameController {
                 throw Abort(.badRequest)
             }
             let encodedPath = installPath.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? installPath
+            let arch = req.query[String.self, at: "arch"]
+            let archParam = arch.map { "&arch=\($0)" } ?? ""
             return try await req.view.render("install-log", InstallLogContext(
                 gameId: gameId,
                 gameName: gameName,
-                streamURL: "/games/install/stream?gameId=\(gameId)&gameName=\(gameName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? gameName)&installPath=\(encodedPath)"
+                streamURL: "/games/install/stream?gameId=\(gameId)&gameName=\(gameName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? gameName)&installPath=\(encodedPath)\(archParam)"
             ))
         }
 
@@ -93,6 +96,7 @@ enum GameController {
                   let installPath = req.query[String.self, at: "installPath"] else {
                 throw Abort(.badRequest)
             }
+            let arch = req.query[String.self, at: "arch"]
 
             let body = Response.Body(stream: { writer in
                 Task.detached {
@@ -101,6 +105,7 @@ enum GameController {
                             gameId: gameId,
                             gameName: gameName,
                             installPath: installPath,
+                            arch: arch,
                             writer: writer
                         )
                     } catch {
@@ -214,6 +219,7 @@ enum GameController {
 
     struct AddGameInput: Content {
         let installPath: String
+        let arch: String?  // "auto", "win32", or "win64"
     }
 
     struct InstallLogContext: Content {
@@ -225,7 +231,8 @@ enum GameController {
     // MARK: - Install Logic
 
     private static func runInstall(
-        gameId: String, gameName: String, installPath: String, writer: BodyStreamWriter
+        gameId: String, gameName: String, installPath: String,
+        arch: String? = nil, writer: BodyStreamWriter
     ) async throws {
         let installerURL = URL(fileURLWithPath: installPath)
         guard let wineURL = LaunchService.resolveWine() else {
@@ -257,6 +264,18 @@ enum GameController {
             effectiveInstallerURL = try handler.discoverInstaller(at: mount.mountPoint)
             sendSSE(writer: writer, event: "log",
                     data: "<div class='log-line'>Found installer: \(escapeHTML(effectiveInstallerURL.lastPathComponent))</div>")
+        }
+
+        // Detect architecture from installer PE header
+        let detectedArch = PEReader.detectArch(fileURL: effectiveInstallerURL)?.rawValue
+        let bottleArch: String? = arch ?? detectedArch
+        if let detected = detectedArch {
+            sendSSE(writer: writer, event: "log",
+                    data: "<div class='log-line'>Detected architecture: \(detected)</div>")
+        }
+        if let override = arch {
+            sendSSE(writer: writer, event: "log",
+                    data: "<div class='log-line'>Architecture override: \(override)</div>")
         }
 
         // Create bottle
@@ -343,6 +362,7 @@ enum GameController {
             name: gameName,
             installPath: installPath,
             executablePath: executablePath,
+            bottleArch: bottleArch,
             recipeId: nil,
             addedAt: Date()
         )
