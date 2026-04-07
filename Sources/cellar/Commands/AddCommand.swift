@@ -13,8 +13,17 @@ struct AddCommand: AsyncParsableCommand {
     @Flag(help: "Pre-install recipe dependencies before running installer (old behavior)")
     var forceProactiveDeps: Bool = false
 
+    @Option(name: .long, help: "Force bottle architecture: win32 or win64 (default: auto-detect from installer PE header)")
+    var arch: String? = nil
+
     mutating func run() async throws {
         let installerURL = URL(fileURLWithPath: installerPath)
+
+        // Validate --arch value early
+        if let archOverride = arch, archOverride != "win32" && archOverride != "win64" {
+            print("Error: --arch must be 'win32' or 'win64', got '\(archOverride)'")
+            throw ExitCode.failure
+        }
 
         // 1. Verify installer exists
         guard FileManager.default.fileExists(atPath: installerURL.path) else {
@@ -46,6 +55,16 @@ struct AddCommand: AsyncParsableCommand {
             print("Mounted at \(mount.mountPoint.path)")
             effectiveInstallerURL = try handler.discoverInstaller(at: mount.mountPoint)
             print("Found installer: \(effectiveInstallerURL.lastPathComponent)")
+        }
+
+        // Detect PE architecture from installer header, apply --arch override if provided
+        let detectedArch = PEReader.detectArch(fileURL: effectiveInstallerURL)?.rawValue
+        let bottleArch: String? = arch ?? detectedArch
+        if let detected = detectedArch {
+            print("Detected installer architecture: \(detected)")
+        }
+        if let override = arch {
+            print("Architecture override: \(override)")
         }
 
         // 2. Check dependencies — offer inline install if missing
@@ -315,6 +334,7 @@ struct AddCommand: AsyncParsableCommand {
             name: gameName,
             installPath: "",
             executablePath: executablePath,
+            bottleArch: bottleArch,
             recipeId: activeRecipe?.id ?? gameId,
             addedAt: Date()
         )
