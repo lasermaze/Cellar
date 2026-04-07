@@ -472,3 +472,14 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19 �
 | 34. Update AgentTools | 1/1 | Complete    | 2026-04-03 | - |
 | 35. Wire It Together | 1/1 | Complete    | 2026-04-03 | - |
 | 36. Event Log Resume and SessionHandoff | 1/1 | Complete    | 2026-04-04 | - |
+
+### Phase 37: supporting Win32 apps. We need to pick when it is best to decide about win32 bottle against win64
+
+**Goal:** PE arch detection utility, GameEntry arch storage, agent prompt awareness, CLI --arch flag, web UI arch override. All bottles remain WoW64 -- WINEARCH=win32 is not supported on macOS Wine.
+**Requirements**: [PE-01, PE-02, PE-03, PE-04, PE-05, PE-06]
+**Depends on:** Phase 36
+**Plans:** 2 plans
+
+Plans:
+- [ ] 37-01-PLAN.md -- PEReader utility, GameEntry bottleArch field, AddCommand --arch flag
+- [ ] 37-02-PLAN.md -- Agent arch awareness (inspect_game + system prompt) + web UI override
