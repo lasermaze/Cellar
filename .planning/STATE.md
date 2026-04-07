@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-07T01:41:08.493Z"
+last_updated: "2026-04-07T01:45:39.437Z"
 progress:
   total_phases: 37
-  completed_phases: 34
+  completed_phases: 35
   total_plans: 78
-  completed_plans: 77
+  completed_plans: 78
 ---
 
 # Project State
@@ -85,6 +85,7 @@ Progress: [████████████████████] 98% (Ph
 | Phase 36-event-log-resume P01 | 8 | 2 tasks | 2 files |
 | Phase 36-event-log-resume P01 | 8 | 2 tasks | 2 files |
 | Phase 37-supporting-win32-apps P01 | 8 | 2 tasks | 5 files |
+| Phase 37-supporting-win32-apps P02 | 2 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -183,6 +184,9 @@ Progress: [████████████████████] 98% (Ph
 - [Phase 36-event-log-resume]: Event log preferred over SessionHandoff for resume: richer context (tool history, env changes, launch outcomes). DiagnosticRecord guard checks both are nil to prevent double context injection
 - [Phase 37-supporting-win32-apps]: bottleArch is informational only — WINEARCH not passed to WineProcess (macOS Wine WoW64 mode only)
 - [Phase 37-supporting-win32-apps]: PEReader reads e_lfanew as 4-byte DWORD (fixing DiagnosticTools 2-byte bug); unknown machine types return nil (fixing DiagnosticTools treating all non-AMD64 as 32-bit)
+- [Phase 37-02]: inspect_game keeps exe_type for backward compat and adds bottle_arch as canonical arch field
+- [Phase 37-02]: arch query param omitted from redirect URL when auto/nil — clean URLs for default case
+- [Phase 37-02]: bottleArch in GameEntry uses arch override first, falls back to PE auto-detection from installer
 
 ### Roadmap Evolution
 

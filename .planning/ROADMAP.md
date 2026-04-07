@@ -478,7 +478,7 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19 �
 **Goal:** PE arch detection utility, GameEntry arch storage, agent prompt awareness, CLI --arch flag, web UI arch override. All bottles remain WoW64 -- WINEARCH=win32 is not supported on macOS Wine.
 **Requirements**: [PE-01, PE-02, PE-03, PE-04, PE-05, PE-06]
 **Depends on:** Phase 36
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 37-01-PLAN.md -- PEReader utility, GameEntry bottleArch field, AddCommand --arch flag
