@@ -196,6 +196,7 @@ Progress: [████████████████████] 100%
 - Phase 28 added (2026-04-02): Fix Collective Memory Prompt Injection — remove reasoning from prompt, allowlist env/registry, sanitize fields, CSRF protection, .env permissions
 - Phase 29 added (2026-04-03): Secure collective memory — Cloudflare Worker write proxy, remove bundled private key, anonymous public reads, server-side validation
 - Phases 31–36 added (2026-04-03): v1.3 Agent Loop Rewrite — typed results, thread-safe control, middleware system, JSONL event log, clean endTurn semantics
+- Phase 37 added: Supporting Win32 apps — decide when to use win32 vs win64 bottle
 
 ### Pending Todos
 
