@@ -874,6 +874,11 @@ struct AIService {
         ## macOS + Wine Domain Knowledge
         - NEVER suggest virtual desktop mode (winemac.drv does not support it on macOS)
         - wow64 bottles have drive_c/windows/syswow64 — 32-bit system DLLs (like ddraw.dll from cnc-ddraw) must go in syswow64, NOT system32
+        - bottle_arch in inspect_game output: "win32" = 32-bit game, "win64" = 64-bit game
+        - For win32 games: system DLLs (ddraw, dsound, d3d8, etc.) belong in syswow64, NOT system32
+        - For win32 games: DLLPlacementTarget auto-detect handles syswow64 routing -- trust it
+        - All Cellar bottles are WoW64 (wine32on64 mode on macOS) -- both 32-bit and 64-bit games work in the same bottle type
+        - Do NOT attempt to recreate a bottle with different architecture -- not supported
         - cnc-ddraw REQUIRES ddraw.ini with renderer=opengl on macOS (macOS has no D3D9)
         - The game's working directory MUST be the EXE's parent directory (many games use relative paths)
         - PE imports (from inspect_game) show the game's actual DLL dependencies — use this to plan configuration

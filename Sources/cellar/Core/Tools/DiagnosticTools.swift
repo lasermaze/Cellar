@@ -10,28 +10,14 @@ extension AgentTools {
         print("[inspect_game] START for \(gameId)")
         let gameDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
 
-        // Detect PE type by reading the exe header bytes directly (no external process)
+        // Detect PE type using PEReader
         print("[inspect_game] detecting PE type...")
-        var exeType = "unknown"
-        if let handle = try? FileHandle(forReadingFrom: URL(fileURLWithPath: executablePath)) {
-            let header = handle.readData(ofLength: 512)
-            try? handle.close()
-            // Check for MZ header + PE signature
-            if header.count >= 2 && header[0] == 0x4D && header[1] == 0x5A {  // "MZ"
-                // PE offset is at bytes 60-63 (little-endian)
-                if header.count >= 64 {
-                    let peOffset = Int(header[60]) | (Int(header[61]) << 8)
-                    if peOffset + 6 <= header.count,
-                       header[peOffset] == 0x50, header[peOffset+1] == 0x45 {  // "PE\0\0"
-                        let machine = UInt16(header[peOffset+4]) | (UInt16(header[peOffset+5]) << 8)
-                        if machine == 0x8664 {
-                            exeType = "PE32+ (64-bit)"
-                        } else {
-                            exeType = "PE32 (32-bit)"
-                        }
-                    }
-                }
-            }
+        let detectedArch = PEReader.detectArch(fileURL: URL(fileURLWithPath: executablePath))
+        let exeType: String
+        switch detectedArch {
+        case .win64: exeType = "PE32+ (64-bit)"
+        case .win32: exeType = "PE32 (32-bit)"
+        case nil:    exeType = "unknown"
         }
         print("[inspect_game] PE type: \(exeType)")
 
@@ -128,6 +114,7 @@ extension AgentTools {
             "game_id": gameId,
             "executable_path": executablePath,
             "exe_type": exeType,
+            "bottle_arch": detectedArch?.rawValue ?? "unknown",
             "game_files": allGameFiles,
             "bottle_exists": bottleExists,
             "bottle_path": bottleURL.path,
