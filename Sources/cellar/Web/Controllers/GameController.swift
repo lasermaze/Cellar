@@ -37,10 +37,10 @@ enum GameController {
             let installerURL = URL(fileURLWithPath: input.installPath)
 
             guard FileManager.default.fileExists(atPath: installerURL.path) else {
-                throw Abort(.badRequest, reason: "Installer not found at \(input.installPath)")
+                return Response(status: .badRequest, body: .init(string: "File not found at \(input.installPath)"))
             }
             guard LaunchService.resolveWine() != nil else {
-                throw Abort(.serviceUnavailable, reason: "Wine is not installed. Visit /status for setup instructions.")
+                return Response(status: .serviceUnavailable, body: .init(string: "Wine is not installed. Run cellar status to set it up."))
             }
 
             // For disc images, try to get volume label by mounting briefly
@@ -63,7 +63,7 @@ enum GameController {
 
             // Check if game already exists
             if let _ = try? CellarStore.findGame(id: gameId) {
-                throw Abort(.conflict, reason: "Game '\(gameName)' is already installed. Use the library to launch it.")
+                return Response(status: .conflict, body: .init(string: "Game '\(gameName)' is already installed."))
             }
 
             let encodedPath = input.installPath.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? input.installPath

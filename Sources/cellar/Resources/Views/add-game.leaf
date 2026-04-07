@@ -3,7 +3,8 @@
     <section>
       <h2>Add Game</h2>
       <div class="section-card" style="max-width: 560px;">
-        <form hx-post="/games" hx-target="body">
+        <div id="add-error" style="display:none; background: #FEE2E2; color: var(--error); padding: 0.75rem 1rem; border-radius: var(--radius-sm); margin-bottom: 1rem; font-size: 0.875rem;"></div>
+        <form id="add-form" hx-post="/games" hx-target="body">
           <div class="form-group">
             <label for="installPath">Installer Path</label>
             <input type="text" id="installPath" name="installPath"
@@ -20,12 +21,33 @@
             </select>
             <div class="form-hint">Auto-detect reads the installer's PE header. Override if the installer arch doesn't match the game.</div>
           </div>
-          <div style="display: flex; gap: 0.75rem;">
-            <button type="submit" class="btn btn-primary">Add Game <span class="arrow">→</span></button>
+          <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <button type="submit" id="add-btn" class="btn btn-primary">Add Game <span class="arrow">→</span></button>
             <a href="/" class="btn btn-secondary">Cancel</a>
+            <span id="add-spinner" style="display:none; font-size: 0.85rem; color: var(--text-secondary);">Setting up&hellip;</span>
           </div>
         </form>
       </div>
     </section>
+    <script>
+      document.getElementById('add-form').addEventListener('htmx:beforeRequest', function() {
+        document.getElementById('add-error').style.display = 'none';
+        document.getElementById('add-btn').disabled = true;
+        document.getElementById('add-btn').style.opacity = '0.5';
+        document.getElementById('add-spinner').style.display = 'inline';
+      });
+      document.getElementById('add-form').addEventListener('htmx:afterRequest', function(e) {
+        if (e.detail.failed || (e.detail.xhr && e.detail.xhr.status >= 400)) {
+          var msg = 'Something went wrong.';
+          try { msg = e.detail.xhr.responseText || msg; } catch(_) {}
+          var el = document.getElementById('add-error');
+          el.textContent = msg;
+          el.style.display = 'block';
+          document.getElementById('add-btn').disabled = false;
+          document.getElementById('add-btn').style.opacity = '1';
+          document.getElementById('add-spinner').style.display = 'none';
+        }
+      });
+    </script>
   #endexport
 #endextend

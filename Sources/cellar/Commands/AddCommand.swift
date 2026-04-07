@@ -16,6 +16,9 @@ struct AddCommand: AsyncParsableCommand {
     @Option(name: .long, help: "Force bottle architecture: win32 or win64 (default: auto-detect from installer PE header)")
     var arch: String? = nil
 
+    @Flag(name: .long, help: "Disable UAC in the Wine bottle before installing (fixes 'Run as normal user' errors)")
+    var noUac: Bool = false
+
     mutating func run() async throws {
         let installerURL = URL(fileURLWithPath: installerPath)
 
@@ -117,6 +120,29 @@ struct AddCommand: AsyncParsableCommand {
         let bottleManager = BottleManager(wineBinary: wineURL)
         _ = try bottleManager.createBottle(gameId: gameId)
 
+        // 5b. Disable admin detection if requested (fixes installers that reject "Run as Administrator")
+        // Wine maps macOS user as Windows Administrator. This Wine-specific registry key
+        // makes IsUserAnAdmin() return FALSE so installers that refuse to run as admin will proceed.
+        if noUac {
+            let regContent = """
+            Windows Registry Editor Version 5.00
+
+            [HKEY_LOCAL_MACHINE\\SOFTWARE\\Wine]
+            "NonAdmin"="1"
+
+            [HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System]
+            "EnableLUA"=dword:00000000
+
+            """
+            let bottlePath = CellarPaths.bottleDir(for: gameId)
+            let regFile = bottlePath.appendingPathComponent("disable-uac.reg")
+            try regContent.write(to: regFile, atomically: true, encoding: .utf8)
+            let wineProc = WineProcess(wineBinary: wineURL, winePrefix: bottlePath)
+            try wineProc.applyRegistryFile(at: regFile)
+            try FileManager.default.removeItem(at: regFile)
+            print("Admin detection disabled in bottle.")
+        }
+
         // 6. Load recipe
         let recipe = try RecipeEngine.findBundledRecipe(for: gameId)
 
@@ -144,10 +170,14 @@ struct AddCommand: AsyncParsableCommand {
         // 8. Run installer (first attempt)
         let wineProcess = WineProcess(wineBinary: wineURL, winePrefix: CellarPaths.bottleDir(for: gameId))
         print("Running installer inside Wine bottle...")
+        var installerEnv: [String: String] = [:]
+        if noUac {
+            installerEnv["__COMPAT_LAYER"] = "RunAsInvoker"
+        }
         let installerResult = try wineProcess.run(
             binary: effectiveInstallerURL.path,
             arguments: ["/VERYSILENT", "/SP-", "/SUPPRESSMSGBOXES"],
-            environment: [:]
+            environment: installerEnv
         )
 
         // 9. Reactive dep install: if installer failed, diagnose and retry
@@ -173,7 +203,7 @@ struct AddCommand: AsyncParsableCommand {
                         let retryResult = try wineProcess.run(
                             binary: effectiveInstallerURL.path,
                             arguments: ["/VERYSILENT", "/SP-", "/SUPPRESSMSGBOXES"],
-                            environment: [:]
+                            environment: installerEnv
                         )
                         if retryResult.exitCode == 0 {
                             print("Installer succeeded on retry.")
@@ -213,7 +243,7 @@ struct AddCommand: AsyncParsableCommand {
                     _ = try wineProcess.run(
                         binary: effectiveInstallerURL.path,
                         arguments: ["/VERYSILENT", "/SP-", "/SUPPRESSMSGBOXES"],
-                        environment: [:]
+                        environment: installerEnv
                     )
                 }
             }
