@@ -12,6 +12,7 @@ struct GameEntryTests {
             name: "Cossacks: European Wars",
             installPath: "/Users/test/games/cossacks",
             executablePath: "C:\\Games\\Cossacks\\dmcr.exe",
+            bottleArch: "win32",
             recipeId: "cossacks-european-wars",
             addedAt: Date(timeIntervalSince1970: 1700000000),
             lastLaunched: nil,
@@ -28,6 +29,7 @@ struct GameEntryTests {
         #expect(decoded.id == "cossacks")
         #expect(decoded.name == "Cossacks: European Wars")
         #expect(decoded.executablePath == "C:\\Games\\Cossacks\\dmcr.exe")
+        #expect(decoded.bottleArch == "win32")
         #expect(decoded.recipeId == "cossacks-european-wars")
     }
 
@@ -46,6 +48,7 @@ struct GameEntryTests {
         let decoded = try decoder.decode(GameEntry.self, from: Data(json.utf8))
         #expect(decoded.id == "test")
         #expect(decoded.executablePath == nil)
+        #expect(decoded.bottleArch == nil)  // backward compat: legacy JSON without bottleArch decodes as nil
         #expect(decoded.lastLaunched == nil)
         #expect(decoded.lastResult == nil)
     }
