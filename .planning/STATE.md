@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-04T01:10:25.301Z"
+last_updated: "2026-04-07T01:41:08.493Z"
 progress:
-  total_phases: 36
+  total_phases: 37
   completed_phases: 34
-  total_plans: 76
-  completed_plans: 76
+  total_plans: 78
+  completed_plans: 77
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 36 (Event Log Resume) — complete
-Plan: P01 complete (all plans done — final v1.3 phase)
-Status: Phase 36 complete — swift build passes, swift test passes (165 tests), v1.3 complete
-Last activity: 2026-04-02 — P01 complete: AgentEventLog.findMostRecent(gameId:) added; AIService.runAgentLoop() prefers event log resume over SessionHandoff; event log cleaned up on success
+Phase: 37 (Win32 App Support) — P01 complete
+Plan: P01 complete — PEReader utility, GameEntry.bottleArch, AddCommand --arch flag
+Status: Phase 37 P01 complete — swift build passes, swift test passes (173 tests)
+Last activity: 2026-04-06 — P01 complete: PEReader.detectArch(fileURL:) added; GameEntry.bottleArch field added; AddCommand --arch flag added with PE auto-detection
 
-Progress: [████████████████████] 100%
+Progress: [████████████████████] 98% (Phase 37 P01/2 complete)
 
 ## Performance Metrics
 
@@ -84,6 +84,7 @@ Progress: [████████████████████] 100%
 | Phase 35-wire-it-together PP01 | 2 | 2 tasks | 4 files |
 | Phase 36-event-log-resume P01 | 8 | 2 tasks | 2 files |
 | Phase 36-event-log-resume P01 | 8 | 2 tasks | 2 files |
+| Phase 37-supporting-win32-apps P01 | 8 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -180,6 +181,8 @@ Progress: [████████████████████] 100%
 - [Phase 35]: if case pattern matching used for AgentStopReason equality — enum has associated values, no Equatable conformance
 - [Phase 36-event-log-resume]: findMostRecent(gameId:) scans logsDir, filters by prefix/suffix, sorts descending by filename — ISO8601 timestamps sort correctly lexicographically without date parsing
 - [Phase 36-event-log-resume]: Event log preferred over SessionHandoff for resume: richer context (tool history, env changes, launch outcomes). DiagnosticRecord guard checks both are nil to prevent double context injection
+- [Phase 37-supporting-win32-apps]: bottleArch is informational only — WINEARCH not passed to WineProcess (macOS Wine WoW64 mode only)
+- [Phase 37-supporting-win32-apps]: PEReader reads e_lfanew as 4-byte DWORD (fixing DiagnosticTools 2-byte bug); unknown machine types return nil (fixing DiagnosticTools treating all non-AMD64 as 32-bit)
 
 ### Roadmap Evolution
 
