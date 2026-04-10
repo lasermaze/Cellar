@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-10T01:43:29.467Z"
+last_updated: "2026-04-10T01:45:57.080Z"
 progress:
   total_phases: 38
-  completed_phases: 35
+  completed_phases: 36
   total_plans: 81
-  completed_plans: 80
+  completed_plans: 81
 ---
 
 # Project State
@@ -88,6 +88,7 @@ Progress: [████████████████████] 100% (P
 | Phase 37-supporting-win32-apps P02 | 2 | 2 tasks | 4 files |
 | Phase 38-rebuild-memory-layer P01 | 5 | 2 tasks | 13 files |
 | Phase 38-rebuild-memory-layer P03 | 4 | 2 tasks | 2 files |
+| Phase 38-rebuild-memory-layer-shared-wiki-for-agents-based-on-karpathy-principles P02 | 8 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -196,6 +197,8 @@ Progress: [████████████████████] 100% (P
 - [Phase 38-01]: games/ directory reserved for future per-game pages from ingest — not seeded manually
 - [Phase 38-03]: DLLOverrideRecord.source is optional (String?) — nil check required before lowercased() comparison in WikiService.ingest
 - [Phase 38-03]: WikiService.ingest call placed inside didSave block — wiki only grows from confirmed saves, not partial completions
+- [Phase 38-02]: query_wiki dispatch is non-async — WikiService.search is synchronous file I/O, no await needed
+- [Phase 38-02]: Wiki context injected after collective memory and before compatibility data — synthesized pattern knowledge is higher-level than raw compat reports
 
 ### Roadmap Evolution
 
