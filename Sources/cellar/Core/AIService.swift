@@ -1033,6 +1033,9 @@ struct AIService {
         if let memoryContext = memoryContext {
             contextParts.append(memoryContext)
         }
+        if let wikiContext = WikiService.fetchContext(for: entry.name) {
+            contextParts.append(wikiContext)
+        }
         if let compatReport = compatContext {
             contextParts.append(compatReport.formatForAgent())
         }
@@ -1099,6 +1102,10 @@ struct AIService {
                     tools: tools, gameName: entry.name,
                     wineURL: wineURL, isWebContext: askUserHandler != nil
                 )
+                // Ingest session learnings into wiki
+                if let record = SuccessDatabase.load(gameId: gameId) {
+                    WikiService.ingest(record: record)
+                }
             }
             SessionHandoff.delete(gameId: gameId)
             // Clean up event log on successful session (no stale logs accumulating)
