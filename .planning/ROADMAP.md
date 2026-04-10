@@ -483,3 +483,14 @@ Phases execute in numeric order: 13 → 14 → 15 → 16 → 17 → 18 → 19 �
 Plans:
 - [ ] 37-01-PLAN.md -- PEReader utility, GameEntry bottleArch field, AddCommand --arch flag
 - [ ] 37-02-PLAN.md -- Agent arch awareness (inspect_game + system prompt) + web UI override
+
+### Phase 38: Rebuild memory layer - shared wiki for agents based on Karpathy principles
+
+**Goal:** Replace scattered config-file memory with a structured LLM-maintained wiki (SCHEMA.md, index.md, log.md, category pages) bundled as SPM resources. WikiService provides keyword-scored context injection at session start and a query_wiki agent tool for mid-session lookups.
+**Requirements**: TBD
+**Depends on:** Phase 37
+**Plans:** 2 plans
+
+Plans:
+- [ ] 38-01-PLAN.md — Wiki directory structure, seed pages, WikiService.swift, Package.swift resource bundling
+- [ ] 38-02-PLAN.md — Agent integration: query_wiki tool in AgentTools, wiki context injection in AIService
