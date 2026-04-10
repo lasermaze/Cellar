@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-07T01:49:05.562Z"
+last_updated: "2026-04-10T01:38:45Z"
 progress:
-  total_phases: 37
-  completed_phases: 35
-  total_plans: 78
-  completed_plans: 78
+  total_phases: 38
+  completed_phases: 36
+  total_plans: 79
+  completed_plans: 79
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 37 (Win32 App Support) — P01 complete
-Plan: P01 complete — PEReader utility, GameEntry.bottleArch, AddCommand --arch flag
-Status: Phase 37 P01 complete — swift build passes, swift test passes (173 tests)
-Last activity: 2026-04-06 — P01 complete: PEReader.detectArch(fileURL:) added; GameEntry.bottleArch field added; AddCommand --arch flag added with PE auto-detection
+Phase: 38 (Rebuild Memory Layer) — P01 complete
+Plan: P01 complete — Wiki directory structure, 8 seed pages, WikiService.swift with keyword-based context injection
+Status: Phase 38 P01 complete — swift build passes, wiki bundled as SPM resource
+Last activity: 2026-04-10 — P01 complete: wiki/ seeded with SCHEMA.md, index.md, log.md, 8 pages across engines/symptoms/environments; WikiService.fetchContext and search added; Package.swift updated with .copy("wiki")
 
-Progress: [████████████████████] 98% (Phase 37 P01/2 complete)
+Progress: [████████████████████] 99% (Phase 38 P01/1 complete)
 
 ## Performance Metrics
 
@@ -86,6 +86,7 @@ Progress: [████████████████████] 98% (Ph
 | Phase 36-event-log-resume P01 | 8 | 2 tasks | 2 files |
 | Phase 37-supporting-win32-apps P01 | 8 | 2 tasks | 5 files |
 | Phase 37-supporting-win32-apps P02 | 2 | 2 tasks | 4 files |
+| Phase 38-rebuild-memory-layer P01 | 5 | 2 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -187,6 +188,11 @@ Progress: [████████████████████] 98% (Ph
 - [Phase 37-02]: inspect_game keeps exe_type for backward compat and adds bottle_arch as canonical arch field
 - [Phase 37-02]: arch query param omitted from redirect URL when auto/nil — clean URLs for default case
 - [Phase 37-02]: bottleArch in GameEntry uses arch override first, falls back to PE auto-detection from installer
+- [Phase 38-01]: Wiki stored as SPM bundled resource (.copy("wiki")) — ships with binary via brew upgrade, not in ~/.cellar/
+- [Phase 38-01]: WikiService.fetchContext returns nil (not empty string) on wiki absence — graceful degradation per research pitfall #5
+- [Phase 38-01]: WikiService.search returns plain String (never nil) for agent tool use — human-readable no-match response
+- [Phase 38-01]: maxContentLength=4000 and maxPages=3 cap wiki context injection — avoids context bloat per pitfall #2
+- [Phase 38-01]: games/ directory reserved for future per-game pages from ingest — not seeded manually
 
 ### Roadmap Evolution
 
@@ -204,6 +210,7 @@ Progress: [████████████████████] 98% (Ph
 - Phase 29 added (2026-04-03): Secure collective memory — Cloudflare Worker write proxy, remove bundled private key, anonymous public reads, server-side validation
 - Phases 31–36 added (2026-04-03): v1.3 Agent Loop Rewrite — typed results, thread-safe control, middleware system, JSONL event log, clean endTurn semantics
 - Phase 37 added: Supporting Win32 apps — decide when to use win32 vs win64 bottle
+- Phase 38 added: Rebuild memory layer — shared wiki for agents based on Karpathy principles
 
 ### Pending Todos
 
@@ -215,5 +222,5 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-02
-Stopped at: Phase 31 P01 complete — new types (ToolResult, LoopState, AgentStopReason expansion) added to AgentLoop.swift
+Last session: 2026-04-10
+Stopped at: Phase 38 P01 complete — wiki/ seeded with 8 pages, WikiService.swift added, Package.swift updated with .copy("wiki")
