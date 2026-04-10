@@ -220,6 +220,16 @@ extension AgentTools {
         }
     }
 
+    // MARK: - Wiki Lookup
+
+    func queryWiki(input: JSONValue) -> String {
+        guard case .object(let obj) = input,
+              case .string(let query) = obj["query"] else {
+            return jsonResult(["error": "query parameter required"])
+        }
+        return WikiService.search(query: query)
+    }
+
     // MARK: - Compatibility Lookup
 
     func queryCompatibility(input: JSONValue) async -> String {

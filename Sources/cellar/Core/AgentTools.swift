@@ -566,6 +566,15 @@ final class AgentTools: @unchecked Sendable {
                 ]),
                 "required": .array([.string("game_name")])
             ])
+        ),
+
+        // 21. query_wiki — required query
+        ToolDefinition(
+            name: "query_wiki",
+            description: "Search the compiled knowledge wiki for Wine compatibility patterns, engine-specific fixes, common symptom solutions, and environment notes. Returns synthesized knowledge pages. Use this when you encounter a specific symptom or engine and want to check accumulated knowledge before trying web research.",
+            inputSchema: .object([
+                "query": .string("Search query — game name, engine, symptom, or keyword (e.g. 'directdraw black screen', 'unity wine crash', 'dxvk apple silicon')")
+            ])
         )
     ]
 
@@ -614,6 +623,7 @@ final class AgentTools: @unchecked Sendable {
         case "fetch_page":          resultString = await fetchPage(input: input)
         case "list_windows":        resultString = listWindows(input: input)
         case "query_compatibility": resultString = await queryCompatibility(input: input)
+        case "query_wiki":          resultString = queryWiki(input: input)
         default:
             return .error(content: jsonResult(["error": "Unknown tool: \(toolName)"]))
         }
