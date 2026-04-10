@@ -68,6 +68,146 @@ struct WikiService: Sendable {
         return pageContents.joined(separator: "\n\n---\n\n")
     }
 
+    // MARK: - Ingest
+
+    /// Ingest learnings from a successful game session into wiki pages.
+    /// Appends pitfalls to symptom pages, engine info to engine pages, and logs the ingest.
+    /// Best-effort — failures are logged to stderr but never block the user.
+    static func ingest(record: SuccessRecord) {
+        guard let wikiDir = Bundle.module.url(forResource: "wiki", withExtension: nil) else {
+            return
+        }
+
+        var pagesUpdated: [String] = []
+
+        // 1. Append pitfalls to matching symptom pages
+        for pitfall in record.pitfalls {
+            let symptomSlug = slugify(pitfall.symptom)
+            let candidates = ["symptoms/crash-on-launch.md", "symptoms/black-screen.md", "symptoms/d3d-errors.md"]
+            if let bestPage = findBestMatch(slug: symptomSlug, symptom: pitfall.symptom, candidates: candidates) {
+                let pageURL = wikiDir.appendingPathComponent(bestPage)
+                if appendIfNew(to: pageURL, entry: formatPitfall(pitfall, gameName: record.gameName)) {
+                    pagesUpdated.append(bestPage)
+                }
+            }
+        }
+
+        // 2. Append engine/graphics info to engine pages
+        if let engine = record.engine?.lowercased() {
+            let enginePages: [String: String] = [
+                "directdraw": "engines/directdraw.md",
+                "unity": "engines/unity.md",
+                "dxvk": "engines/dxvk.md",
+            ]
+            let key = enginePages.keys.first { engine.contains($0) || (record.graphicsApi?.lowercased().contains($0) ?? false) }
+            if let key = key, let pagePath = enginePages[key] {
+                let pageURL = wikiDir.appendingPathComponent(pagePath)
+                let entry = formatEngineEntry(record: record)
+                if appendIfNew(to: pageURL, entry: entry) {
+                    pagesUpdated.append(pagePath)
+                }
+            }
+        }
+
+        // Also check graphicsApi independently (e.g., graphicsApi: "directdraw" without engine set)
+        if let gfx = record.graphicsApi?.lowercased(), record.engine == nil || !(record.engine?.lowercased().contains(gfx) ?? false) {
+            if gfx.contains("directdraw") || gfx.contains("ddraw") {
+                let pageURL = wikiDir.appendingPathComponent("engines/directdraw.md")
+                let entry = formatEngineEntry(record: record)
+                if appendIfNew(to: pageURL, entry: entry) {
+                    pagesUpdated.append("engines/directdraw.md")
+                }
+            }
+        }
+
+        // 3. Append DLL override patterns to relevant pages
+        for override in record.dllOverrides {
+            if let source = override.source, source.lowercased().contains("cnc-ddraw") {
+                let pageURL = wikiDir.appendingPathComponent("engines/directdraw.md")
+                let entry = "- \(record.gameName): `\(override.dll)=\(override.mode)` via \(source)"
+                if appendIfNew(to: pageURL, entry: entry) {
+                    pagesUpdated.append("engines/directdraw.md")
+                }
+            }
+        }
+
+        // 4. Append to log.md
+        if !pagesUpdated.isEmpty {
+            let logURL = wikiDir.appendingPathComponent("log.md")
+            let uniquePages = Array(Set(pagesUpdated)).sorted()
+            let dateStr = ISO8601DateFormatter().string(from: Date()).prefix(10)
+            let logEntry = "\n## [\(dateStr)] ingest | \(record.gameName)\nPages updated: \(uniquePages.joined(separator: ", "))\nSource: Successful agent session (gameId: \(record.gameId))\n"
+            if let data = logEntry.data(using: .utf8), let handle = try? FileHandle(forWritingTo: logURL) {
+                handle.seekToEndOfFile()
+                handle.write(data)
+                handle.closeFile()
+            }
+        }
+    }
+
+    // MARK: - Ingest Helpers
+
+    /// Format a pitfall as a wiki bullet point
+    private static func formatPitfall(_ pitfall: PitfallRecord, gameName: String) -> String {
+        var line = "- **\(gameName)**: \(pitfall.symptom) → \(pitfall.fix) (cause: \(pitfall.cause))"
+        if let wrongFix = pitfall.wrongFix {
+            line += " [wrong fix: \(wrongFix)]"
+        }
+        return line
+    }
+
+    /// Format engine/graphics entry for a wiki page
+    private static func formatEngineEntry(record: SuccessRecord) -> String {
+        var parts = ["- **\(record.gameName)**"]
+        if let gfx = record.graphicsApi { parts.append("(\(gfx))") }
+        if !record.environment.isEmpty {
+            let envStr = record.environment.sorted(by: { $0.key < $1.key }).map { "\($0.key)=\($0.value)" }.joined(separator: ", ")
+            parts.append("env: `\(envStr)`")
+        }
+        if let wine = record.wineVersion { parts.append("on Wine \(wine)") }
+        return parts.joined(separator: " ")
+    }
+
+    /// Slugify a string for fuzzy matching
+    private static func slugify(_ text: String) -> String {
+        text.lowercased()
+            .components(separatedBy: .alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: "-")
+    }
+
+    /// Find the best matching page from candidates by keyword overlap with symptom text
+    private static func findBestMatch(slug: String, symptom: String, candidates: [String]) -> String? {
+        let words = symptom.lowercased().components(separatedBy: .alphanumerics.inverted).filter { $0.count > 2 }
+        var bestScore = 0
+        var bestPage: String?
+        for candidate in candidates {
+            let score = words.reduce(0) { acc, word in
+                acc + (candidate.lowercased().contains(word) ? 1 : 0)
+            }
+            if score > bestScore {
+                bestScore = score
+                bestPage = candidate
+            }
+        }
+        // Fall back to crash-on-launch as the catch-all symptom page
+        return bestPage ?? "symptoms/crash-on-launch.md"
+    }
+
+    /// Append entry to a page file only if it doesn't already contain the entry text.
+    /// Returns true if appended, false if skipped (duplicate or error).
+    private static func appendIfNew(to pageURL: URL, entry: String) -> Bool {
+        guard let existing = try? String(contentsOf: pageURL, encoding: .utf8) else { return false }
+        if existing.contains(entry) { return false }
+        let appendText = "\n\(entry)\n"
+        guard let data = appendText.data(using: .utf8),
+              let handle = try? FileHandle(forWritingTo: pageURL) else { return false }
+        handle.seekToEndOfFile()
+        handle.write(data)
+        handle.closeFile()
+        return true
+    }
+
     // MARK: - Private
 
     /// Extract search keywords from game name and symptom list.
