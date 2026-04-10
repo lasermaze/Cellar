@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-10T01:38:45Z"
+last_updated: "2026-04-10T01:43:29.467Z"
 progress:
   total_phases: 38
-  completed_phases: 36
-  total_plans: 79
-  completed_plans: 79
+  completed_phases: 35
+  total_plans: 81
+  completed_plans: 80
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 38 (Rebuild Memory Layer) — P01 complete
-Plan: P01 complete — Wiki directory structure, 8 seed pages, WikiService.swift with keyword-based context injection
-Status: Phase 38 P01 complete — swift build passes, wiki bundled as SPM resource
-Last activity: 2026-04-10 — P01 complete: wiki/ seeded with SCHEMA.md, index.md, log.md, 8 pages across engines/symptoms/environments; WikiService.fetchContext and search added; Package.swift updated with .copy("wiki")
+Phase: 38 (Rebuild Memory Layer) — P03 complete
+Plan: P03 complete — WikiService.ingest post-session wiki updates, AIService calls ingest after successful save
+Status: Phase 38 P03 complete — swift build and all 173 tests pass
+Last activity: 2026-04-10 — P03 complete: WikiService.ingest appends pitfalls/engine info/DLL overrides to wiki pages; AIService calls ingest inside didSave block; dedup prevents duplicate entries; log.md updated per ingest
 
-Progress: [████████████████████] 99% (Phase 38 P01/1 complete)
+Progress: [████████████████████] 100% (Phase 38 complete — P01 wiki foundation + P02 query_wiki tool + P03 post-session ingest)
 
 ## Performance Metrics
 
@@ -87,6 +87,7 @@ Progress: [████████████████████] 99% (Ph
 | Phase 37-supporting-win32-apps P01 | 8 | 2 tasks | 5 files |
 | Phase 37-supporting-win32-apps P02 | 2 | 2 tasks | 4 files |
 | Phase 38-rebuild-memory-layer P01 | 5 | 2 tasks | 13 files |
+| Phase 38-rebuild-memory-layer P03 | 4 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -193,6 +194,8 @@ Progress: [████████████████████] 99% (Ph
 - [Phase 38-01]: WikiService.search returns plain String (never nil) for agent tool use — human-readable no-match response
 - [Phase 38-01]: maxContentLength=4000 and maxPages=3 cap wiki context injection — avoids context bloat per pitfall #2
 - [Phase 38-01]: games/ directory reserved for future per-game pages from ingest — not seeded manually
+- [Phase 38-03]: DLLOverrideRecord.source is optional (String?) — nil check required before lowercased() comparison in WikiService.ingest
+- [Phase 38-03]: WikiService.ingest call placed inside didSave block — wiki only grows from confirmed saves, not partial completions
 
 ### Roadmap Evolution
 
@@ -223,4 +226,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-04-10
-Stopped at: Phase 38 P01 complete — wiki/ seeded with 8 pages, WikiService.swift added, Package.swift updated with .copy("wiki")
+Stopped at: Phase 38 P03 complete — WikiService.ingest added, AIService calls ingest after successful save, all 173 tests pass

@@ -489,7 +489,7 @@ Plans:
 **Goal:** Replace scattered config-file memory with a structured LLM-maintained wiki (SCHEMA.md, index.md, log.md, category pages) bundled as SPM resources. WikiService provides keyword-scored context injection at session start and a query_wiki agent tool for mid-session lookups.
 **Requirements**: TBD
 **Depends on:** Phase 37
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] 38-01-PLAN.md — Wiki directory structure, seed pages, WikiService.swift, Package.swift resource bundling
