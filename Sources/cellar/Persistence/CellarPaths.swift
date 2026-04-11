@@ -137,6 +137,14 @@ struct CellarPaths {
         memoryCacheDir.appendingPathComponent("\(slug).json")
     }
 
+    /// Directory for cached wiki pages — mirrors cellar-memory/wiki/ structure
+    static let wikiCacheDir: URL = base.appendingPathComponent("wiki")
+
+    /// Cache file path for a given wiki page relative path (e.g. "engines/directdraw.md")
+    static func wikiCacheFile(for relativePath: String) -> URL {
+        wikiCacheDir.appendingPathComponent(relativePath)
+    }
+
     // Diagnostics directory: ~/.cellar/diagnostics/
     static let diagnosticsDir: URL = base.appendingPathComponent("diagnostics")
 
