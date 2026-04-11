@@ -8,26 +8,69 @@ struct WikiService: Sendable {
     /// Maximum number of pages to load
     private static let maxPages = 3
 
-    /// Fetch relevant wiki context for a game name and optional symptom keywords.
-    /// Returns formatted wiki content block, or nil if wiki unavailable or no relevant pages found.
-    static func fetchContext(for gameName: String, symptoms: [String] = []) -> String? {
-        guard let wikiDir = Bundle.module.url(forResource: "wiki", withExtension: nil) else {
-            return nil
+    // MARK: - Cache Helpers
+
+    private static let cacheTTL: TimeInterval = 3600
+
+    private static func isCacheFresh(_ url: URL) -> Bool {
+        guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+              let mdate = attrs[.modificationDate] as? Date else { return false }
+        return Date().timeIntervalSince(mdate) < cacheTTL
+    }
+
+    private static func readCache(_ relativePath: String) -> String? {
+        let file = CellarPaths.wikiCacheFile(for: relativePath)
+        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+        return try? String(contentsOf: file, encoding: .utf8)
+    }
+
+    private static func writeCache(_ relativePath: String, _ content: String) {
+        let file = CellarPaths.wikiCacheFile(for: relativePath)
+        try? FileManager.default.createDirectory(
+            at: file.deletingLastPathComponent(),
+            withIntermediateDirectories: true
+        )
+        try? content.write(to: file, atomically: true, encoding: .utf8)
+    }
+
+    private static func fetchPage(_ relativePath: String) async -> String? {
+        // Fresh cache short-circuit
+        if let cached = readCache(relativePath), isCacheFresh(CellarPaths.wikiCacheFile(for: relativePath)) {
+            return cached
         }
-        let indexURL = wikiDir.appendingPathComponent("index.md")
-        guard let indexContent = try? String(contentsOf: indexURL, encoding: .utf8) else {
+        // Network fetch
+        let urlString = "https://raw.githubusercontent.com/\(CellarPaths.memoryRepo)/main/wiki/\(relativePath)"
+        if let url = URL(string: urlString) {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 5
+            if let (data, response) = try? await URLSession.shared.data(for: request),
+               let http = response as? HTTPURLResponse, http.statusCode == 200,
+               let body = String(data: data, encoding: .utf8) {
+                writeCache(relativePath, body)
+                return body
+            }
+        }
+        // Stale-on-failure: return any cached copy even if expired
+        return readCache(relativePath)
+    }
+
+    // MARK: - Read Path
+
+    /// Fetch relevant wiki context for a game engine and optional symptom keywords.
+    /// Returns formatted wiki content block, or nil if wiki unavailable or no relevant pages found.
+    static func fetchContext(engine: String?, symptoms: [String] = [], maxPages: Int = 3) async -> String? {
+        guard let indexContent = await fetchPage("index.md") else {
             return nil
         }
 
-        let keywords = extractKeywords(gameName: gameName, symptoms: symptoms)
+        let keywords = extractKeywords(gameName: engine ?? "", symptoms: symptoms)
         let pagePaths = findRelevantPages(in: indexContent, keywords: keywords, limit: maxPages)
         guard !pagePaths.isEmpty else { return nil }
 
         var totalLength = 0
         var pageContents: [String] = []
         for path in pagePaths {
-            let pageURL = wikiDir.appendingPathComponent(path)
-            guard let content = try? String(contentsOf: pageURL, encoding: .utf8) else { continue }
+            guard let content = await fetchPage(path) else { continue }
             if totalLength + content.count > maxContentLength && !pageContents.isEmpty { break }
             pageContents.append(content)
             totalLength += content.count
@@ -40,17 +83,13 @@ struct WikiService: Sendable {
 
     /// Search wiki pages by query string, returning formatted content or a no-match message.
     /// Used by the query_wiki agent tool for mid-session lookups.
-    static func search(query: String) -> String {
-        guard let wikiDir = Bundle.module.url(forResource: "wiki", withExtension: nil) else {
+    static func search(query: String, maxResults: Int = 3) async -> String {
+        guard let indexContent = await fetchPage("index.md") else {
             return "Wiki not available"
-        }
-        let indexURL = wikiDir.appendingPathComponent("index.md")
-        guard let indexContent = try? String(contentsOf: indexURL, encoding: .utf8) else {
-            return "Wiki index not available"
         }
 
         let keywords = query.lowercased().components(separatedBy: .alphanumerics.inverted).filter { $0.count > 2 }
-        let pagePaths = findRelevantPages(in: indexContent, keywords: keywords, limit: maxPages)
+        let pagePaths = findRelevantPages(in: indexContent, keywords: keywords, limit: maxResults)
         guard !pagePaths.isEmpty else {
             return "No relevant wiki pages found for '\(query)'"
         }
@@ -58,13 +97,15 @@ struct WikiService: Sendable {
         var pageContents: [String] = []
         var totalLength = 0
         for path in pagePaths {
-            let pageURL = wikiDir.appendingPathComponent(path)
-            guard let content = try? String(contentsOf: pageURL, encoding: .utf8) else { continue }
+            guard let content = await fetchPage(path) else { continue }
             if totalLength + content.count > maxContentLength && !pageContents.isEmpty { break }
             pageContents.append("[\(path)]\n\(content)")
             totalLength += content.count
         }
 
+        if pageContents.isEmpty {
+            return "No relevant wiki pages found for '\(query)'"
+        }
         return pageContents.joined(separator: "\n\n---\n\n")
     }
 
