@@ -111,26 +111,50 @@ struct WikiService: Sendable {
 
     // MARK: - Ingest
 
-    /// Ingest learnings from a successful game session into wiki pages.
-    /// Appends pitfalls to symptom pages, engine info to engine pages, and logs the ingest.
-    /// Best-effort — failures are logged to stderr but never block the user.
-    static func ingest(record: SuccessRecord) {
-        guard let wikiDir = Bundle.module.url(forResource: "wiki", withExtension: nil) else {
-            return
-        }
+    private struct WikiAppendPayload: Encodable {
+        let page: String
+        let entry: String
+        let commitMessage: String
+    }
 
-        var pagesUpdated: [String] = []
+    private static var wikiProxyURL: URL? {
+        let override = ProcessInfo.processInfo.environment["CELLAR_WIKI_PROXY_URL"]
+        let defaultURL = "https://cellar-memory-proxy.sook40.workers.dev/api/wiki/append"
+        return URL(string: override ?? defaultURL)
+    }
+
+    private static func postWikiAppend(page: String, entry: String, commitMessage: String) async {
+        guard let url = wikiProxyURL else { return }
+        let payload = WikiAppendPayload(page: page, entry: entry, commitMessage: commitMessage)
+        guard let body = try? JSONEncoder().encode(payload) else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = body
+        req.timeoutInterval = 10
+        do {
+            let (_, response) = try await URLSession.shared.data(for: req)
+            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                fputs("wiki-append: HTTP \(http.statusCode) for \(page)\n", stderr)
+            }
+        } catch {
+            fputs("wiki-append: \(error.localizedDescription) for \(page)\n", stderr)
+        }
+    }
+
+    /// Ingest learnings from a successful game session into wiki pages via the Cloudflare Worker.
+    /// POSTs each derived update to the Worker wiki-append endpoint.
+    /// Best-effort — failures are logged to stderr but never block the user.
+    static func ingest(record: SuccessRecord) async {
+        let commitMessage = "wiki: ingest from \(record.gameName)"
 
         // 1. Append pitfalls to matching symptom pages
         for pitfall in record.pitfalls {
             let symptomSlug = slugify(pitfall.symptom)
             let candidates = ["symptoms/crash-on-launch.md", "symptoms/black-screen.md", "symptoms/d3d-errors.md"]
-            if let bestPage = findBestMatch(slug: symptomSlug, symptom: pitfall.symptom, candidates: candidates) {
-                let pageURL = wikiDir.appendingPathComponent(bestPage)
-                if appendIfNew(to: pageURL, entry: formatPitfall(pitfall, gameName: record.gameName)) {
-                    pagesUpdated.append(bestPage)
-                }
-            }
+            let bestPage = findBestMatch(slug: symptomSlug, symptom: pitfall.symptom, candidates: candidates)
+            let entry = formatPitfall(pitfall, gameName: record.gameName)
+            await postWikiAppend(page: bestPage, entry: entry, commitMessage: commitMessage)
         }
 
         // 2. Append engine/graphics info to engine pages
@@ -142,48 +166,31 @@ struct WikiService: Sendable {
             ]
             let key = enginePages.keys.first { engine.contains($0) || (record.graphicsApi?.lowercased().contains($0) ?? false) }
             if let key = key, let pagePath = enginePages[key] {
-                let pageURL = wikiDir.appendingPathComponent(pagePath)
                 let entry = formatEngineEntry(record: record)
-                if appendIfNew(to: pageURL, entry: entry) {
-                    pagesUpdated.append(pagePath)
-                }
+                await postWikiAppend(page: pagePath, entry: entry, commitMessage: commitMessage)
             }
         }
 
         // Also check graphicsApi independently (e.g., graphicsApi: "directdraw" without engine set)
         if let gfx = record.graphicsApi?.lowercased(), record.engine == nil || !(record.engine?.lowercased().contains(gfx) ?? false) {
             if gfx.contains("directdraw") || gfx.contains("ddraw") {
-                let pageURL = wikiDir.appendingPathComponent("engines/directdraw.md")
                 let entry = formatEngineEntry(record: record)
-                if appendIfNew(to: pageURL, entry: entry) {
-                    pagesUpdated.append("engines/directdraw.md")
-                }
+                await postWikiAppend(page: "engines/directdraw.md", entry: entry, commitMessage: commitMessage)
             }
         }
 
         // 3. Append DLL override patterns to relevant pages
         for override in record.dllOverrides {
             if let source = override.source, source.lowercased().contains("cnc-ddraw") {
-                let pageURL = wikiDir.appendingPathComponent("engines/directdraw.md")
                 let entry = "- \(record.gameName): `\(override.dll)=\(override.mode)` via \(source)"
-                if appendIfNew(to: pageURL, entry: entry) {
-                    pagesUpdated.append("engines/directdraw.md")
-                }
+                await postWikiAppend(page: "engines/directdraw.md", entry: entry, commitMessage: commitMessage)
             }
         }
 
-        // 4. Append to log.md
-        if !pagesUpdated.isEmpty {
-            let logURL = wikiDir.appendingPathComponent("log.md")
-            let uniquePages = Array(Set(pagesUpdated)).sorted()
-            let dateStr = ISO8601DateFormatter().string(from: Date()).prefix(10)
-            let logEntry = "\n## [\(dateStr)] ingest | \(record.gameName)\nPages updated: \(uniquePages.joined(separator: ", "))\nSource: Successful agent session (gameId: \(record.gameId))\n"
-            if let data = logEntry.data(using: .utf8), let handle = try? FileHandle(forWritingTo: logURL) {
-                handle.seekToEndOfFile()
-                handle.write(data)
-                handle.closeFile()
-            }
-        }
+        // 4. Append log entry summarizing this ingest
+        let dateStr = ISO8601DateFormatter().string(from: Date()).prefix(10)
+        let logEntry = "## [\(dateStr)] ingest | \(record.gameName) (gameId: \(record.gameId))"
+        await postWikiAppend(page: "log.md", entry: logEntry, commitMessage: commitMessage)
     }
 
     // MARK: - Ingest Helpers
@@ -218,7 +225,7 @@ struct WikiService: Sendable {
     }
 
     /// Find the best matching page from candidates by keyword overlap with symptom text
-    private static func findBestMatch(slug: String, symptom: String, candidates: [String]) -> String? {
+    private static func findBestMatch(slug: String, symptom: String, candidates: [String]) -> String {
         let words = symptom.lowercased().components(separatedBy: .alphanumerics.inverted).filter { $0.count > 2 }
         var bestScore = 0
         var bestPage: String?
@@ -233,20 +240,6 @@ struct WikiService: Sendable {
         }
         // Fall back to crash-on-launch as the catch-all symptom page
         return bestPage ?? "symptoms/crash-on-launch.md"
-    }
-
-    /// Append entry to a page file only if it doesn't already contain the entry text.
-    /// Returns true if appended, false if skipped (duplicate or error).
-    private static func appendIfNew(to pageURL: URL, entry: String) -> Bool {
-        guard let existing = try? String(contentsOf: pageURL, encoding: .utf8) else { return false }
-        if existing.contains(entry) { return false }
-        let appendText = "\n\(entry)\n"
-        guard let data = appendText.data(using: .utf8),
-              let handle = try? FileHandle(forWritingTo: pageURL) else { return false }
-        handle.seekToEndOfFile()
-        handle.write(data)
-        handle.closeFile()
-        return true
     }
 
     // MARK: - Private
