@@ -1024,7 +1024,7 @@ struct AIService {
         let launchInstruction = "Launch the game '\(entry.name)' (ID: \(gameId)). The executable is at: \(executablePath). Follow the Research-Diagnose-Adapt workflow: start by querying the success database, then inspect the game. Move quickly to a real launch_game call — research and at most one trace_launch before your first real launch."
 
         var contextParts: [String] = []
-        if let wikiContext = WikiService.fetchContext(for: entry.name) {
+        if let wikiContext = await WikiService.fetchContext(engine: entry.name) {
             contextParts.append(wikiContext)
         }
         if let compatReport = compatContext {

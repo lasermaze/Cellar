@@ -222,12 +222,12 @@ extension AgentTools {
 
     // MARK: - Wiki Lookup
 
-    func queryWiki(input: JSONValue) -> String {
+    func queryWiki(input: JSONValue) async -> String {
         guard case .object(let obj) = input,
               case .string(let query) = obj["query"] else {
             return jsonResult(["error": "query parameter required"])
         }
-        return WikiService.search(query: query)
+        return await WikiService.search(query: query)
     }
 
     // MARK: - Compatibility Lookup

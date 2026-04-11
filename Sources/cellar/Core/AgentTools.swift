@@ -630,7 +630,7 @@ final class AgentTools: @unchecked Sendable {
         case "fetch_page":          resultString = await fetchPage(input: input)
         case "list_windows":        resultString = listWindows(input: input)
         case "query_compatibility": resultString = await queryCompatibility(input: input)
-        case "query_wiki":          resultString = queryWiki(input: input)
+        case "query_wiki":          resultString = await queryWiki(input: input)
         default:
             return .error(content: jsonResult(["error": "Unknown tool: \(toolName)"]))
         }
