@@ -627,6 +627,99 @@ async function handleContribute(
 }
 
 // ---------------------------------------------------------------------------
+// Wiki append handler
+// ---------------------------------------------------------------------------
+
+async function handleWikiAppend(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  const cors = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Content-Type": "application/json",
+  };
+
+  if (request.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: cors });
+  }
+  if (request.method !== "POST") {
+    return new Response("method not allowed", { status: 405, headers: cors });
+  }
+
+  // IP rate limit — reuse existing rateLimitMap via isRateLimited helper
+  const ip =
+    request.headers.get("CF-Connecting-IP") ??
+    request.headers.get("X-Forwarded-For") ??
+    "unknown";
+  if (isRateLimited(ip)) {
+    return new Response(
+      JSON.stringify({ status: "error", message: "rate_limited" }),
+      { status: 429, headers: cors }
+    );
+  }
+
+  // Body size cap — 50KB, same as handleContribute
+  const contentLength = Number(request.headers.get("Content-Length") ?? 0);
+  if (contentLength > 51200) {
+    return new Response(
+      JSON.stringify({ status: "error", message: "payload_too_large" }),
+      { status: 413, headers: cors }
+    );
+  }
+
+  const raw = await request.text();
+  if (raw.length > 51200) {
+    return new Response(
+      JSON.stringify({ status: "error", message: "payload_too_large" }),
+      { status: 413, headers: cors }
+    );
+  }
+
+  let payload: WikiAppendPayload;
+  try {
+    payload = JSON.parse(raw) as WikiAppendPayload;
+  } catch {
+    return new Response(
+      JSON.stringify({ status: "error", message: "invalid_json" }),
+      { status: 400, headers: cors }
+    );
+  }
+
+  // Path allowlist — prevent directory traversal
+  if (typeof payload.page !== "string" || !WIKI_PAGE_PATTERN.test(payload.page)) {
+    return new Response(
+      JSON.stringify({ status: "error", message: "invalid_page" }),
+      { status: 400, headers: cors }
+    );
+  }
+  if (typeof payload.entry !== "string" || payload.entry.trim().length === 0) {
+    return new Response(
+      JSON.stringify({ status: "error", message: "empty_entry" }),
+      { status: 400, headers: cors }
+    );
+  }
+
+  const commitMessage = payload.commitMessage?.trim() || `wiki: append to ${payload.page}`;
+
+  try {
+    const token = await getInstallationToken(env);
+    const repo = env.CELLAR_MEMORY_REPO ?? "lasermaze/cellar-memory";
+    const result = await writeWikiPage(payload.page, payload.entry, commitMessage, token, repo);
+    return new Response(JSON.stringify({ status: result }), {
+      status: 200,
+      headers: cors,
+    });
+  } catch (err) {
+    return new Response(
+      JSON.stringify({ status: "error", message: String(err) }),
+      { status: 502, headers: cors }
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main fetch handler
 // ---------------------------------------------------------------------------
 
@@ -646,6 +739,10 @@ export default {
 
     if (request.method === "POST" && url.pathname === "/api/contribute") {
       return handleContribute(request, env);
+    }
+
+    if (url.pathname === "/api/wiki/append") {
+      return handleWikiAppend(request, env);
     }
 
     return new Response(JSON.stringify({ status: "error", message: "not found" }), {
