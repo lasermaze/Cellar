@@ -467,6 +467,76 @@ async function writeEntryToGitHub(
 }
 
 // ---------------------------------------------------------------------------
+// Wiki append helpers
+// ---------------------------------------------------------------------------
+
+interface WikiAppendPayload {
+  page: string;
+  entry: string;
+  commitMessage?: string;
+}
+
+// Allowed wiki page paths — prevents directory traversal and writes outside wiki/
+const WIKI_PAGE_PATTERN = /^(engines|symptoms|environments|games)\/[a-z0-9-]+\.md$|^log\.md$|^index\.md$/;
+
+async function writeWikiPage(
+  page: string,
+  entry: string,
+  commitMessage: string,
+  token: string,
+  repo: string,
+  attempt = 0
+): Promise<"ok" | "skipped"> {
+  const path = `wiki/${page}`;
+  const apiBase = `https://api.github.com/repos/${repo}/contents/${path}`;
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "Content-Type": "application/json",
+    "User-Agent": "cellar-memory-proxy/1.0",
+  };
+
+  // GET current file (or 404 — file does not exist yet)
+  const getResp = await fetch(apiBase, { headers });
+  let sha: string | undefined;
+  let existing = "";
+  if (getResp.ok) {
+    const data = (await getResp.json()) as { sha: string; content: string };
+    sha = data.sha;
+    existing = atob(data.content.replace(/\s/g, ""));
+  } else if (getResp.status !== 404) {
+    throw new Error(`GitHub GET failed: ${getResp.status}`);
+  }
+
+  // Server-side substring dedup — the Swift client no longer dedups locally
+  if (existing.length > 0 && existing.includes(entry.trim())) {
+    return "skipped";
+  }
+
+  // Append with a leading newline if existing content does not already end in one
+  const sep = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
+  const updated = existing + sep + entry + "\n";
+  const content = btoa(unescape(encodeURIComponent(updated)));
+  const putBody: Record<string, unknown> = { message: commitMessage, content };
+  if (sha) putBody.sha = sha;
+
+  const putResp = await fetch(apiBase, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(putBody),
+  });
+
+  if (putResp.status === 409 && attempt === 0) {
+    // Concurrent write — retry once
+    return writeWikiPage(page, entry, commitMessage, token, repo, 1);
+  }
+  if (!putResp.ok) {
+    throw new Error(`GitHub PUT failed: ${putResp.status}`);
+  }
+  return "ok";
+}
+
+// ---------------------------------------------------------------------------
 // Contribute handler
 // ---------------------------------------------------------------------------
 
