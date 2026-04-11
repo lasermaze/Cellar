@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-11T01:59:28.868Z"
+last_updated: "2026-04-11T02:02:39.635Z"
 progress:
   total_phases: 39
   completed_phases: 36
   total_plans: 85
-  completed_plans: 83
+  completed_plans: 84
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 39 (Move Wiki to cellar-memory GitHub repo) — P01 complete
-Plan: P01 complete — WikiService read path migrated to async cache+GitHub-raw; all callers awaited
-Status: Phase 39 P01 complete — swift build zero errors; fetchContext/search async; ~/.cellar/wiki/ cache path
-Last activity: 2026-04-11 — P01 complete: WikiService.fetchContext and .search are async; cache at ~/.cellar/wiki/; stale-on-failure; AIService/ResearchTools/AgentTools callers awaited
+Phase: 39 (Move Wiki to cellar-memory GitHub repo) — P02 complete
+Plan: P02 complete — WikiService.ingest async, POSTs to Cloudflare Worker; AIService awaits; swift build zero errors
+Status: Phase 39 P02 complete — write path via Worker; no Bundle.module / local file writes remain in ingest
+Last activity: 2026-04-11 — P02 complete: WikiService.ingest async; postWikiAppend helper; AIService awaits ingest; CELLAR_WIKI_PROXY_URL override
 
-Progress: [█████░░░░░░░░░░░░░░░] 25% (Phase 39 — P01 read path async+cache complete)
+Progress: [█████░░░░░░░░░░░░░░░] 50% (Phase 39 — P01+P02 complete; P03 Worker already done; P04 SPM cleanup remains)
 
 ## Performance Metrics
 
@@ -91,6 +91,7 @@ Progress: [█████░░░░░░░░░░░░░░░] 25% (Ph
 | Phase 38-rebuild-memory-layer-shared-wiki-for-agents-based-on-karpathy-principles P02 | 8 | 2 tasks | 3 files |
 | Phase 39-move-wiki-to-cellar-memory P03 | 2 | 2 tasks | 1 files |
 | Phase 39-move-wiki-to-cellar-memory P01 | 2 | 3 tasks | 5 files |
+| Phase 39-move-wiki-to-cellar-memory P02 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -206,6 +207,8 @@ Progress: [█████░░░░░░░░░░░░░░░] 25% (Ph
 - [Phase 39-01]: fetchContext parameter renamed from 'for gameName: String' to 'engine: String?' to match planned P01 interface; AIService call updated accordingly
 - [Phase 39-01]: Bundle.module left in ingest() body — P02 will replace entire ingest function body
 - [Phase 39-01]: queryWiki made async in ResearchTools — execute() in AgentTools was already async, no control flow change needed
+- [Phase 39-02]: wikiProxyURL host copied verbatim from CollectiveMemoryWriteService (sook40.workers.dev); path changed to /api/wiki/append
+- [Phase 39-02]: log.md entry POSTed unconditionally — Worker dedup prevents duplicates; simpler than gating on pagesUpdated
 
 ### Roadmap Evolution
 
