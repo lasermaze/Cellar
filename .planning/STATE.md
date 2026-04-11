@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-10T01:49:08.323Z"
+last_updated: "2026-04-11T01:59:05.620Z"
 progress:
-  total_phases: 38
+  total_phases: 39
   completed_phases: 36
-  total_plans: 81
-  completed_plans: 81
+  total_plans: 85
+  completed_plans: 82
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 38 (Rebuild Memory Layer) — P03 complete
-Plan: P03 complete — WikiService.ingest post-session wiki updates, AIService calls ingest after successful save
-Status: Phase 38 P03 complete — swift build and all 173 tests pass
-Last activity: 2026-04-10 — P03 complete: WikiService.ingest appends pitfalls/engine info/DLL overrides to wiki pages; AIService calls ingest inside didSave block; dedup prevents duplicate entries; log.md updated per ingest
+Phase: 39 (Move Wiki to cellar-memory GitHub repo) — P03 complete
+Plan: P03 complete — POST /api/wiki/append endpoint added to Cloudflare Worker
+Status: Phase 39 P03 complete — handleWikiAppend with dedup, path allowlist, and GitHub Contents API write
+Last activity: 2026-04-11 — P03 complete: writeWikiPage helper with server-side dedup; handleWikiAppend reuses CORS/rate-limit from handleContribute; route wired into main dispatch
 
-Progress: [████████████████████] 100% (Phase 38 complete — P01 wiki foundation + P02 query_wiki tool + P03 post-session ingest)
+Progress: [█████░░░░░░░░░░░░░░░] 25% (Phase 39 — P01 wiki seed migration + P02 WikiService read/write update + P03 Worker endpoint)
 
 ## Performance Metrics
 
@@ -89,6 +89,7 @@ Progress: [████████████████████] 100% (P
 | Phase 38-rebuild-memory-layer P01 | 5 | 2 tasks | 13 files |
 | Phase 38-rebuild-memory-layer P03 | 4 | 2 tasks | 2 files |
 | Phase 38-rebuild-memory-layer-shared-wiki-for-agents-based-on-karpathy-principles P02 | 8 | 2 tasks | 3 files |
+| Phase 39-move-wiki-to-cellar-memory P03 | 2 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -199,6 +200,8 @@ Progress: [████████████████████] 100% (P
 - [Phase 38-03]: WikiService.ingest call placed inside didSave block — wiki only grows from confirmed saves, not partial completions
 - [Phase 38-02]: query_wiki dispatch is non-async — WikiService.search is synchronous file I/O, no await needed
 - [Phase 38-02]: Wiki context injected after collective memory and before compatibility data — synthesized pattern knowledge is higher-level than raw compat reports
+- [Phase 39-03]: isRateLimited() helper shared for /api/wiki/append — single 10/hr/IP bucket covers both contribute and wiki append
+- [Phase 39-03]: WIKI_PAGE_PATTERN allows engines/|symptoms/|environments/|games/ subdirs plus log.md and index.md at root — path prefix wiki/ applied inside writeWikiPage
 
 ### Roadmap Evolution
 
@@ -217,6 +220,7 @@ Progress: [████████████████████] 100% (P
 - Phases 31–36 added (2026-04-03): v1.3 Agent Loop Rewrite — typed results, thread-safe control, middleware system, JSONL event log, clean endTurn semantics
 - Phase 37 added: Supporting Win32 apps — decide when to use win32 vs win64 bottle
 - Phase 38 added: Rebuild memory layer — shared wiki for agents based on Karpathy principles
+- Phase 39 added (2026-04-10): Move wiki to cellar-memory GitHub repo — bundled wiki is read-only on signed apps, no cross-user sharing. Reuse existing Cloudflare Worker write proxy for authenticated wiki writes, local cache at ~/.cellar/wiki/
 
 ### Pending Todos
 

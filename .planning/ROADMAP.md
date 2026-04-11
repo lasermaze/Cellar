@@ -494,3 +494,13 @@ Plans:
 Plans:
 - [ ] 38-01-PLAN.md — Wiki directory structure, seed pages, WikiService.swift, Package.swift resource bundling
 - [ ] 38-02-PLAN.md — Agent integration: query_wiki tool in AgentTools, wiki context injection in AIService
+
+### Phase 39: Move wiki to cellar-memory GitHub repo - shared growing artifact via Cloudflare Worker
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 38
+**Plans:** 1/4 plans executed
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 39 to break down)
