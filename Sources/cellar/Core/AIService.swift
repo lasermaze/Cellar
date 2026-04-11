@@ -1004,12 +1004,6 @@ struct AIService {
             onOutput: onOutput
         )
 
-        // Fetch collective memory context (silent skip on any failure)
-        let memoryContext = await CollectiveMemoryService.fetchBestEntry(
-            for: entry.name,
-            wineURL: wineURL
-        )
-
         // Fetch community compatibility data from Lutris + ProtonDB (silent skip on any failure)
         let compatContext = await CompatibilityService.fetchReport(for: entry.name)
 
@@ -1030,9 +1024,6 @@ struct AIService {
         let launchInstruction = "Launch the game '\(entry.name)' (ID: \(gameId)). The executable is at: \(executablePath). Follow the Research-Diagnose-Adapt workflow: start by querying the success database, then inspect the game. Move quickly to a real launch_game call — research and at most one trace_launch before your first real launch."
 
         var contextParts: [String] = []
-        if let memoryContext = memoryContext {
-            contextParts.append(memoryContext)
-        }
         if let wikiContext = WikiService.fetchContext(for: entry.name) {
             contextParts.append(wikiContext)
         }

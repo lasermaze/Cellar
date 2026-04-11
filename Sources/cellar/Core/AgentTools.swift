@@ -573,7 +573,14 @@ final class AgentTools: @unchecked Sendable {
             name: "query_wiki",
             description: "Search the compiled knowledge wiki for Wine compatibility patterns, engine-specific fixes, common symptom solutions, and environment notes. Returns synthesized knowledge pages. Use this when you encounter a specific symptom or engine and want to check accumulated knowledge before trying web research.",
             inputSchema: .object([
-                "query": .string("Search query — game name, engine, symptom, or keyword (e.g. 'directdraw black screen', 'unity wine crash', 'dxvk apple silicon')")
+                "type": .string("object"),
+                "properties": .object([
+                    "query": .object([
+                        "type": .string("string"),
+                        "description": .string("Search query — game name, engine, symptom, or keyword (e.g. 'directdraw black screen', 'unity wine crash', 'dxvk apple silicon')")
+                    ])
+                ]),
+                "required": .array([.string("query")])
             ])
         )
     ]
