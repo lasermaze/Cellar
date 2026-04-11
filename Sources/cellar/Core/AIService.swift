@@ -1095,7 +1095,7 @@ struct AIService {
                 )
                 // Ingest session learnings into wiki
                 if let record = SuccessDatabase.load(gameId: gameId) {
-                    WikiService.ingest(record: record)
+                    await WikiService.ingest(record: record)
                 }
             }
             SessionHandoff.delete(gameId: gameId)
