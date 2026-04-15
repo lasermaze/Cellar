@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-11T02:02:39.635Z"
+last_updated: "2026-04-15T01:04:15.615Z"
 progress:
-  total_phases: 39
-  completed_phases: 36
-  total_plans: 85
-  completed_plans: 84
+  total_phases: 40
+  completed_phases: 37
+  total_plans: 87
+  completed_plans: 85
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 39 (Move Wiki to cellar-memory GitHub repo) — P02 complete
-Plan: P02 complete — WikiService.ingest async, POSTs to Cloudflare Worker; AIService awaits; swift build zero errors
-Status: Phase 39 P02 complete — write path via Worker; no Bundle.module / local file writes remain in ingest
-Last activity: 2026-04-11 — P02 complete: WikiService.ingest async; postWikiAppend helper; AIService awaits ingest; CELLAR_WIKI_PROXY_URL override
+Phase: 39 (Move Wiki to cellar-memory GitHub repo) — COMPLETE (all 4 plans done)
+Plan: P04 complete — SPM wiki bundle removed; Sources/cellar/wiki/ deleted; 173 tests pass
+Status: Phase 39 COMPLETE — wiki lives in cellar-memory repo; Worker write path; local cache read path; no bundled wiki
+Last activity: 2026-04-15 — P04 complete: .copy("wiki") removed from Package.swift; Sources/cellar/wiki/ deleted
 
-Progress: [█████░░░░░░░░░░░░░░░] 50% (Phase 39 — P01+P02 complete; P03 Worker already done; P04 SPM cleanup remains)
+Progress: [███████████████░░░░░] 75% (Phase 39 complete; Phase 40 wiki batch ingest next)
 
 ## Performance Metrics
 
@@ -92,6 +92,7 @@ Progress: [█████░░░░░░░░░░░░░░░] 50% (Ph
 | Phase 39-move-wiki-to-cellar-memory P03 | 2 | 2 tasks | 1 files |
 | Phase 39-move-wiki-to-cellar-memory P01 | 2 | 3 tasks | 5 files |
 | Phase 39-move-wiki-to-cellar-memory P02 | 3 | 2 tasks | 2 files |
+| Phase 39-move-wiki-to-cellar-memory P04 | 5 | 1 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -209,6 +210,7 @@ Progress: [█████░░░░░░░░░░░░░░░] 50% (Ph
 - [Phase 39-01]: queryWiki made async in ResearchTools — execute() in AgentTools was already async, no control flow change needed
 - [Phase 39-02]: wikiProxyURL host copied verbatim from CollectiveMemoryWriteService (sook40.workers.dev); path changed to /api/wiki/append
 - [Phase 39-02]: log.md entry POSTed unconditionally — Worker dedup prevents duplicates; simpler than gating on pagesUpdated
+- [Phase 39-04]: Empty resources array not used — .copy(Resources) kept as sole entry, wiki bundle removed leaving only Resources for Leaf/static assets
 
 ### Roadmap Evolution
 
@@ -228,6 +230,7 @@ Progress: [█████░░░░░░░░░░░░░░░] 50% (Ph
 - Phase 37 added: Supporting Win32 apps — decide when to use win32 vs win64 bottle
 - Phase 38 added: Rebuild memory layer — shared wiki for agents based on Karpathy principles
 - Phase 39 added (2026-04-10): Move wiki to cellar-memory GitHub repo — bundled wiki is read-only on signed apps, no cross-user sharing. Reuse existing Cloudflare Worker write proxy for authenticated wiki writes, local cache at ~/.cellar/wiki/
+- Phase 40 added (2026-04-14): Wiki batch ingest — pre-compile game pages from Lutris, ProtonDB, WineHQ AppDB, PCGamingWiki. Reuse existing CompatibilityService + PageParser. Eliminates redundant live fetching every session.
 
 ### Pending Todos
 
@@ -239,5 +242,5 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-10
-Stopped at: Phase 38 P03 complete — WikiService.ingest added, AIService calls ingest after successful save, all 173 tests pass
+Last session: 2026-04-15
+Stopped at: Phase 39 P04 complete — SPM wiki bundle removed; Sources/cellar/wiki/ deleted; Phase 39 fully complete; 173 tests pass
