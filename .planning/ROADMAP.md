@@ -504,3 +504,14 @@ Plans:
 
 Plans:
 - [ ] TBD (run /gsd:plan-phase 39 to break down)
+
+### Phase 40: Wiki batch ingest - pre-compile game pages from Lutris ProtonDB WineHQ PCGamingWiki
+
+**Goal:** Pre-compile per-game wiki pages from Lutris, ProtonDB, WineHQ AppDB, and PCGamingWiki via a `cellar wiki ingest` CLI command, eliminating redundant live fetching every agent session
+**Requirements**: TBD
+**Depends on:** Phase 39
+**Plans:** 2 plans
+
+Plans:
+- [ ] 40-01-PLAN.md — Access promotions, fetchPopularGames helper, WikiIngestService pipeline
+- [ ] 40-02-PLAN.md — WikiCommand/IngestCommand CLI with three modes, Cellar.swift registration
