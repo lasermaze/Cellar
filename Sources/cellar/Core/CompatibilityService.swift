@@ -247,6 +247,20 @@ struct CompatibilityService {
         return report.isEmpty ? nil : report
     }
 
+    /// Fetch top N game names sorted by popularity from the Lutris catalog.
+    /// Returns an empty array on any network or decode failure.
+    static func fetchPopularGames(limit: Int = 50) async -> [String] {
+        guard let url = URL(string: "https://lutris.net/api/games?ordering=-popularity&page_size=\(limit)") else { return [] }
+        var request = URLRequest(url: url)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 10
+        guard let (data, statusCode) = await performFetch(request: request), statusCode == 200,
+              let response = try? JSONDecoder().decode(LutrisSearchResponse.self, from: data) else {
+            return []
+        }
+        return response.results.map { $0.name }
+    }
+
     // MARK: - Private Fetchers (async)
 
     private static func fetchLutrisGame(name: String) async -> LutrisGame? {

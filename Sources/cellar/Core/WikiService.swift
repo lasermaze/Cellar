@@ -123,7 +123,7 @@ struct WikiService: Sendable {
         return URL(string: override ?? defaultURL)
     }
 
-    private static func postWikiAppend(page: String, entry: String, commitMessage: String) async {
+    static func postWikiAppend(page: String, entry: String, commitMessage: String) async {
         guard let url = wikiProxyURL else { return }
         let payload = WikiAppendPayload(page: page, entry: entry, commitMessage: commitMessage)
         guard let body = try? JSONEncoder().encode(payload) else { return }
@@ -217,7 +217,7 @@ struct WikiService: Sendable {
     }
 
     /// Slugify a string for fuzzy matching
-    private static func slugify(_ text: String) -> String {
+    static func slugify(_ text: String) -> String {
         text.lowercased()
             .components(separatedBy: .alphanumerics.inverted)
             .filter { !$0.isEmpty }
