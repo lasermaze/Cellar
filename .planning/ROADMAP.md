@@ -510,7 +510,7 @@ Plans:
 **Goal:** Pre-compile per-game wiki pages from Lutris, ProtonDB, WineHQ AppDB, and PCGamingWiki via a `cellar wiki ingest` CLI command, eliminating redundant live fetching every agent session
 **Requirements**: TBD
 **Depends on:** Phase 39
-**Plans:** 2 plans
+**Plans:** 1/2 plans executed
 
 Plans:
 - [ ] 40-01-PLAN.md — Access promotions, fetchPopularGames helper, WikiIngestService pipeline

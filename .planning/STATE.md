@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-15T01:06:01.860Z"
+last_updated: "2026-04-15T01:11:29.021Z"
 progress:
   total_phases: 40
   completed_phases: 37
   total_plans: 87
-  completed_plans: 85
+  completed_plans: 86
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 39 (Move Wiki to cellar-memory GitHub repo) — COMPLETE (all 4 plans done)
-Plan: P04 complete — SPM wiki bundle removed; Sources/cellar/wiki/ deleted; 173 tests pass
-Status: Phase 39 COMPLETE — wiki lives in cellar-memory repo; Worker write path; local cache read path; no bundled wiki
-Last activity: 2026-04-15 — P04 complete: .copy("wiki") removed from Package.swift; Sources/cellar/wiki/ deleted
+Phase: 40 (Wiki Batch Ingest) — IN PROGRESS (P01 done, P02 next)
+Plan: P01 complete — WikiIngestService created; postWikiAppend/slugify promoted; fetchPopularGames added
+Status: Phase 40 P01 COMPLETE — ingest pipeline ready; CLI command (P02) next
+Last activity: 2026-04-15 — P01 complete: WikiIngestService.swift created with TTL-guarded ingest pipeline
 
-Progress: [███████████████░░░░░] 75% (Phase 39 complete; Phase 40 wiki batch ingest next)
+Progress: [████████████████░░░░] 80% (Phase 40 P01 complete; P02 CLI command next)
 
 ## Performance Metrics
 
@@ -93,6 +93,7 @@ Progress: [███████████████░░░░░] 75% (Ph
 | Phase 39-move-wiki-to-cellar-memory P01 | 2 | 3 tasks | 5 files |
 | Phase 39-move-wiki-to-cellar-memory P02 | 3 | 2 tasks | 2 files |
 | Phase 39-move-wiki-to-cellar-memory P04 | 5 | 1 tasks | 12 files |
+| Phase 40-wiki-batch-ingest P01 | 4 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -211,6 +212,9 @@ Progress: [███████████████░░░░░] 75% (Ph
 - [Phase 39-02]: wikiProxyURL host copied verbatim from CollectiveMemoryWriteService (sook40.workers.dev); path changed to /api/wiki/append
 - [Phase 39-02]: log.md entry POSTed unconditionally — Worker dedup prevents duplicates; simpler than gating on pagesUpdated
 - [Phase 39-04]: Empty resources array not used — .copy(Resources) kept as sole entry, wiki bundle removed leaving only Resources for Leaf/static assets
+- [Phase 40-wiki-batch-ingest]: fetchPopularGames placed in CompatibilityService so private LutrisSearchResponse stays accessible without promotion
+- [Phase 40-wiki-batch-ingest]: TTL check fetches GitHub raw URL; 404 or network error treated as stale — proceed with ingest
+- [Phase 40-wiki-batch-ingest]: All 4 sources optional in WikiIngestService.ingest — page skipped only when all return nil/empty
 
 ### Roadmap Evolution
 
@@ -243,4 +247,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-04-15
-Stopped at: Phase 39 P04 complete — SPM wiki bundle removed; Sources/cellar/wiki/ deleted; Phase 39 fully complete; 173 tests pass
+Stopped at: Phase 40 P01 complete — WikiIngestService created; postWikiAppend/slugify promoted to internal; fetchPopularGames added to CompatibilityService; P02 CLI command next
