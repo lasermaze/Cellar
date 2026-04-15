@@ -131,6 +131,7 @@ struct WikiIngestService: Sendable {
     private static func fetchHTML(from url: URL) async -> String? {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
+        request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)", forHTTPHeaderField: "User-Agent")
         guard let (data, response) = try? await URLSession.shared.data(for: request),
               let http = response as? HTTPURLResponse,
               http.statusCode == 200,

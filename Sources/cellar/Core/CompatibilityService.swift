@@ -105,6 +105,7 @@ struct CompatibilityReport {
     let protonTrendingTier: String?
 
     var isEmpty: Bool {
+        installerCount == 0 &&
         lutrisEnvVars.isEmpty &&
         lutrisDlls.isEmpty &&
         lutrisWinetricks.isEmpty &&
@@ -317,9 +318,7 @@ struct CompatibilityService {
             return cached
         }
 
-        var urlComponents = URLComponents(string: "https://lutris.net/api/installers")!
-        urlComponents.queryItems = [URLQueryItem(name: "game", value: slug)]
-        guard let url = urlComponents.url else { return [] }
+        guard let url = URL(string: "https://lutris.net/api/installers/\(slug)") else { return [] }
 
         var request = URLRequest(url: url)
         request.timeoutInterval = 5
