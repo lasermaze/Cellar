@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-15T01:11:29.021Z"
+last_updated: "2026-04-15T02:38:12.580Z"
 progress:
   total_phases: 40
-  completed_phases: 37
+  completed_phases: 38
   total_plans: 87
-  completed_plans: 86
+  completed_plans: 87
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 40 (Wiki Batch Ingest) — IN PROGRESS (P01 done, P02 next)
-Plan: P01 complete — WikiIngestService created; postWikiAppend/slugify promoted; fetchPopularGames added
-Status: Phase 40 P01 COMPLETE — ingest pipeline ready; CLI command (P02) next
-Last activity: 2026-04-15 — P01 complete: WikiIngestService.swift created with TTL-guarded ingest pipeline
+Phase: 40 (Wiki Batch Ingest) — COMPLETE (P01 + P02 done)
+Plan: P02 complete — WikiCommand + IngestCommand CLI registered; cellar wiki ingest functional
+Status: Phase 40 COMPLETE — wiki batch ingest pipeline and CLI command both shipped
+Last activity: 2026-04-15 — P02 complete: WikiCommand.swift created; WikiCommand registered in Cellar subcommands
 
-Progress: [████████████████░░░░] 80% (Phase 40 P01 complete; P02 CLI command next)
+Progress: [████████████████████] 100% (Phase 40 complete — all plans done)
 
 ## Performance Metrics
 
@@ -94,6 +94,7 @@ Progress: [████████████████░░░░] 80% (Ph
 | Phase 39-move-wiki-to-cellar-memory P02 | 3 | 2 tasks | 2 files |
 | Phase 39-move-wiki-to-cellar-memory P04 | 5 | 1 tasks | 12 files |
 | Phase 40-wiki-batch-ingest P01 | 4 | 2 tasks | 3 files |
+| Phase 40-wiki-batch-ingest P02 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -215,6 +216,7 @@ Progress: [████████████████░░░░] 80% (Ph
 - [Phase 40-wiki-batch-ingest]: fetchPopularGames placed in CompatibilityService so private LutrisSearchResponse stays accessible without promotion
 - [Phase 40-wiki-batch-ingest]: TTL check fetches GitHub raw URL; 404 or network error treated as stale — proceed with ingest
 - [Phase 40-wiki-batch-ingest]: All 4 sources optional in WikiIngestService.ingest — page skipped only when all return nil/empty
+- [Phase 40-wiki-batch-ingest]: IngestCommand nested as WikiCommand extension for clean scoping; --all-local uses customLong for kebab-case CLI flag
 
 ### Roadmap Evolution
 
@@ -247,4 +249,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-04-15
-Stopped at: Phase 40 P01 complete — WikiIngestService created; postWikiAppend/slugify promoted to internal; fetchPopularGames added to CompatibilityService; P02 CLI command next
+Stopped at: Phase 40 P02 complete — WikiCommand + IngestCommand created; cellar wiki ingest (single/--popular/--all-local) registered in Cellar subcommands; Phase 40 complete
