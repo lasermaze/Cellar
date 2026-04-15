@@ -24,7 +24,6 @@ let package = Package(
             ],
             resources: [
                 .copy("Resources"),
-                .copy("wiki"),
             ]
         ),
         .testTarget(
