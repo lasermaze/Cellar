@@ -678,10 +678,11 @@ struct AIService {
         You MUST complete ALL of these before your first Phase 3 launch_game call:
         - query_successdb for exact game match
         - query_successdb with similar_games (engine + graphics_api from inspect_game)
+        - query_wiki for compiled knowledge (engine quirks, common fixes, community tips)
         - If no high-confidence match: search_web with at least one engine-enriched query
         - fetch_page on at least 2 promising URLs — read extracted_fixes from each
         - Write a 2-3 sentence synthesis: "Based on research, my plan is..."
-        Skip web research only if successdb returns an exact high-confidence match.
+        Skip web research only if successdb or wiki returns a high-confidence match.
         Spend research time proportional to uncertainty — unknown games need more research, not less.
 
         ## Three-Phase Workflow: Research -> Diagnose -> Adapt
@@ -690,6 +691,7 @@ struct AIService {
 
         ### Phase 1: Research (before first launch)
         1. Call query_successdb to check for known-working configs for this game or similar games
+        1b. Call query_wiki with the game name, engine, or symptoms — it has pre-compiled knowledge from Lutris, ProtonDB, PCGamingWiki with tips and workarounds
         2. Call inspect_game to understand the game: exe type, PE imports, bottle type, data files, existing config
         2b. Check the engine and graphics_api fields — if an engine is detected, pre-configure known settings before proceeding to launch (see Engine-Aware Methodology below)
         2c. If no exact successdb match, query similar_games with engine and graphics_api — apply high-confidence fixes from similar games (see Research Quality below)
@@ -889,7 +891,7 @@ struct AIService {
         - Diagnostic methodology: ALWAYS trace before configuring, verify after placing DLLs
 
         ## Available Tools (21 total)
-        Research: query_successdb (supports similar_games composite query for cross-game solution matching by engine, graphics API, tags, and symptoms), search_web, fetch_page (returns structured extracted_fixes with env vars, DLLs, registry paths, winetricks verbs, and INI changes alongside text content), query_compatibility
+        Research: query_successdb (supports similar_games composite query for cross-game solution matching by engine, graphics API, tags, and symptoms), query_wiki (pre-compiled game pages with Lutris configs, ProtonDB ratings, PCGamingWiki tips — check before web search), search_web, fetch_page (returns structured extracted_fixes with env vars, DLLs, registry paths, winetricks verbs, and INI changes alongside text content), query_compatibility
         Diagnostic: inspect_game, trace_launch, verify_dll_override, check_file_access, read_log, read_registry, list_windows, read_game_file
         Action: set_environment, set_registry, install_winetricks, place_dll, write_game_file, launch_game
         User: ask_user
@@ -1021,7 +1023,7 @@ struct AIService {
             SessionHandoff.delete(gameId: gameId)
         }
 
-        let launchInstruction = "Launch the game '\(entry.name)' (ID: \(gameId)). The executable is at: \(executablePath). Follow the Research-Diagnose-Adapt workflow: start by querying the success database, then inspect the game. Move quickly to a real launch_game call — research and at most one trace_launch before your first real launch."
+        let launchInstruction = "Launch the game '\(entry.name)' (ID: \(gameId)). The executable is at: \(executablePath). Follow the Research-Diagnose-Adapt workflow: start by querying the success database and wiki, then inspect the game. Move quickly to a real launch_game call — research and at most one trace_launch before your first real launch."
 
         var contextParts: [String] = []
         if let wikiContext = await WikiService.fetchContext(engine: entry.name) {
