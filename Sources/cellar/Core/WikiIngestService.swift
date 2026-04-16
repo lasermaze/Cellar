@@ -8,6 +8,9 @@ import Foundation
 /// Worker at wiki/games/{slug}.md.
 struct WikiIngestService: Sendable {
 
+    /// Maximum characters of free-text community notes per source
+    private static let maxNotesLength = 1500
+
     // MARK: - Public API
 
     /// Ingest a single game: fetch all sources, format a wiki page, and POST to Worker.
@@ -24,17 +27,19 @@ struct WikiIngestService: Sendable {
         // a. Fetch CompatibilityReport (Lutris + ProtonDB)
         let report = await CompatibilityService.fetchReport(for: gameName)
 
-        // b. Fetch WineHQ fixes
-        let wineHQFixes = await fetchWineHQFixes(gameName: gameName)
+        // b. Fetch WineHQ page (fixes + text)
+        let wineHQPage = await fetchWineHQPage(gameName: gameName)
 
-        // c. Fetch PCGamingWiki fixes
-        let pcgwFixes = await fetchPCGWFixes(gameName: gameName)
+        // c. Fetch PCGamingWiki page (fixes + text)
+        let pcgwPage = await fetchPCGWPage(gameName: gameName)
 
         // d. Skip if all sources returned nil/empty
         let hasReport = report != nil
-        let hasWineHQ = wineHQFixes.map { !$0.isEmpty } ?? false
-        let hasPCGW = pcgwFixes.map { !$0.isEmpty } ?? false
-        guard hasReport || hasWineHQ || hasPCGW else {
+        let hasWineHQ = wineHQPage.map { !$0.extractedFixes.isEmpty } ?? false
+        let hasPCGW = pcgwPage.map { !$0.extractedFixes.isEmpty } ?? false
+        let hasWineHQText = wineHQPage.map { !$0.textContent.isEmpty } ?? false
+        let hasPCGWText = pcgwPage.map { !$0.textContent.isEmpty } ?? false
+        guard hasReport || hasWineHQ || hasPCGW || hasWineHQText || hasPCGWText else {
             fputs("wiki-ingest: no data found for '\(gameName)', skipping\n", stderr)
             return false
         }
@@ -43,11 +48,9 @@ struct WikiIngestService: Sendable {
         let pageContent = formatGamePage(
             gameName: gameName,
             report: report,
-            wineHQFixes: wineHQFixes,
-            pcgwFixes: pcgwFixes
+            wineHQPage: wineHQPage,
+            pcgwPage: pcgwPage
         )
-
-        // f. slug already computed above (step a0)
 
         // g. POST full page content to games/{slug}.md
         let pagePath = "games/\(slug).md"
@@ -57,7 +60,6 @@ struct WikiIngestService: Sendable {
             commitMessage: "wiki: ingest \(gameName)"
         )
 
-        // h. Return success
         return true
     }
 
@@ -69,11 +71,9 @@ struct WikiIngestService: Sendable {
         guard let url = URL(string: rawURL) else { return false }
 
         guard let html = await fetchHTML(from: url) else {
-            // Network error or 404 — assume stale, proceed with ingest
             return false
         }
 
-        // Parse "**Last updated:** yyyy-MM-dd" line
         let pattern = #"\*\*Last updated:\*\*\s*(\d{4}-\d{2}-\d{2})"#
         guard let regex = try? NSRegularExpression(pattern: pattern),
               let match = regex.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
@@ -98,19 +98,24 @@ struct WikiIngestService: Sendable {
 
     // MARK: - Source Fetchers
 
-    private static func fetchWineHQFixes(gameName: String) async -> ExtractedFixes? {
+    private static func fetchWineHQPage(gameName: String) async -> ParsedPage? {
         guard let encoded = gameName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let url = URL(string: "https://appdb.winehq.org/objectManager.php?sClass=application&sTitle=\(encoded)") else {
             return nil
         }
         guard let html = await fetchHTML(from: url), !html.isEmpty else { return nil }
-        let parsed = try? WineHQParser().parseHTML(html, url: url)
-        let fixes = parsed?.extractedFixes
-        return (fixes?.isEmpty == false) ? fixes : nil
+        // Detect bot-protection pages (Anubis/Cloudflare challenge)
+        if html.contains("Making sure you're not a bot") || html.contains("Anubis") || html.contains("proof-of-work") {
+            return nil
+        }
+        guard let parsed = try? WineHQParser().parseHTML(html, url: url) else { return nil }
+        if parsed.extractedFixes.isEmpty && parsed.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return nil
+        }
+        return parsed
     }
 
-    private static func fetchPCGWFixes(gameName: String) async -> ExtractedFixes? {
-        // Replace spaces with underscores, percent-encode for URL path
+    private static func fetchPCGWPage(gameName: String) async -> ParsedPage? {
         let titleWithUnderscores = gameName
             .split(separator: " ")
             .map { String($0.prefix(1).uppercased() + $0.dropFirst()) }
@@ -120,14 +125,15 @@ struct WikiIngestService: Sendable {
             return nil
         }
         guard let html = await fetchHTML(from: url), !html.isEmpty else { return nil }
-        let parsed = try? PCGamingWikiParser().parseHTML(html, url: url)
-        let fixes = parsed?.extractedFixes
-        return (fixes?.isEmpty == false) ? fixes : nil
+        guard let parsed = try? PCGamingWikiParser().parseHTML(html, url: url) else { return nil }
+        if parsed.extractedFixes.isEmpty && parsed.textContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return nil
+        }
+        return parsed
     }
 
     // MARK: - HTML Fetch Helper
 
-    /// Perform a GET request, return the HTML body on HTTP 200, nil otherwise. Timeout: 15 seconds.
     private static func fetchHTML(from url: URL) async -> String? {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
@@ -146,9 +152,12 @@ struct WikiIngestService: Sendable {
     private static func formatGamePage(
         gameName: String,
         report: CompatibilityReport?,
-        wineHQFixes: ExtractedFixes?,
-        pcgwFixes: ExtractedFixes?
+        wineHQPage: ParsedPage?,
+        pcgwPage: ParsedPage?
     ) -> String {
+        let wineHQFixes = wineHQPage?.extractedFixes
+        let pcgwFixes = pcgwPage?.extractedFixes
+
         let dateStr = {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd"
@@ -162,8 +171,8 @@ struct WikiIngestService: Sendable {
             if r.installerCount > 0 { sources.append("Lutris") }
             if r.protonTier != nil { sources.append("ProtonDB") }
         }
-        if wineHQFixes != nil { sources.append("WineHQ") }
-        if pcgwFixes != nil { sources.append("PCGamingWiki") }
+        if wineHQPage != nil { sources.append("WineHQ") }
+        if pcgwPage != nil { sources.append("PCGamingWiki") }
         let sourcesLine = sources.isEmpty ? "none" : sources.joined(separator: ", ")
 
         var lines: [String] = []
@@ -306,6 +315,59 @@ struct WikiIngestService: Sendable {
         }
         lines.append("")
 
+        // Community Notes — free-text tips and tricks from WineHQ and PCGamingWiki
+        let wineHQText = wineHQPage?.textContent.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let pcgwText = pcgwPage?.textContent.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        if !wineHQText.isEmpty || !pcgwText.isEmpty {
+            lines.append("## Community Notes")
+            lines.append("")
+
+            if !wineHQText.isEmpty {
+                lines.append("### WineHQ AppDB")
+                lines.append("")
+                let truncated = truncateToLastSentence(wineHQText, maxLength: maxNotesLength)
+                // Quote each line for readability
+                for line in truncated.components(separatedBy: .newlines) {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    if !trimmed.isEmpty {
+                        lines.append("> \(trimmed)")
+                    }
+                }
+                lines.append("")
+            }
+
+            if !pcgwText.isEmpty {
+                lines.append("### PCGamingWiki")
+                lines.append("")
+                let truncated = truncateToLastSentence(pcgwText, maxLength: maxNotesLength)
+                for line in truncated.components(separatedBy: .newlines) {
+                    let trimmed = line.trimmingCharacters(in: .whitespaces)
+                    if !trimmed.isEmpty {
+                        lines.append("> \(trimmed)")
+                    }
+                }
+                lines.append("")
+            }
+        }
+
         return lines.joined(separator: "\n")
+    }
+
+    // MARK: - Helpers
+
+    /// Truncate text to maxLength, cutting at the last sentence boundary to avoid mid-word cutoff.
+    private static func truncateToLastSentence(_ text: String, maxLength: Int) -> String {
+        guard text.count > maxLength else { return text }
+        let truncated = String(text.prefix(maxLength))
+        // Find last sentence-ending punctuation
+        if let lastPeriod = truncated.lastIndex(where: { $0 == "." || $0 == "!" || $0 == "?" }) {
+            return String(truncated[...lastPeriod])
+        }
+        // Fall back to last newline
+        if let lastNewline = truncated.lastIndex(of: "\n") {
+            return String(truncated[...lastNewline])
+        }
+        return truncated + "..."
     }
 }
