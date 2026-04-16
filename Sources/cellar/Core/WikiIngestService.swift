@@ -316,9 +316,9 @@ struct WikiIngestService: Sendable {
         }
         lines.append("")
 
-        // Community Notes — free-text tips and tricks from WineHQ and PCGamingWiki
-        let wineHQText = wineHQPage?.textContent.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let pcgwText = pcgwPage?.textContent.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        // Community Notes — filtered free-text from WineHQ and PCGamingWiki
+        let wineHQText = filterUsefulText(wineHQPage?.textContent ?? "")
+        let pcgwText = filterUsefulText(pcgwPage?.textContent ?? "")
 
         if !wineHQText.isEmpty || !pcgwText.isEmpty {
             lines.append("## Community Notes")
@@ -328,7 +328,6 @@ struct WikiIngestService: Sendable {
                 lines.append("### WineHQ AppDB")
                 lines.append("")
                 let truncated = truncateToLastSentence(wineHQText, maxLength: maxNotesLength)
-                // Quote each line for readability
                 for line in truncated.components(separatedBy: .newlines) {
                     let trimmed = line.trimmingCharacters(in: .whitespaces)
                     if !trimmed.isEmpty {
@@ -356,6 +355,47 @@ struct WikiIngestService: Sendable {
     }
 
     // MARK: - Helpers
+
+    /// Filter raw page text to only keep lines with useful game/Wine information.
+    /// Strips: TOC lines, section numbering, navigation, short fragments, repeated headers.
+    private static func filterUsefulText(_ raw: String) -> String {
+        let lines = raw.components(separatedBy: .newlines)
+        var useful: [String] = []
+        var seen = Set<String>()
+
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+
+            // Skip empty lines
+            if trimmed.isEmpty { continue }
+
+            // Skip TOC-style lines (numbers + section names like "1.1 Version differences" or "3 Essential improvements 3.1 Patches")
+            if trimmed.range(of: #"^\d+(\.\d+)* "#, options: .regularExpression) != nil { continue }
+            // Skip lines that are mostly TOC references (contain multiple "X.Y" patterns)
+            let tocRefs = trimmed.matches(of: /\d+\.\d+/)
+            if tocRefs.count >= 3 { continue }
+
+            // Skip pure "Contents" header
+            if trimmed == "Contents" { continue }
+
+            // Skip navigation/boilerplate
+            let skipPhrases = ["jump to", "navigation", "table of contents", "edit source",
+                               "this page", "retrieved from", "categories:", "hidden categories"]
+            if skipPhrases.contains(where: { trimmed.lowercased().contains($0) }) { continue }
+
+            // Skip very short lines (likely headers or fragments)
+            if trimmed.count < 30 { continue }
+
+            // Skip duplicate lines
+            let normalized = trimmed.lowercased()
+            if !seen.insert(normalized).inserted { continue }
+
+            // Keep lines that look like actual content (sentences, descriptions)
+            useful.append(trimmed)
+        }
+
+        return useful.joined(separator: "\n")
+    }
 
     /// Truncate text to maxLength, cutting at the last sentence boundary to avoid mid-word cutoff.
     private static func truncateToLastSentence(_ text: String, maxLength: Int) -> String {
