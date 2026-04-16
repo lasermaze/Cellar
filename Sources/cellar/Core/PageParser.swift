@@ -329,12 +329,18 @@ struct PCGamingWikiParser: PageParser {
             }
         }
 
-        // Extract fix-related section content
+        // Extract fix-related section content AND build targeted textContent
         let headings = (try? document.select(".mw-parser-output h2, .mw-parser-output h3")) ?? Elements()
-        let fixKeywords = ["fix", "workaround", "improvement", "issue"]
+        let fixKeywords = ["fix", "workaround", "improvement", "issue", "essential", "note", "bug",
+                           "compatibility", "wine", "proton", "linux", "crash", "audio", "video",
+                           "graphic", "display", "input", "network", "other information"]
         for heading in headings {
             if let headingText = try? heading.text().lowercased(),
                fixKeywords.contains(where: { headingText.contains($0) }) {
+                // Add the section heading to text
+                if let title = try? heading.text() {
+                    allText += "### \(title)\n"
+                }
                 // Gather sibling content until next heading
                 var sibling = try? heading.nextElementSibling()
                 while let el = sibling {
@@ -343,17 +349,20 @@ struct PCGamingWikiParser: PageParser {
                     if let text = try? el.text(), !text.isEmpty {
                         let sectionFixes = extractWineFixes(from: text, context: "PCGamingWiki")
                         fixes.merge(sectionFixes)
+                        allText += text + "\n"
                     }
                     sibling = try? el.nextElementSibling()
                 }
             }
         }
 
-        // Build text content from paragraphs, headings, lists
-        let contentElements = (try? document.select(".mw-parser-output p, .mw-parser-output h2, .mw-parser-output h3, .mw-parser-output li")) ?? Elements()
-        for el in contentElements {
-            if let text = try? el.text(), !text.isEmpty {
-                allText += text + "\n"
+        // Capture intro paragraph (first <p> in content — game description)
+        if let paragraphs = try? document.select(".mw-parser-output p") {
+            for p in paragraphs {
+                if let introText = try? p.text(), introText.count >= 30 {
+                    allText = introText + "\n\n" + allText
+                    break
+                }
             }
         }
 
