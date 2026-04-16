@@ -57,7 +57,8 @@ struct WikiIngestService: Sendable {
         await WikiService.postWikiAppend(
             page: pagePath,
             entry: pageContent,
-            commitMessage: "wiki: ingest \(gameName)"
+            commitMessage: "wiki: ingest \(gameName)",
+            overwrite: true
         )
 
         return true

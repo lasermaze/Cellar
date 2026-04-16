@@ -115,6 +115,7 @@ struct WikiService: Sendable {
         let page: String
         let entry: String
         let commitMessage: String
+        let overwrite: Bool?
     }
 
     private static var wikiProxyURL: URL? {
@@ -123,9 +124,9 @@ struct WikiService: Sendable {
         return URL(string: override ?? defaultURL)
     }
 
-    static func postWikiAppend(page: String, entry: String, commitMessage: String) async {
+    static func postWikiAppend(page: String, entry: String, commitMessage: String, overwrite: Bool = false) async {
         guard let url = wikiProxyURL else { return }
-        let payload = WikiAppendPayload(page: page, entry: entry, commitMessage: commitMessage)
+        let payload = WikiAppendPayload(page: page, entry: entry, commitMessage: commitMessage, overwrite: overwrite ? true : nil)
         guard let body = try? JSONEncoder().encode(payload) else { return }
         var req = URLRequest(url: url)
         req.httpMethod = "POST"

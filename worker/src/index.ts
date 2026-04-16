@@ -474,6 +474,7 @@ interface WikiAppendPayload {
   page: string;
   entry: string;
   commitMessage?: string;
+  overwrite?: boolean;
 }
 
 // Allowed wiki page paths — prevents directory traversal and writes outside wiki/
@@ -485,6 +486,7 @@ async function writeWikiPage(
   commitMessage: string,
   token: string,
   repo: string,
+  overwrite = false,
   attempt = 0
 ): Promise<"ok" | "skipped"> {
   const path = `wiki/${page}`;
@@ -508,14 +510,19 @@ async function writeWikiPage(
     throw new Error(`GitHub GET failed: ${getResp.status}`);
   }
 
-  // Server-side substring dedup — the Swift client no longer dedups locally
-  if (existing.length > 0 && existing.includes(entry.trim())) {
-    return "skipped";
+  // Overwrite mode: replace entire file content (used by batch ingest for game pages)
+  let updated: string;
+  if (overwrite) {
+    updated = entry.endsWith("\n") ? entry : entry + "\n";
+  } else {
+    // Server-side substring dedup — the Swift client no longer dedups locally
+    if (existing.length > 0 && existing.includes(entry.trim())) {
+      return "skipped";
+    }
+    // Append with a leading newline if existing content does not already end in one
+    const sep = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
+    updated = existing + sep + entry + "\n";
   }
-
-  // Append with a leading newline if existing content does not already end in one
-  const sep = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
-  const updated = existing + sep + entry + "\n";
   const content = btoa(unescape(encodeURIComponent(updated)));
   const putBody: Record<string, unknown> = { message: commitMessage, content };
   if (sha) putBody.sha = sha;
@@ -528,7 +535,7 @@ async function writeWikiPage(
 
   if (putResp.status === 409 && attempt === 0) {
     // Concurrent write — retry once
-    return writeWikiPage(page, entry, commitMessage, token, repo, 1);
+    return writeWikiPage(page, entry, commitMessage, token, repo, overwrite, 1);
   }
   if (!putResp.ok) {
     throw new Error(`GitHub PUT failed: ${putResp.status}`);
@@ -706,7 +713,7 @@ async function handleWikiAppend(
   try {
     const token = await getInstallationToken(env);
     const repo = env.CELLAR_MEMORY_REPO ?? "lasermaze/cellar-memory";
-    const result = await writeWikiPage(payload.page, payload.entry, commitMessage, token, repo);
+    const result = await writeWikiPage(payload.page, payload.entry, commitMessage, token, repo, payload.overwrite ?? false);
     return new Response(JSON.stringify({ status: result }), {
       status: 200,
       headers: cors,
