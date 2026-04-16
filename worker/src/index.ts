@@ -42,7 +42,7 @@ function isRateLimited(ip: string): boolean {
   const now = Date.now();
   const cutoff = now - 60 * 60 * 1000; // 1 hour
   const timestamps = (rateLimitMap.get(ip) ?? []).filter((t) => t > cutoff);
-  if (timestamps.length >= 10) return true;
+  if (timestamps.length >= 100) return true;
   timestamps.push(now);
   rateLimitMap.set(ip, timestamps);
   return false;
