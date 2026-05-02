@@ -938,6 +938,7 @@ struct AIService {
         - When you call `save_success`, fill `resolution_narrative` with concrete prose: "Half-Life launched after setting WINEDLLOVERRIDES=ddraw=n,b and installing dotnet48 — without dotnet48, vgui2.dll crashed at menu load." Do NOT write generic acknowledgements like "game is working." That is useless to the next agent.
         - If you give up: call `save_failure` with the symptom and what you tried. This prevents future agents from repeating the dead end. Example: `save_failure(narrative: "Crashes at intro video — tried wmp9, mf, qasf, and disabling video; logs show codec failure 0x80004005", blocking_symptom: "intro_video_crash")`.
         - Per-session entries live at `wiki/sessions/{date}-{slug}-{id}.md`. They are append-only and never edited. Be honest about what didn't work — that is the highest-value content.
+        - During a session, call `update_wiki(content: "...")` for any non-obvious finding worth preserving. Examples: "v-sync off triples cutscene fps", "native d3d9 fixes menu but breaks alt-tab", "dotnet48 must be installed before mfc42 verb". These notes are automatically appended to your session log at the end. Don't pollute it with obvious things — only insights that took effort to find.
         """
 
         let tools = AgentTools(
@@ -1053,6 +1054,8 @@ struct AIService {
         let initialMessage = contextParts.joined(separator: "\n\n")
 
         let sessionStartTime = Date()
+        // Purge stale draft files older than 7 days (bounded cost, best-effort)
+        SessionDraftBuffer.purgeOldDrafts()
         let result = await agentLoop.run(
             initialMessage: initialMessage,
             toolExecutor: { name, input in await tools.execute(toolName: name, input: input) },
@@ -1114,8 +1117,10 @@ struct AIService {
                         outcome: .success,
                         duration: Date().timeIntervalSince(sessionStartTime),
                         wineURL: wineURL,
-                        midSessionNotes: []  // Phase B will populate via SessionDraftBuffer
+                        midSessionNotes: tools.draftBuffer.notes
                     )
+                    // Clear the on-disk draft after successful session log write
+                    tools.draftBuffer.clearDraft()
                 }
             }
             SessionHandoff.delete(gameId: gameId)
@@ -1163,8 +1168,9 @@ struct AIService {
                     duration: Date().timeIntervalSince(sessionStartTime),
                     wineURL: wineURL,
                     stopReason: stopReasonStr,
-                    midSessionNotes: []
+                    midSessionNotes: tools.draftBuffer.notes
                 )
+                // Failure path: keep the draft on disk for inspection. Do NOT clearDraft().
             }
 
             let handoff = tools.captureHandoff(

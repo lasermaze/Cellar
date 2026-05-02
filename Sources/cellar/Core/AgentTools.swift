@@ -71,6 +71,12 @@ final class AgentTools: @unchecked Sendable {
     /// even when no other substantive material exists.
     var hasSubstantiveFailure: Bool = false
 
+    /// Stable per-session short ID (8 hex chars). Used for the on-disk draft file path.
+    let sessionShortId: String = String(UUID().uuidString.prefix(8)).lowercased()
+
+    /// Mid-session observation buffer (populated by update_wiki tool, flushed by AIService at session end).
+    lazy var draftBuffer: SessionDraftBuffer = SessionDraftBuffer(shortId: sessionShortId)
+
     // MARK: - Init
 
     init(
@@ -605,6 +611,22 @@ final class AgentTools: @unchecked Sendable {
                 ]),
                 "required": .array([.string("narrative"), .string("blocking_symptom")])
             ])
+        ),
+
+        // 23. update_wiki — required content
+        ToolDefinition(
+            name: "update_wiki",
+            description: "Capture a mid-session observation worth preserving for future agents. Use this for non-obvious findings that you might forget by session end. Examples: 'v-sync off triples cutscene fps on this engine', 'menu music skips when MF dlls present, fine without them', 'native d3d9.dll causes crash on alt-tab specifically'. The note is automatically attached to the session log entry written at session end. Be specific and concrete.",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "content": .object([
+                        "type": .string("string"),
+                        "description": .string("One short observation (1-3 sentences). Will be timestamped and attached to the session log.")
+                    ])
+                ]),
+                "required": .array([.string("content")])
+            ])
         )
     ]
 
@@ -655,6 +677,7 @@ final class AgentTools: @unchecked Sendable {
         case "query_compatibility": resultString = await queryCompatibility(input: input)
         case "query_wiki":          resultString = await queryWiki(input: input)
         case "save_failure":        resultString = await saveFailure(input: input)
+        case "update_wiki":         resultString = await updateWiki(input: input)
         default:
             return .error(content: jsonResult(["error": "Unknown tool: \(toolName)"]))
         }

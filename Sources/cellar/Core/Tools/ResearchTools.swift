@@ -222,6 +222,27 @@ extension AgentTools {
 
     // MARK: - Wiki Lookup
 
+    func updateWiki(input: JSONValue) async -> String {
+        guard case .object(let obj) = input,
+              case .string(let content) = obj["content"] else {
+            return jsonResult(["error": "update_wiki requires content (string)"])
+        }
+        let trimmed = content.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return jsonResult(["error": "content cannot be empty"])
+        }
+        if trimmed.count > 1000 {
+            return jsonResult(["error": "content too long (max 1000 chars; observed \(trimmed.count))"])
+        }
+        draftBuffer.append(content: trimmed)
+        return jsonResult([
+            "ok": "true",
+            "noted": "true",
+            "total_notes": "\(draftBuffer.notes.count)",
+            "message": "Observation captured. Will be attached to session log at end."
+        ])
+    }
+
     func queryWiki(input: JSONValue) async -> String {
         guard case .object(let obj) = input,
               case .string(let query) = obj["query"] else {

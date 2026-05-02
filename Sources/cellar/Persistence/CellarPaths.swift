@@ -137,6 +137,16 @@ struct CellarPaths {
         memoryCacheDir.appendingPathComponent("\(slug).json")
     }
 
+    /// Directory for session draft files — crash-recovery checkpoint for mid-session notes.
+    static var sessionsDraftDir: URL {
+        base.appendingPathComponent("cache/sessions", isDirectory: true)
+    }
+
+    /// Draft file path for a given session short ID (e.g. "a3f9c1d2").
+    static func sessionDraftFile(for shortId: String) -> URL {
+        sessionsDraftDir.appendingPathComponent("\(shortId).draft.md")
+    }
+
     /// Directory for cached wiki pages — mirrors cellar-memory/wiki/ structure
     static let wikiCacheDir: URL = base.appendingPathComponent("wiki")
 
