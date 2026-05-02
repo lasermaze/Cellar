@@ -478,7 +478,7 @@ interface WikiAppendPayload {
 }
 
 // Allowed wiki page paths — prevents directory traversal and writes outside wiki/
-const WIKI_PAGE_PATTERN = /^(engines|symptoms|environments|games)\/[a-z0-9-]+\.md$|^log\.md$|^index\.md$/;
+const WIKI_PAGE_PATTERN = /^(engines|symptoms|environments|games|sessions)\/[a-z0-9-]+\.md$|^log\.md$|^index\.md$/;
 
 async function writeWikiPage(
   page: string,
