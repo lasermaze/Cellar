@@ -67,6 +67,9 @@ final class AgentTools: @unchecked Sendable {
     var lastAppliedActions: [String] = []
     /// Previous launch diagnostics for computing changes between launches.
     var previousDiagnostics: WineDiagnostics? = nil
+    /// Set by save_failure tool to signal the failure branch should write a session log entry
+    /// even when no other substantive material exists.
+    var hasSubstantiveFailure: Bool = false
 
     // MARK: - Init
 
@@ -435,10 +438,10 @@ final class AgentTools: @unchecked Sendable {
             ])
         ),
 
-        // 16. save_success — required game_name, many optional detail params
+        // 16. save_success — required game_name and resolution_narrative
         ToolDefinition(
             name: "save_success",
-            description: "Save a comprehensive success record after the game launches successfully. Captures everything: environment, DLL overrides with placement details, game config files, registry settings, pitfalls (what went wrong and how it was fixed), and a resolution narrative. This replaces save_recipe for detailed records.",
+            description: "Record a working configuration after the game launches successfully. REQUIRED: resolution_narrative — concrete prose explaining what you tried, what worked, what didn't, and what you'd try next time. NOT a generic confirmation. Example: \"Set WINEDLLOVERRIDES=ddraw=n,b after dxvk failed; installed dotnet48 to fix vgui2 crash; confirmed menu and first level run at 60fps.\" This narrative becomes the session log future agents read. Generic strings like \"game works\" are rejected by the wiki.",
             inputSchema: .object([
                 "type": .string("object"),
                 "properties": .object([
@@ -505,7 +508,7 @@ final class AgentTools: @unchecked Sendable {
                         "items": .object(["type": .string("string")])
                     ])
                 ]),
-                "required": .array([.string("game_name")])
+                "required": .array([.string("game_name"), .string("resolution_narrative")])
             ])
         ),
 
@@ -582,6 +585,26 @@ final class AgentTools: @unchecked Sendable {
                 ]),
                 "required": .array([.string("query")])
             ])
+        ),
+
+        // 22. save_failure — required narrative and blocking_symptom
+        ToolDefinition(
+            name: "save_failure",
+            description: "Record that you've given up on this session and what you learned. Use this when you cannot find a working configuration after substantive troubleshooting. The entry is added to the shared wiki so future agents skip the dead-ends you already proved don't work. REQUIRED: narrative (what you tried and why it didn't work) and blocking_symptom (the specific failure mode that stopped you). This is more valuable than silently giving up — failure data is rare and high-signal.",
+            inputSchema: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "narrative": .object([
+                        "type": .string("string"),
+                        "description": .string("Prose describing what you tried, what worked partially, and the final blocker. 2-5 sentences. Be specific.")
+                    ]),
+                    "blocking_symptom": .object([
+                        "type": .string("string"),
+                        "description": .string("Short tag for the failure mode (e.g. 'd3d9_init_fail', 'intro_video_crash', 'menu_freeze').")
+                    ])
+                ]),
+                "required": .array([.string("narrative"), .string("blocking_symptom")])
+            ])
         )
     ]
 
@@ -631,6 +654,7 @@ final class AgentTools: @unchecked Sendable {
         case "list_windows":        resultString = listWindows(input: input)
         case "query_compatibility": resultString = await queryCompatibility(input: input)
         case "query_wiki":          resultString = await queryWiki(input: input)
+        case "save_failure":        resultString = await saveFailure(input: input)
         default:
             return .error(content: jsonResult(["error": "Unknown tool: \(toolName)"]))
         }

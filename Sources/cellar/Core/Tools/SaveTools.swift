@@ -229,6 +229,25 @@ extension AgentTools {
         }
     }
 
+    // MARK: 22. save_failure
+
+    func saveFailure(input: JSONValue) async -> String {
+        guard case .object(let obj) = input,
+              case .string(_) = obj["narrative"],    // validate present but used by AIService at loop end
+              case .string(let symptom) = obj["blocking_symptom"] else {
+            return jsonResult(["error": "save_failure requires narrative and blocking_symptom"])
+        }
+        // Mark the AgentTools state so AIService failure branch knows to write a session log.
+        hasSubstantiveFailure = true
+        // Seed pendingActions so the failure session log captures the symptom tag.
+        pendingActions.append("save_failure: \(symptom)")
+        fputs("save_failure recorded: \(symptom)\n", stderr)
+        return jsonResult([
+            "ok": "true",
+            "message": "Failure recorded. Session log will be written when the loop ends."
+        ])
+    }
+
     // MARK: - Success Record Helper
 
     /// Convert a SuccessRecord to a dictionary for JSON output via jsonResult.
