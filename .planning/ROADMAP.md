@@ -521,7 +521,7 @@ Plans:
 **Goal:** Every agent session (success or substantive failure) deposits a dated, structured Markdown entry into `wiki/sessions/`. `query_wiki` surfaces the most recent entries for a game alongside the existing upstream-derived page. Closes the loop from one-way DB cache to shared journal of agent experience.
 **Requirements**: WIKI-SESSION-WRITE, WIKI-SESSION-RETRIEVAL, WIKI-NARRATIVE-PASSTHROUGH, WIKI-MIDSESSION-CAPTURE
 **Depends on:** Phase 40
-**Plans:** 1/2 plans executed
+**Plans:** 2/2 plans complete
 
 Plans:
 - [ ] 41-01-PLAN.md — Phase A: Worker regex fix, postSessionLog writer, success+failure path wiring (gathered from AgentTools state), narrative passthrough, query_wiki retrieval extension, save_failure tool, system prompt

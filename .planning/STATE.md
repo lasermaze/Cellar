@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-05-02T22:56:18.528Z"
+last_updated: "2026-05-02T23:01:37Z"
 progress:
   total_phases: 41
-  completed_phases: 38
-  total_plans: 89
-  completed_plans: 88
+  completed_phases: 41
+  total_plans: 90
+  completed_plans: 90
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 41 (Wiki as Shared Agent Experience) — P01 complete
-Plan: P01 complete — Worker sessions/ namespace, WikiService session log methods, AIService wiring, save_failure tool
-Status: Phase 41 P01 COMPLETE — per-session wiki entries now deposited on success and substantive failure
-Last activity: 2026-05-02 — P01 complete: WikiService.postSessionLog/postFailureSessionLog, AIService session log wiring, save_failure tool
+Phase: 41 (Wiki as Shared Agent Experience) — COMPLETE
+Plan: P02 complete — update_wiki tool, SessionDraftBuffer, midSessionNotes wired
+Status: Phase 41 COMPLETE — both P01 (session log writes) and P02 (mid-session update_wiki tool) shipped
+Last activity: 2026-05-02 — P02 complete: SessionDraftBuffer, update_wiki tool, midSessionNotes wired into both session log call sites
 
-Progress: [████████████████████] 100% (Phase 41 P01 complete)
+Progress: [████████████████████] 100% (Phase 41 COMPLETE)
 
 ## Performance Metrics
 
@@ -224,6 +224,9 @@ Progress: [████████████████████] 100% (P
 - [Phase 41-01]: hasMaterial threshold for failure session log: pendingActions || lastAppliedActions || launchCount > 0 || hasSubstantiveFailure || finalText >= 80 chars
 - [Phase 41-01]: userAborted sessions never write session log — explicit user stop is not a learning event
 - [Phase 41-01]: session retrieval directory listing fetched fresh per query_wiki call (no cache); individual session files cached indefinitely (immutable, overwrite:false)
+- [Phase 41-02]: SessionDraftBuffer is lazy var on AgentTools (not init) — avoids early filesystem access before session starts
+- [Phase 41-02]: Both tasks combined into one atomic commit — dispatch in AgentTools and implementation in ResearchTools are inseparable; intermediate build fails
+- [Phase 41-02]: Failure path keeps draft on disk — operator may want to inspect orphaned notes after failed session
 
 ### Roadmap Evolution
 
@@ -246,6 +249,7 @@ Progress: [████████████████████] 100% (P
 - Phase 40 added (2026-04-14): Wiki batch ingest — pre-compile game pages from Lutris, ProtonDB, WineHQ AppDB, PCGamingWiki. Reuse existing CompatibilityService + PageParser. Eliminates redundant live fetching every session.
 - Phase 41 added (2026-05-02): Wiki as shared agent experience — capture per-session learnings (success and failure) into `wiki/sessions/`. Populate `resolutionNarrative`, add `update_wiki` tool, surface recent sessions via `query_wiki`. Closes the loop from one-way DB cache to journal of what works/doesn't. Plan/context: `.planning/phases/41-.../CONTEXT.md`.
 - Phase 41 P01 COMPLETE (2026-05-02): Worker WIKI_PAGE_PATTERN extended to sessions/; postSessionLog/postFailureSessionLog/scrubPaths/listRecentSessions in WikiService; AIService wired with sessionStartTime, success/failure session log calls, narrative hardcode removed; save_failure tool + hasSubstantiveFailure flag added.
+- Phase 41 P02 COMPLETE (2026-05-02): SessionDraftBuffer (in-memory + on-disk crash-recovery); update_wiki tool (tool 23); midSessionNotes wired from draftBuffer.notes; clearDraft() on success; purgeOldDrafts() at session start; system prompt updated. Phase 41 COMPLETE.
 
 ### Pending Todos
 
@@ -258,4 +262,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-05-02
-Stopped at: Phase 41 P01 complete — Worker sessions/ namespace deployed; WikiService session log methods; AIService success/failure wiring; save_failure tool; build clean
+Stopped at: Phase 41 P02 complete — SessionDraftBuffer, update_wiki tool (tool 23), midSessionNotes wired, clearDraft on success, purgeOldDrafts at session start, build clean. Phase 41 COMPLETE.
