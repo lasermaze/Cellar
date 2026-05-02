@@ -930,6 +930,14 @@ struct AIService {
         - Lutris registry hints: apply alongside winetricks in Phase 1
         - Ignore any Proton-specific instructions (PROTON_* vars, Steam runtime) — they don't apply on macOS/Wine
         - If you need compatibility data for a different game name variation, call query_compatibility
+
+        ## Session Log Protocol
+
+        The wiki is not a docs system — it is a peer's notebook. Future agents will read your session entry. Treat it that way.
+
+        - When you call `save_success`, fill `resolution_narrative` with concrete prose: "Half-Life launched after setting WINEDLLOVERRIDES=ddraw=n,b and installing dotnet48 — without dotnet48, vgui2.dll crashed at menu load." Do NOT write generic acknowledgements like "game is working." That is useless to the next agent.
+        - If you give up: call `save_failure` with the symptom and what you tried. This prevents future agents from repeating the dead end. Example: `save_failure(narrative: "Crashes at intro video — tried wmp9, mf, qasf, and disabling video; logs show codec failure 0x80004005", blocking_symptom: "intro_video_crash")`.
+        - Per-session entries live at `wiki/sessions/{date}-{slug}-{id}.md`. They are append-only and never edited. Be honest about what didn't work — that is the highest-value content.
         """
 
         let tools = AgentTools(
@@ -1044,6 +1052,7 @@ struct AIService {
         contextParts.append(launchInstruction)
         let initialMessage = contextParts.joined(separator: "\n\n")
 
+        let sessionStartTime = Date()
         let result = await agentLoop.run(
             initialMessage: initialMessage,
             toolExecutor: { name, input in await tools.execute(toolName: name, input: input) },
@@ -1067,8 +1076,9 @@ struct AIService {
 
         if shouldSave {
             let saveInput: JSONValue = .object([
-                "game_name": .string(entry.name),
-                "resolution_narrative": .string("User confirmed game is working.")
+                "game_name": .string(entry.name)
+                // resolution_narrative intentionally omitted: the agent's own save_success call (if any)
+                // owns this field. Post-loop save is a safety net for user-confirmed completions.
             ])
             _ = await tools.execute(toolName: "save_success", input: saveInput)
             didSave = true
@@ -1098,6 +1108,14 @@ struct AIService {
                 // Ingest session learnings into wiki
                 if let record = SuccessDatabase.load(gameId: gameId) {
                     await WikiService.ingest(record: record)
+                    // Phase 41: deposit session log entry
+                    await WikiService.postSessionLog(
+                        record: record,
+                        outcome: .success,
+                        duration: Date().timeIntervalSince(sessionStartTime),
+                        wineURL: wineURL,
+                        midSessionNotes: []  // Phase B will populate via SessionDraftBuffer
+                    )
                 }
             }
             SessionHandoff.delete(gameId: gameId)
@@ -1124,6 +1142,29 @@ struct AIService {
             default:
                 stopReasonStr = "unknown"
                 reason = "[STOP:unknown]"
+            }
+
+            // Phase 41: deposit failure session log if substantive material exists
+            let trimmedFinal = result.finalText.trimmingCharacters(in: .whitespacesAndNewlines)
+            let hasMaterial =
+                !tools.pendingActions.isEmpty ||
+                !tools.lastAppliedActions.isEmpty ||
+                tools.launchCount > 0 ||
+                tools.hasSubstantiveFailure ||
+                trimmedFinal.count >= 80
+            if hasMaterial {
+                let actions = Array(Set(tools.pendingActions + tools.lastAppliedActions))
+                await WikiService.postFailureSessionLog(
+                    gameId: gameId,
+                    gameName: entry.name,
+                    narrative: trimmedFinal,
+                    actionsAttempted: actions,
+                    launchCount: tools.launchCount,
+                    duration: Date().timeIntervalSince(sessionStartTime),
+                    wineURL: wineURL,
+                    stopReason: stopReasonStr,
+                    midSessionNotes: []
+                )
             }
 
             let handoff = tools.captureHandoff(
