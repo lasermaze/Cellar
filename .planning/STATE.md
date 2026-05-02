@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-04-15T02:39:26.515Z"
+last_updated: "2026-05-02T22:56:18.528Z"
 progress:
-  total_phases: 40
+  total_phases: 41
   completed_phases: 38
-  total_plans: 87
-  completed_plans: 87
+  total_plans: 89
+  completed_plans: 88
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 40 (Wiki Batch Ingest) — COMPLETE (P01 + P02 done)
-Plan: P02 complete — WikiCommand + IngestCommand CLI registered; cellar wiki ingest functional
-Status: Phase 40 COMPLETE — wiki batch ingest pipeline and CLI command both shipped
-Last activity: 2026-04-15 — P02 complete: WikiCommand.swift created; WikiCommand registered in Cellar subcommands
+Phase: 41 (Wiki as Shared Agent Experience) — P01 complete
+Plan: P01 complete — Worker sessions/ namespace, WikiService session log methods, AIService wiring, save_failure tool
+Status: Phase 41 P01 COMPLETE — per-session wiki entries now deposited on success and substantive failure
+Last activity: 2026-05-02 — P01 complete: WikiService.postSessionLog/postFailureSessionLog, AIService session log wiring, save_failure tool
 
-Progress: [████████████████████] 100% (Phase 40 complete — all plans done)
+Progress: [████████████████████] 100% (Phase 41 P01 complete)
 
 ## Performance Metrics
 
@@ -95,6 +95,8 @@ Progress: [████████████████████] 100% (P
 | Phase 39-move-wiki-to-cellar-memory P04 | 5 | 1 tasks | 12 files |
 | Phase 40-wiki-batch-ingest P01 | 4 | 2 tasks | 3 files |
 | Phase 40-wiki-batch-ingest P02 | 3 | 2 tasks | 2 files |
+| Phase 41-wiki-as-shared-agent-experience P01 | 5 | 4 tasks | 5 files |
+| Phase 41-wiki-as-shared-agent-experience P01 | 5 | 4 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -217,6 +219,11 @@ Progress: [████████████████████] 100% (P
 - [Phase 40-wiki-batch-ingest]: TTL check fetches GitHub raw URL; 404 or network error treated as stale — proceed with ingest
 - [Phase 40-wiki-batch-ingest]: All 4 sources optional in WikiIngestService.ingest — page skipped only when all return nil/empty
 - [Phase 40-wiki-batch-ingest]: IngestCommand nested as WikiCommand extension for clean scoping; --all-local uses customLong for kebab-case CLI flag
+- [Phase 41-01]: postFailureSessionLog is a separate method (no optional SuccessRecord) — failure path genuinely has no SuccessRecord; cleaner API boundary
+- [Phase 41-01]: narrative passthrough fix: drop resolution_narrative from post-loop save; agent's earlier save_success call owns the field; nil is honest when no agent call happened
+- [Phase 41-01]: hasMaterial threshold for failure session log: pendingActions || lastAppliedActions || launchCount > 0 || hasSubstantiveFailure || finalText >= 80 chars
+- [Phase 41-01]: userAborted sessions never write session log — explicit user stop is not a learning event
+- [Phase 41-01]: session retrieval directory listing fetched fresh per query_wiki call (no cache); individual session files cached indefinitely (immutable, overwrite:false)
 
 ### Roadmap Evolution
 
@@ -237,6 +244,8 @@ Progress: [████████████████████] 100% (P
 - Phase 38 added: Rebuild memory layer — shared wiki for agents based on Karpathy principles
 - Phase 39 added (2026-04-10): Move wiki to cellar-memory GitHub repo — bundled wiki is read-only on signed apps, no cross-user sharing. Reuse existing Cloudflare Worker write proxy for authenticated wiki writes, local cache at ~/.cellar/wiki/
 - Phase 40 added (2026-04-14): Wiki batch ingest — pre-compile game pages from Lutris, ProtonDB, WineHQ AppDB, PCGamingWiki. Reuse existing CompatibilityService + PageParser. Eliminates redundant live fetching every session.
+- Phase 41 added (2026-05-02): Wiki as shared agent experience — capture per-session learnings (success and failure) into `wiki/sessions/`. Populate `resolutionNarrative`, add `update_wiki` tool, surface recent sessions via `query_wiki`. Closes the loop from one-way DB cache to journal of what works/doesn't. Plan/context: `.planning/phases/41-.../CONTEXT.md`.
+- Phase 41 P01 COMPLETE (2026-05-02): Worker WIKI_PAGE_PATTERN extended to sessions/; postSessionLog/postFailureSessionLog/scrubPaths/listRecentSessions in WikiService; AIService wired with sessionStartTime, success/failure session log calls, narrative hardcode removed; save_failure tool + hasSubstantiveFailure flag added.
 
 ### Pending Todos
 
@@ -248,5 +257,5 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-04-15
-Stopped at: Phase 40 P02 complete — WikiCommand + IngestCommand created; cellar wiki ingest (single/--popular/--all-local) registered in Cellar subcommands; Phase 40 complete
+Last session: 2026-05-02
+Stopped at: Phase 41 P01 complete — Worker sessions/ namespace deployed; WikiService session log methods; AIService success/failure wiring; save_failure tool; build clean
