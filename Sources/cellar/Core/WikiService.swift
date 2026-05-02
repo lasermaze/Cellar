@@ -1,5 +1,25 @@
 import Foundation
 
+public enum SessionOutcome: String {
+    case success
+    case failed
+    case partial
+    var headerLabel: String {
+        switch self {
+        case .success: return "success"
+        case .failed:  return "failed"
+        case .partial: return "partial"
+        }
+    }
+    var fieldLabel: String {
+        switch self {
+        case .success: return "SUCCESS"
+        case .failed:  return "FAILED"
+        case .partial: return "PARTIAL"
+        }
+    }
+}
+
 struct WikiService: Sendable {
 
     /// Maximum total characters of wiki content to return (prevents context bloat)
@@ -106,7 +126,28 @@ struct WikiService: Sendable {
         if pageContents.isEmpty {
             return "No relevant wiki pages found for '\(query)'"
         }
-        return pageContents.joined(separator: "\n\n---\n\n")
+        var formatted = pageContents.joined(separator: "\n\n---\n\n")
+
+        // Phase 41: append recent session entries when the query matches a known game slug.
+        let slug = slugify(query)
+        let sessionPaths = await listRecentSessions(forSlug: slug, max: 3)
+        if !sessionPaths.isEmpty {
+            var sessionsText = "\n\n## Recent sessions for \(query)\n"
+            var consumed = 0
+            let totalBudget = 4000
+            let perSessionCap = 1333
+            for path in sessionPaths {
+                guard consumed < totalBudget,
+                      let raw = await fetchPage(path) else { continue }
+                let sliceLen = min(perSessionCap, totalBudget - consumed)
+                let snippet = String(raw.prefix(sliceLen))
+                sessionsText += "\n--- \(path) ---\n" + snippet + "\n"
+                consumed += snippet.count
+            }
+            formatted += sessionsText
+        }
+
+        return formatted
     }
 
     // MARK: - Ingest
@@ -194,6 +235,79 @@ struct WikiService: Sendable {
         await postWikiAppend(page: "log.md", entry: logEntry, commitMessage: commitMessage)
     }
 
+    // MARK: - Session Log
+
+    /// Write a per-session log entry for a successful or partial session.
+    static func postSessionLog(
+        record: SuccessRecord,
+        outcome: SessionOutcome,
+        duration: TimeInterval,
+        wineURL: URL?,
+        midSessionNotes: [(timestamp: String, content: String)] = []
+    ) async {
+        let dateStr = String(ISO8601DateFormatter().string(from: Date()).prefix(10))
+        let slug = slugify(record.gameName)
+        let shortId = String(UUID().uuidString.prefix(8)).lowercased()
+        let pagePath = "sessions/\(dateStr)-\(slug)-\(shortId).md"
+
+        let body = formatSessionEntry(
+            record: record,
+            outcome: outcome,
+            duration: duration,
+            wineURL: wineURL,
+            shortId: shortId,
+            dateStr: dateStr,
+            midSessionNotes: midSessionNotes
+        )
+        let scrubbed = scrubPaths(body)
+
+        await postWikiAppend(
+            page: pagePath,
+            entry: scrubbed,
+            commitMessage: "wiki: session log \(record.gameName) (\(outcome.headerLabel))",
+            overwrite: false
+        )
+    }
+
+    /// Write a per-session log entry for a failed session (no SuccessRecord available).
+    static func postFailureSessionLog(
+        gameId: String,
+        gameName: String,
+        narrative: String,
+        actionsAttempted: [String],
+        launchCount: Int,
+        duration: TimeInterval,
+        wineURL: URL?,
+        stopReason: String,
+        midSessionNotes: [(timestamp: String, content: String)] = []
+    ) async {
+        let dateStr = String(ISO8601DateFormatter().string(from: Date()).prefix(10))
+        let slug = slugify(gameName)
+        let shortId = String(UUID().uuidString.prefix(8)).lowercased()
+        let pagePath = "sessions/\(dateStr)-\(slug)-\(shortId).md"
+
+        let body = formatFailureEntry(
+            gameName: gameName,
+            narrative: narrative,
+            actionsAttempted: actionsAttempted,
+            launchCount: launchCount,
+            duration: duration,
+            wineURL: wineURL,
+            stopReason: stopReason,
+            shortId: shortId,
+            dateStr: dateStr,
+            midSessionNotes: midSessionNotes
+        )
+        let scrubbed = scrubPaths(body)
+
+        await postWikiAppend(
+            page: pagePath,
+            entry: scrubbed,
+            commitMessage: "wiki: session log \(gameName) (failed)",
+            overwrite: false
+        )
+    }
+
     // MARK: - Ingest Helpers
 
     /// Format a pitfall as a wiki bullet point
@@ -241,6 +355,180 @@ struct WikiService: Sendable {
         }
         // Fall back to crash-on-launch as the catch-all symptom page
         return bestPage ?? "symptoms/crash-on-launch.md"
+    }
+
+    // MARK: - Session Log Helpers
+
+    private static func parseWineVersion(from url: URL?) -> String {
+        guard let url = url else { return "unknown" }
+        // wineURL is typically /usr/local/cellar/wine-staging/8.21.0/bin/wine64 or similar
+        // Walk up two levels: bin -> 8.21.0
+        let twoUp = url.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent
+        return twoUp.isEmpty || twoUp == "/" ? "unknown" : twoUp
+    }
+
+    private static func scrubPaths(_ text: String) -> String {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return text.replacingOccurrences(of: home, with: "~")
+    }
+
+    private static func formatSessionEntry(
+        record: SuccessRecord,
+        outcome: SessionOutcome,
+        duration: TimeInterval,
+        wineURL: URL?,
+        shortId: String,
+        dateStr: String,
+        midSessionNotes: [(timestamp: String, content: String)]
+    ) -> String {
+        let runnerLabel = "Wine \(parseWineVersion(from: wineURL))"
+        let durationMin = max(1, Int(duration / 60.0))
+        let narrative = (record.resolutionNarrative ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let tldr = narrative.isEmpty
+            ? "Session ended (\(outcome.headerLabel)) after \(durationMin) min."
+            : String(narrative.split(separator: "\n").first ?? Substring(narrative))
+
+        var worked: [String] = []
+        for (k, v) in record.environment.sorted(by: { $0.key < $1.key }) {
+            worked.append("- env: `\(k)=\(v)`")
+        }
+        for ovr in record.dllOverrides {
+            worked.append("- dll override: `\(ovr.dll)=\(ovr.mode)`" + (ovr.source.map { " (source: \($0))" } ?? ""))
+        }
+        if let engine = record.engine { worked.append("- engine: \(engine)") }
+        if let gfx = record.graphicsApi { worked.append("- graphics: \(gfx)") }
+        if worked.isEmpty { worked.append("- (none recorded)") }
+
+        var didnt: [String] = []
+        for p in record.pitfalls {
+            didnt.append("- \(p.symptom)" + (p.fix.isEmpty ? "" : " — tried: \(p.fix)"))
+        }
+        if didnt.isEmpty { didnt.append("- (none recorded)") }
+
+        var midSection = ""
+        if !midSessionNotes.isEmpty {
+            midSection = "\n## Mid-session observations\n"
+            for note in midSessionNotes {
+                midSection += "- [\(note.timestamp)] \(note.content)\n"
+            }
+        }
+
+        return """
+        # \(record.gameName) — \(dateStr) (\(outcome.headerLabel))
+
+        **Runner:** \(runnerLabel)
+        **Outcome:** \(outcome.fieldLabel)
+        **Duration:** \(durationMin) minutes
+        **Session:** \(shortId)
+
+        ## TL;DR
+        \(tldr)
+
+        ## What worked
+        \(worked.joined(separator: "\n"))
+
+        ## What didn't work
+        \(didnt.joined(separator: "\n"))
+
+        ## Quirks
+        - (none recorded)
+
+        ## Narrative
+        \(narrative.isEmpty ? "(no narrative provided)" : narrative)
+        \(midSection)
+        """
+    }
+
+    private static func formatFailureEntry(
+        gameName: String,
+        narrative: String,
+        actionsAttempted: [String],
+        launchCount: Int,
+        duration: TimeInterval,
+        wineURL: URL?,
+        stopReason: String,
+        shortId: String,
+        dateStr: String,
+        midSessionNotes: [(timestamp: String, content: String)]
+    ) -> String {
+        let runnerLabel = "Wine \(parseWineVersion(from: wineURL))"
+        let durationMin = max(1, Int(duration / 60.0))
+        let trimmedNarrative = narrative.trimmingCharacters(in: .whitespacesAndNewlines)
+        let tldr = trimmedNarrative.isEmpty
+            ? "Failed after \(launchCount) launches (\(stopReason))."
+            : String(trimmedNarrative.split(separator: "\n").first ?? Substring(trimmedNarrative))
+
+        let didnt: [String] = actionsAttempted.isEmpty
+            ? ["- (no actions recorded)"]
+            : actionsAttempted.map { "- \($0)" }
+
+        var midSection = ""
+        if !midSessionNotes.isEmpty {
+            midSection = "\n## Mid-session observations\n"
+            for note in midSessionNotes {
+                midSection += "- [\(note.timestamp)] \(note.content)\n"
+            }
+        }
+
+        return """
+        # \(gameName) — \(dateStr) (failed)
+
+        **Runner:** \(runnerLabel)
+        **Outcome:** FAILED
+        **Duration:** \(durationMin) minutes
+        **Session:** \(shortId)
+        **Stop reason:** \(stopReason)
+        **Launches attempted:** \(launchCount)
+
+        ## TL;DR
+        \(tldr)
+
+        ## What worked
+        - (session did not reach a working state)
+
+        ## What didn't work
+        \(didnt.joined(separator: "\n"))
+
+        ## Quirks
+        - (none recorded)
+
+        ## Narrative
+        \(trimmedNarrative.isEmpty ? "(no narrative provided)" : trimmedNarrative)
+        \(midSection)
+        """
+    }
+
+    // MARK: - Session Retrieval
+
+    private static func sessionsListingURL() -> URL? {
+        let repo = CellarPaths.memoryRepo
+        return URL(string: "https://api.github.com/repos/\(repo)/contents/wiki/sessions")
+    }
+
+    private struct GHContentsItem: Decodable {
+        let name: String
+        let path: String
+        let type: String
+    }
+
+    private static func listRecentSessions(forSlug slug: String, max: Int) async -> [String] {
+        guard let url = sessionsListingURL() else { return [] }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 5
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: req)
+            if let http = response as? HTTPURLResponse, http.statusCode == 404 { return [] }
+            let items = (try? JSONDecoder().decode([GHContentsItem].self, from: data)) ?? []
+            // Filenames sort lexicographically; ISO8601 dates make most-recent = greatest filename.
+            let matches = items
+                .filter { $0.type == "file" && $0.name.hasSuffix(".md") && $0.name.contains("-\(slug)-") }
+                .sorted { $0.name > $1.name }
+                .prefix(max)
+            return matches.map { $0.path.replacingOccurrences(of: "wiki/", with: "") }
+        } catch {
+            return []
+        }
     }
 
     // MARK: - Private
