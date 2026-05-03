@@ -117,518 +117,11 @@ final class AgentTools: @unchecked Sendable {
 
     // MARK: - Tool Definitions
 
-    /// JSON Schema tool definitions for all agent tools.
-    static let toolDefinitions: [ToolDefinition] = [
-
-        // 1. inspect_game — no required params; game context is implicit
-        ToolDefinition(
-            name: "inspect_game",
-            description: "Inspect the game setup: executable type (PE32/PE32+), game directory files, bottle state, installed DLLs in system32, and bundled recipe info. Call this first to understand what you're working with.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([:]),
-                "required": .array([])
-            ])
-        ),
-
-        // 2. read_log — optional lines param
-        ToolDefinition(
-            name: "read_log",
-            description: "Read the Wine stderr log from the most recent game launch. Returns the last 8000 characters of the log file. Use this after launch_game to diagnose errors.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "lines": .object([
-                        "type": .string("number"),
-                        "description": .string("Number of lines to return from the end (default 200, max ~8000 chars)")
-                    ])
-                ]),
-                "required": .array([])
-            ])
-        ),
-
-        // 3. read_registry — required key_path, optional value_name
-        ToolDefinition(
-            name: "read_registry",
-            description: "Read Wine registry values directly from user.reg or system.reg. Use key paths like 'HKCU\\\\Software\\\\Wine\\\\DllOverrides'. Returns all values in the matching section, or a specific value if value_name is provided.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "key_path": .object([
-                        "type": .string("string"),
-                        "description": .string("Windows registry key path, e.g. HKCU\\\\Software\\\\Wine\\\\DllOverrides or HKLM\\\\System\\\\CurrentControlSet\\\\Control")
-                    ]),
-                    "value_name": .object([
-                        "type": .string("string"),
-                        "description": .string("Optional: specific value name to read. If omitted, returns all values in the section.")
-                    ])
-                ]),
-                "required": .array([.string("key_path")])
-            ])
-        ),
-
-        // 4. ask_user — required question, optional options array
-        ToolDefinition(
-            name: "ask_user",
-            description: "Ask the user a question and return their answer. Use for decisions that require user input — e.g. confirming a potentially destructive action, or gathering info about their game version. Keep questions concise.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "question": .object([
-                        "type": .string("string"),
-                        "description": .string("The question to ask the user")
-                    ]),
-                    "options": .object([
-                        "type": .string("array"),
-                        "description": .string("Optional: numbered choices to present to the user"),
-                        "items": .object(["type": .string("string")])
-                    ])
-                ]),
-                "required": .array([.string("question")])
-            ])
-        ),
-
-        // 5. set_environment — required key, value
-        ToolDefinition(
-            name: "set_environment",
-            description: "Set a Wine environment variable for the next launch_game call. Variables accumulate across multiple calls. Common variables: WINEDLLOVERRIDES, WINEFSYNC, WINEESYNC, MESA_GL_VERSION_OVERRIDE, WINEDEBUG.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "key": .object([
-                        "type": .string("string"),
-                        "description": .string("Environment variable name (e.g. WINEDLLOVERRIDES)")
-                    ]),
-                    "value": .object([
-                        "type": .string("string"),
-                        "description": .string("Environment variable value (e.g. ddraw=n,b)")
-                    ])
-                ]),
-                "required": .array([.string("key"), .string("value")])
-            ])
-        ),
-
-        // 6. set_registry — required key_path, value_name, data
-        ToolDefinition(
-            name: "set_registry",
-            description: "Write a value to the Wine registry via wine regedit. Use for persistent game configuration. Data format: 'dword:00000001', '\"string value\"', 'hex:...'.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "key_path": .object([
-                        "type": .string("string"),
-                        "description": .string("Registry key path, e.g. HKCU\\\\Software\\\\Wine\\\\Direct3D")
-                    ]),
-                    "value_name": .object([
-                        "type": .string("string"),
-                        "description": .string("Registry value name")
-                    ]),
-                    "data": .object([
-                        "type": .string("string"),
-                        "description": .string("Registry data in .reg format: dword:00000001, \"string\", hex:ff,00,...")
-                    ])
-                ]),
-                "required": .array([.string("key_path"), .string("value_name"), .string("data")])
-            ])
-        ),
-
-        // 7. install_winetricks — required verb
-        ToolDefinition(
-            name: "install_winetricks",
-            description: "Install a winetricks verb into the game's Wine bottle. Only verbs from the known-safe allowlist are permitted. Use for runtime dependencies like vcrun2019, d3dx9, dotnet48.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "verb": .object([
-                        "type": .string("string"),
-                        "description": .string("Winetricks verb to install. Allowed verbs: dotnet48, dotnet40, dotnet35, vcrun2019, vcrun2015, vcrun2013, vcrun2010, vcrun2008, d3dx9, d3dx10, d3dx11_43, d3dcompiler_47, dinput8, dinput, quartz, wmp9, wmp10, dsound, xinput, physx, xact, xactengine3_7")
-                    ])
-                ]),
-                "required": .array([.string("verb")])
-            ])
-        ),
-
-        // 8. place_dll — required dll_name, optional target
-        ToolDefinition(
-            name: "place_dll",
-            description: "Download and place a DLL replacement from the known registry. Targets: game_dir (next to EXE), system32 (Wine System32), syswow64 (Wine SysWOW64 for 32-bit system DLLs in wow64 bottles). If target is omitted, auto-detects based on bottle type and DLL metadata. Auto-applies required WINEDLLOVERRIDES and writes companion config files.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "dll_name": .object([
-                        "type": .string("string"),
-                        "description": .string("DLL name from the known registry (e.g. cnc-ddraw)")
-                    ]),
-                    "target": .object([
-                        "type": .string("string"),
-                        "enum": .array([.string("game_dir"), .string("system32"), .string("syswow64")]),
-                        "description": .string("Placement target. If omitted, auto-detects: system DLLs use syswow64 in wow64 bottles, others use game_dir.")
-                    ])
-                ]),
-                "required": .array([.string("dll_name")])
-            ])
-        ),
-
-        // 9. launch_game — optional extra_winedebug, diagnostic
-        ToolDefinition(
-            name: "launch_game",
-            description: "Launch the game with Wine using the currently accumulated environment variables. Runs pre-flight checks (exe exists, DLL files present), returns exit code, elapsed time, stderr tail, detected errors, and loaded DLL summary. Maximum 8 real launches per session. Diagnostic launches (diagnostic=true) do NOT count toward the limit.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "extra_winedebug": .object([
-                        "type": .string("string"),
-                        "description": .string("Optional additional WINEDEBUG channels (e.g. +d3d,+opengl). Merged with existing WINEDEBUG.")
-                    ]),
-                    "diagnostic": .object([
-                        "type": .string("boolean"),
-                        "description": .string("If true, this is a quick diagnostic launch (shorter timeout, more verbose output). Does NOT count toward the 8-launch limit. Default false.")
-                    ])
-                ]),
-                "required": .array([])
-            ])
-        ),
-
-        // 10. save_recipe — required name, optional notes
-        ToolDefinition(
-            name: "save_recipe",
-            description: "Save the current working configuration as a user recipe file for future launches. Call this when the game launches successfully. The recipe captures the accumulated environment variables.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "name": .object([
-                        "type": .string("string"),
-                        "description": .string("Human-readable recipe name (e.g. 'Cossacks European Wars - Working Config')")
-                    ]),
-                    "notes": .object([
-                        "type": .string("string"),
-                        "description": .string("Optional notes about the configuration or what fixed the game")
-                    ])
-                ]),
-                "required": .array([.string("name")])
-            ])
-        ),
-
-        // 11. write_game_file — required relative_path, content
-        ToolDefinition(
-            name: "write_game_file",
-            description: "Write a config or data file into the game directory. Use for files like ddraw.ini, mode.dat, or custom config files the game needs. Paths are relative to the game executable's directory. Windows backslash paths are auto-converted. WARNING: This OVERWRITES the entire file. If modifying an existing config file (e.g. .ini), use check_file_access to verify it exists first, then read it via inspect_game or read_log context. Never write a partial version of an existing config — include ALL original sections/keys plus your changes. A backup is created automatically (.cellar-backup).",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "relative_path": .object([
-                        "type": .string("string"),
-                        "description": .string("File path relative to the game executable directory (e.g. 'ddraw.ini' or 'data/mode.dat')")
-                    ]),
-                    "content": .object([
-                        "type": .string("string"),
-                        "description": .string("The text content to write to the file")
-                    ])
-                ]),
-                "required": .array([.string("relative_path"), .string("content")])
-            ])
-        ),
-
-        // 11b. read_game_file — required relative_path
-        ToolDefinition(
-            name: "read_game_file",
-            description: "Read a file from the game directory. Use this BEFORE write_game_file to see the current contents of config files (.ini, .cfg, etc.) so you can make targeted edits without losing existing settings. Returns the file contents (up to 16000 chars). Paths are relative to the game executable's directory.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "relative_path": .object([
-                        "type": .string("string"),
-                        "description": .string("File path relative to the game executable directory (e.g. 'DeusEx.ini' or 'data/config.cfg')")
-                    ])
-                ]),
-                "required": .array([.string("relative_path")])
-            ])
-        ),
-
-        // --- Diagnostic Tools (Phase 07-03) ---
-
-        // 12. trace_launch — optional debug_channels, timeout_seconds
-        ToolDefinition(
-            name: "trace_launch",
-            description: "Run a short diagnostic Wine launch with debug channels enabled. The game is killed after timeout_seconds. Returns structured DLL load analysis (which DLLs loaded, from where, native vs builtin), any dialog/msgbox text detected, and errors. Use this BEFORE configuring — trace first, then fix. Does NOT count toward the launch limit.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "debug_channels": .object([
-                        "type": .string("array"),
-                        "description": .string("Wine debug channels to enable (default [\"+loaddll\"])"),
-                        "items": .object(["type": .string("string")])
-                    ]),
-                    "timeout_seconds": .object([
-                        "type": .string("number"),
-                        "description": .string("Seconds to wait before killing the process (default 5)")
-                    ])
-                ]),
-                "required": .array([])
-            ])
-        ),
-
-        // 13. check_file_access — required paths array
-        ToolDefinition(
-            name: "check_file_access",
-            description: "Check if the game can find files it needs by verifying file existence relative to the game executable's directory. Use to diagnose 'file not found' errors caused by wrong working directory.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "paths": .object([
-                        "type": .string("array"),
-                        "description": .string("Relative file paths to check from the game executable's directory"),
-                        "items": .object(["type": .string("string")])
-                    ])
-                ]),
-                "required": .array([.string("paths")])
-            ])
-        ),
-
-        // 14. verify_dll_override — required dll_name
-        ToolDefinition(
-            name: "verify_dll_override",
-            description: "Verify that a DLL override is actually working by comparing the configured override (env/registry) with what Wine actually loaded (via a short trace). Explains discrepancies like 'native DLL exists in game_dir but Wine loaded builtin from syswow64'.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "dll_name": .object([
-                        "type": .string("string"),
-                        "description": .string("DLL name to verify (e.g. \"ddraw\")")
-                    ])
-                ]),
-                "required": .array([.string("dll_name")])
-            ])
-        ),
-
-        // 15. query_successdb — optional query params
-        ToolDefinition(
-            name: "query_successdb",
-            description: "Query the local success database for known-working game configurations. Query by game_id (exact), tags (overlap), engine (substring), graphics_api (substring), symptom (fuzzy keyword match against pitfalls), or similar_games (composite multi-signal similarity search). Call this BEFORE web research — local knowledge is faster and more reliable.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "game_id": .object([
-                        "type": .string("string"),
-                        "description": .string("Exact game ID to look up (e.g. 'cossacks-european-wars')")
-                    ]),
-                    "tags": .object([
-                        "type": .string("array"),
-                        "description": .string("Tags to match (any overlap). E.g. ['directdraw', '2d-rts']"),
-                        "items": .object(["type": .string("string")])
-                    ]),
-                    "engine": .object([
-                        "type": .string("string"),
-                        "description": .string("Engine name substring to match (e.g. 'unreal', 'source')")
-                    ]),
-                    "graphics_api": .object([
-                        "type": .string("string"),
-                        "description": .string("Graphics API substring to match (e.g. 'directdraw', 'd3d9')")
-                    ]),
-                    "symptom": .object([
-                        "type": .string("string"),
-                        "description": .string("Symptom description for fuzzy matching against known pitfalls (e.g. 'black screen on launch')")
-                    ]),
-                    "similar_games": .object([
-                        "type": .string("object"),
-                        "description": .string("Find games with similar characteristics. Returns cross-game matches ranked by signal overlap (engine weight 3, graphics_api weight 2, tags weight 1 each, symptom weight 1). Requires at least engine or graphics_api."),
-                        "properties": .object([
-                            "engine": .object(["type": .string("string"), "description": .string("Engine to match (e.g. 'unreal')")]),
-                            "graphics_api": .object(["type": .string("string"), "description": .string("Graphics API to match (e.g. 'directdraw')")]),
-                            "tags": .object(["type": .string("array"), "description": .string("Tags for overlap scoring"), "items": .object(["type": .string("string")])]),
-                            "symptom": .object(["type": .string("string"), "description": .string("Symptom for pitfall matching")])
-                        ])
-                    ])
-                ]),
-                "required": .array([])
-            ])
-        ),
-
-        // 16. save_success — required game_name and resolution_narrative
-        ToolDefinition(
-            name: "save_success",
-            description: "Record a working configuration after the game launches successfully. REQUIRED: resolution_narrative — concrete prose explaining what you tried, what worked, what didn't, and what you'd try next time. NOT a generic confirmation. Example: \"Set WINEDLLOVERRIDES=ddraw=n,b after dxvk failed; installed dotnet48 to fix vgui2 crash; confirmed menu and first level run at 60fps.\" This narrative becomes the session log future agents read. Generic strings like \"game works\" are rejected by the wiki.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "game_name": .object([
-                        "type": .string("string"),
-                        "description": .string("Human-readable game name (e.g. 'Cossacks: European Wars')")
-                    ]),
-                    "game_version": .object([
-                        "type": .string("string"),
-                        "description": .string("Game version if known")
-                    ]),
-                    "source": .object([
-                        "type": .string("string"),
-                        "description": .string("Game source: 'gog', 'steam', 'disc', 'other'")
-                    ]),
-                    "engine": .object([
-                        "type": .string("string"),
-                        "description": .string("Game engine if known (e.g. 'custom', 'unreal', 'source')")
-                    ]),
-                    "graphics_api": .object([
-                        "type": .string("string"),
-                        "description": .string("Primary graphics API: 'directdraw', 'direct3d8', 'direct3d9', 'opengl'")
-                    ]),
-                    "bottle_type": .object([
-                        "type": .string("string"),
-                        "description": .string("Wine bottle type: 'wow64' or 'standard'")
-                    ]),
-                    "working_directory_notes": .object([
-                        "type": .string("string"),
-                        "description": .string("Notes about working directory requirements")
-                    ]),
-                    "dll_overrides": .object([
-                        "type": .string("array"),
-                        "description": .string("DLL overrides applied. Each object: {dll, mode, placement?, source?}"),
-                        "items": .object(["type": .string("object")])
-                    ]),
-                    "game_config_files": .object([
-                        "type": .string("array"),
-                        "description": .string("Game config files modified. Each: {path, purpose, critical_settings?}"),
-                        "items": .object(["type": .string("object")])
-                    ]),
-                    "registry": .object([
-                        "type": .string("array"),
-                        "description": .string("Registry entries set. Each: {key, value_name, data, purpose?}"),
-                        "items": .object(["type": .string("object")])
-                    ]),
-                    "game_specific_dlls": .object([
-                        "type": .string("array"),
-                        "description": .string("Game-specific DLLs placed. Each: {filename, source, placement, version?}"),
-                        "items": .object(["type": .string("object")])
-                    ]),
-                    "pitfalls": .object([
-                        "type": .string("array"),
-                        "description": .string("Pitfalls encountered. Each: {symptom, cause, fix, wrong_fix?}"),
-                        "items": .object(["type": .string("object")])
-                    ]),
-                    "resolution_narrative": .object([
-                        "type": .string("string"),
-                        "description": .string("Free-text narrative of the resolution process and what finally worked")
-                    ]),
-                    "tags": .object([
-                        "type": .string("array"),
-                        "description": .string("Searchable tags for this game (e.g. ['directdraw', '2d-rts', 'gog', 'cnc-ddraw'])"),
-                        "items": .object(["type": .string("string")])
-                    ])
-                ]),
-                "required": .array([.string("game_name"), .string("resolution_narrative")])
-            ])
-        ),
-
-        // 17. search_web — required query
-        ToolDefinition(
-            name: "search_web",
-            description: "Search the web for game-specific Wine compatibility info. Targets WineHQ, ProtonDB, PCGamingWiki, and forums. Results are cached per game for 7 days. Returns structured snippets, not full pages — use fetch_page to read a specific URL. Call this after checking query_successdb.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "query": .object([
-                        "type": .string("string"),
-                        "description": .string("Search query for Wine compatibility info (e.g. 'Cossacks European Wars Wine compatibility')")
-                    ])
-                ]),
-                "required": .array([.string("query")])
-            ])
-        ),
-
-        // 18. fetch_page — required url
-        ToolDefinition(
-            name: "fetch_page",
-            description: "Fetch a URL and extract structured content using SwiftSoup HTML parsing. Returns text_content (up to 8000 chars) plus extracted_fixes containing Wine-specific fix data (env vars, DLL overrides, registry entries, winetricks verbs, INI changes) when detected. Use after search_web to read promising result pages. Specialized parsers for WineHQ AppDB and PCGamingWiki; generic parser for other sites.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "url": .object([
-                        "type": .string("string"),
-                        "description": .string("URL to fetch and extract text from")
-                    ])
-                ]),
-                "required": .array([.string("url")])
-            ])
-        ),
-
-        // 19. list_windows — no required params
-        ToolDefinition(
-            name: "list_windows",
-            description: "Query the macOS window list for Wine processes. Returns window sizes, owner process names, and titles (titles require Screen Recording permission). Use after launch_game to check if the game is showing a dialog (small window) or running normally (large window). If Screen Recording permission is denied, returns bounds and owner only with instructions to grant permission.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([:]),
-                "required": .array([])
-            ])
-        ),
-
-        // 20. query_compatibility — required game_name
-        ToolDefinition(
-            name: "query_compatibility",
-            description: "Query Lutris and ProtonDB community databases for Wine compatibility data on a game. Returns environment variables, DLL overrides, winetricks verbs, registry edits from Lutris installer scripts, and ProtonDB tier rating. Use this for on-demand lookups if compatibility data wasn't in the initial context or you need to check a different game name.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "game_name": .object([
-                        "type": .string("string"),
-                        "description": .string("Game name to search for (e.g. 'Deus Ex', 'Cossacks European Wars')")
-                    ])
-                ]),
-                "required": .array([.string("game_name")])
-            ])
-        ),
-
-        // 21. query_wiki — required query
-        ToolDefinition(
-            name: "query_wiki",
-            description: "Search the compiled knowledge wiki for Wine compatibility patterns, engine-specific fixes, common symptom solutions, and environment notes. Returns synthesized knowledge pages. Use this when you encounter a specific symptom or engine and want to check accumulated knowledge before trying web research.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "query": .object([
-                        "type": .string("string"),
-                        "description": .string("Search query — game name, engine, symptom, or keyword (e.g. 'directdraw black screen', 'unity wine crash', 'dxvk apple silicon')")
-                    ])
-                ]),
-                "required": .array([.string("query")])
-            ])
-        ),
-
-        // 22. save_failure — required narrative and blocking_symptom
-        ToolDefinition(
-            name: "save_failure",
-            description: "Record that you've given up on this session and what you learned. Use this when you cannot find a working configuration after substantive troubleshooting. The entry is added to the shared wiki so future agents skip the dead-ends you already proved don't work. REQUIRED: narrative (what you tried and why it didn't work) and blocking_symptom (the specific failure mode that stopped you). This is more valuable than silently giving up — failure data is rare and high-signal.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "narrative": .object([
-                        "type": .string("string"),
-                        "description": .string("Prose describing what you tried, what worked partially, and the final blocker. 2-5 sentences. Be specific.")
-                    ]),
-                    "blocking_symptom": .object([
-                        "type": .string("string"),
-                        "description": .string("Short tag for the failure mode (e.g. 'd3d9_init_fail', 'intro_video_crash', 'menu_freeze').")
-                    ])
-                ]),
-                "required": .array([.string("narrative"), .string("blocking_symptom")])
-            ])
-        ),
-
-        // 23. update_wiki — required content
-        ToolDefinition(
-            name: "update_wiki",
-            description: "Capture a mid-session observation worth preserving for future agents. Use this for non-obvious findings that you might forget by session end. Examples: 'v-sync off triples cutscene fps on this engine', 'menu music skips when MF dlls present, fine without them', 'native d3d9.dll causes crash on alt-tab specifically'. The note is automatically attached to the session log entry written at session end. Be specific and concrete.",
-            inputSchema: .object([
-                "type": .string("object"),
-                "properties": .object([
-                    "content": .object([
-                        "type": .string("string"),
-                        "description": .string("One short observation (1-3 sentences). Will be timestamped and attached to the session log.")
-                    ])
-                ]),
-                "required": .array([.string("content")])
-            ])
-        )
-    ]
+    /// Tool definitions derived from the AgentToolName enum metadata table.
+    /// Single source of truth: adding a case to AgentToolName automatically adds it here.
+    static var toolDefinitions: [ToolDefinition] {
+        AgentToolName.allCases.map { $0.definition }
+    }
 
     // MARK: - Dispatch
 
@@ -644,68 +137,55 @@ final class AgentTools: @unchecked Sendable {
 
         // User confirmed — signal stop but DON'T save here.
         // Save happens after the loop, in AIService.runAgentLoop().
-        if control.userForceConfirmed && toolName != "save_success" && toolName != "save_recipe" {
+        let resolvedTool = AgentToolName(rawValue: toolName)
+        if control.userForceConfirmed && resolvedTool != .saveSuccess && resolvedTool != .saveRecipe {
             return .stop(
                 content: jsonResult(["user_override": "User confirmed game is working. Stopping."]),
                 reason: .userConfirmedWorking
             )
         }
 
-        // Dispatch to tool implementation (all return String, unchanged)
-        let resultString: String
-        switch toolName {
-        case "inspect_game":        resultString = inspectGame(input: input)
-        case "read_log":            resultString = readLog(input: input)
-        case "read_registry":       resultString = readRegistry(input: input)
-        case "ask_user":            resultString = askUser(input: input)
-        case "set_environment":     resultString = setEnvironment(input: input)
-        case "set_registry":        resultString = setRegistry(input: input)
-        case "install_winetricks":  resultString = installWinetricks(input: input)
-        case "place_dll":           resultString = await placeDLL(input: input)
-        case "launch_game":         resultString = launchGame(input: input)
-        case "save_recipe":         resultString = saveRecipe(input: input)
-        case "write_game_file":     resultString = writeGameFile(input: input)
-        case "read_game_file":      resultString = readGameFile(input: input)
-        case "query_successdb":     resultString = querySuccessdb(input: input)
-        case "save_success":        resultString = saveSuccess(input: input)
-        case "trace_launch":        resultString = traceLaunch(input: input)
-        case "check_file_access":   resultString = checkFileAccess(input: input)
-        case "verify_dll_override": resultString = verifyDllOverride(input: input)
-        case "search_web":          resultString = await searchWeb(input: input)
-        case "fetch_page":          resultString = await fetchPage(input: input)
-        case "list_windows":        resultString = listWindows(input: input)
-        case "query_compatibility": resultString = await queryCompatibility(input: input)
-        case "query_wiki":          resultString = await queryWiki(input: input)
-        case "save_failure":        resultString = await saveFailure(input: input)
-        case "update_wiki":         resultString = await updateWiki(input: input)
-        default:
+        // Resolve wire name to typed enum — unknown tool returns error immediately.
+        guard let tool = resolvedTool else {
             return .error(content: jsonResult(["error": "Unknown tool: \(toolName)"]))
         }
 
-        // Track pending actions (same logic as before, extracted into helper)
-        trackPendingAction(toolName: toolName, input: input)
+        // Dispatch to tool implementation. Compiler enforces exhaustiveness.
+        // Tool implementations in Tools/*.swift keep their JSONValue → String signatures (Phase 31).
+        let resultString: String
+        switch tool {
+        case .inspectGame:       resultString = inspectGame(input: input)
+        case .readLog:           resultString = readLog(input: input)
+        case .readRegistry:      resultString = readRegistry(input: input)
+        case .askUser:           resultString = askUser(input: input)
+        case .setEnvironment:    resultString = setEnvironment(input: input)
+        case .setRegistry:       resultString = setRegistry(input: input)
+        case .installWinetricks: resultString = installWinetricks(input: input)
+        case .placeDll:          resultString = await placeDLL(input: input)
+        case .launchGame:        resultString = launchGame(input: input)
+        case .saveRecipe:        resultString = saveRecipe(input: input)
+        case .writeGameFile:     resultString = writeGameFile(input: input)
+        case .readGameFile:      resultString = readGameFile(input: input)
+        case .querySuccessdb:    resultString = querySuccessdb(input: input)
+        case .saveSuccess:       resultString = saveSuccess(input: input)
+        case .traceLaunch:       resultString = traceLaunch(input: input)
+        case .checkFileAccess:   resultString = checkFileAccess(input: input)
+        case .verifyDllOverride: resultString = verifyDllOverride(input: input)
+        case .searchWeb:         resultString = await searchWeb(input: input)
+        case .fetchPage:         resultString = await fetchPage(input: input)
+        case .listWindows:       resultString = listWindows(input: input)
+        case .queryCompatibility: resultString = await queryCompatibility(input: input)
+        case .queryWiki:         resultString = await queryWiki(input: input)
+        case .saveFailure:       resultString = await saveFailure(input: input)
+        case .updateWiki:        resultString = await updateWiki(input: input)
+        }
+
+        // Track pending actions via enum metadata — single call site, no inline switch.
+        if let desc = tool.pendingActionDescription(for: input) {
+            pendingActions.append(desc)
+        }
 
         return .success(content: resultString)
-    }
-
-    private func trackPendingAction(toolName: String, input: JSONValue) {
-        switch toolName {
-        case "set_environment":
-            if let key = input["key"]?.asString, let value = input["value"]?.asString {
-                pendingActions.append("set_environment(\(key)=\(value))")
-            }
-        case "set_registry":
-            if let keyPath = input["key_path"]?.asString, let name = input["value_name"]?.asString {
-                pendingActions.append("set_registry(\(keyPath), \(name))")
-            }
-        case "install_winetricks":
-            if let verb = input["verb"]?.asString { pendingActions.append("install_winetricks(\(verb))") }
-        case "place_dll":
-            if let dllName = input["dll_name"]?.asString { pendingActions.append("place_dll(\(dllName))") }
-        case "write_game_file":
-            if let path = input["relative_path"]?.asString { pendingActions.append("write_game_file(\(path))") }
-        default: break
-        }
     }
 
     // MARK: - JSON Helper
