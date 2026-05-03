@@ -1,3 +1,7 @@
+import { isPathSafe, applyFencedUpdate } from "./helpers.js";
+
+export { isPathSafe, applyFencedUpdate } from "./helpers.js";
+
 export interface Env {
   GITHUB_APP_PEM: string;
   GITHUB_APP_ID: string;
@@ -8,6 +12,12 @@ export interface Env {
 // ---------------------------------------------------------------------------
 // Constants — must mirror Swift AgentTools.allowedEnvKeys exactly
 // ---------------------------------------------------------------------------
+
+// === ALLOWLIST SOURCE OF TRUTH ===
+// The Swift side reads these from Sources/cellar/Resources/policy/*.json (Phase 43).
+// This Worker keeps a hardcoded mirror — manual sync required when adding new entries.
+// TODO(phase-44+): Replace with a build-time export from the JSON files.
+// === END ===
 
 const ALLOWED_ENV_KEYS = new Set([
   "WINEDEBUG",
@@ -477,8 +487,103 @@ interface WikiAppendPayload {
   overwrite?: boolean;
 }
 
-// Allowed wiki page paths — prevents directory traversal and writes outside wiki/
-const WIKI_PAGE_PATTERN = /^(engines|symptoms|environments|games|sessions)\/[a-z0-9-]+\.md$|^log\.md$|^index\.md$/;
+// WIKI_PAGE_PATTERN is imported from ./helpers.ts — generalized to allow any-depth
+// slug path under wiki/ (not restricted to the original 5 subdirectories).
+
+// Raw write — used internally by writeWikiPage and appendToIndex to avoid recursion.
+async function writeWikiPageRaw(
+  page: string,
+  updated: string,
+  commitMessage: string,
+  token: string,
+  repo: string,
+  sha: string | undefined,
+  attempt = 0
+): Promise<void> {
+  const path = `wiki/${page}`;
+  const apiBase = `https://api.github.com/repos/${repo}/contents/${path}`;
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "Content-Type": "application/json",
+    "User-Agent": "cellar-memory-proxy/1.0",
+  };
+  const content = btoa(unescape(encodeURIComponent(updated)));
+  const putBody: Record<string, unknown> = { message: commitMessage, content };
+  if (sha) putBody.sha = sha;
+  const putResp = await fetch(apiBase, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify(putBody),
+  });
+  if (putResp.status === 409 && attempt === 0) {
+    // Concurrent write — refetch sha and retry once
+    const getResp2 = await fetch(apiBase, { headers });
+    let sha2: string | undefined;
+    if (getResp2.ok) {
+      const d = (await getResp2.json()) as { sha: string };
+      sha2 = d.sha;
+    }
+    return writeWikiPageRaw(page, updated, commitMessage, token, repo, sha2, 1);
+  }
+  if (!putResp.ok) {
+    throw new Error(`GitHub PUT failed: ${putResp.status}`);
+  }
+}
+
+// Extract H1 title from the first 5 KB of a page (for index append).
+function extractH1(content: string): string {
+  const snippet = content.slice(0, 5120);
+  const match = snippet.match(/^# (.+)$/m);
+  return match ? match[1].trim() : "";
+}
+
+// Append a single line to wiki/index.md linking to the newly written page.
+// Skips if: page IS index.md (no recursion), or the line is already present.
+async function appendToIndex(
+  page: string,
+  pageContent: string,
+  token: string,
+  repo: string
+): Promise<void> {
+  if (page === "index.md") return; // no recursion
+
+  const h1 = extractH1(pageContent);
+  const line = h1 ? `- [${h1}](${page})` : `- [${page}](${page})`;
+
+  const indexPath = `wiki/index.md`;
+  const apiBase = `https://api.github.com/repos/${repo}/contents/${indexPath}`;
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "Content-Type": "application/json",
+    "User-Agent": "cellar-memory-proxy/1.0",
+  };
+
+  const getResp = await fetch(apiBase, { headers });
+  let sha: string | undefined;
+  let existing = "";
+  if (getResp.ok) {
+    const data = (await getResp.json()) as { sha: string; content: string };
+    sha = data.sha;
+    existing = atob(data.content.replace(/\s/g, ""));
+  } else if (getResp.status !== 404) {
+    // Non-fatal — best effort index update
+    return;
+  }
+
+  // Dedup: skip if line already present
+  if (existing.includes(line)) return;
+
+  const sep = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
+  const updated = existing + sep + line + "\n";
+
+  try {
+    await writeWikiPageRaw("index.md", updated, `wiki: index ${page}`, token, repo, sha);
+  } catch {
+    // Non-fatal — index append failure should not block the main write
+  }
+}
 
 async function writeWikiPage(
   page: string,
@@ -510,36 +615,28 @@ async function writeWikiPage(
     throw new Error(`GitHub GET failed: ${getResp.status}`);
   }
 
-  // Overwrite mode: replace entire file content (used by batch ingest for game pages)
+  // Build updated content
   let updated: string;
-  if (overwrite) {
+  if (overwrite && page.startsWith("games/")) {
+    // Fenced-section merge — preserve agent-authored content outside AUTO fences
+    updated = applyFencedUpdate(existing, entry);
+  } else if (overwrite) {
     updated = entry.endsWith("\n") ? entry : entry + "\n";
   } else {
-    // Server-side substring dedup — the Swift client no longer dedups locally
+    // Append mode — server-side substring dedup
     if (existing.length > 0 && existing.includes(entry.trim())) {
       return "skipped";
     }
-    // Append with a leading newline if existing content does not already end in one
     const sep = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
     updated = existing + sep + entry + "\n";
   }
-  const content = btoa(unescape(encodeURIComponent(updated)));
-  const putBody: Record<string, unknown> = { message: commitMessage, content };
-  if (sha) putBody.sha = sha;
 
-  const putResp = await fetch(apiBase, {
-    method: "PUT",
-    headers,
-    body: JSON.stringify(putBody),
-  });
+  // Write the page
+  await writeWikiPageRaw(page, updated, commitMessage, token, repo, sha);
 
-  if (putResp.status === 409 && attempt === 0) {
-    // Concurrent write — retry once
-    return writeWikiPage(page, entry, commitMessage, token, repo, overwrite, 1);
-  }
-  if (!putResp.ok) {
-    throw new Error(`GitHub PUT failed: ${putResp.status}`);
-  }
+  // Auto-append to wiki/index.md (append strategy, O(1), no full rebuild)
+  await appendToIndex(page, updated, token, repo);
+
   return "ok";
 }
 
@@ -694,8 +791,8 @@ async function handleWikiAppend(
     );
   }
 
-  // Path allowlist — prevent directory traversal
-  if (typeof payload.page !== "string" || !WIKI_PAGE_PATTERN.test(payload.page)) {
+  // Path safety — prevent directory traversal; now uses isPathSafe (imported from helpers)
+  if (typeof payload.page !== "string" || !isPathSafe(payload.page)) {
     return new Response(
       JSON.stringify({ status: "error", message: "invalid_page" }),
       { status: 400, headers: cors }
