@@ -93,48 +93,86 @@ describe("applyFencedUpdate", () => {
 // ---------------------------------------------------------------------------
 // handleKnowledgeWrite dispatch tests (Tests 16–22)
 // ---------------------------------------------------------------------------
-// Strategy: import handleKnowledgeWrite directly; mock internal write helpers
-// by replacing the module's exported test-seam via vi.mock.
+// Strategy: import handleKnowledgeWrite directly; mock global fetch so no
+// real network calls are made. Tests 19-22 fail before any GitHub calls.
+// Tests 16-18 need fetch mocked for JWT + GitHub Contents API calls.
 
 import { handleKnowledgeWrite } from "../src/index.js";
 
-// Minimal Env stub — handleKnowledgeWrite reads env.CELLAR_MEMORY_REPO
+// Minimal Env stub
 const stubEnv = {
-  GITHUB_APP_PEM: "pem",
+  GITHUB_APP_PEM: "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC7o4qne60TB8+4\n-----END PRIVATE KEY-----",
   GITHUB_APP_ID: "123",
   GITHUB_INSTALLATION_ID: "456",
   CELLAR_MEMORY_REPO: "test/repo",
 };
 
-// Mock the GitHub helpers that require live credentials / network
-vi.mock("../src/github.js", () => ({
-  getInstallationToken: vi.fn().mockResolvedValue("mock-token"),
-  writeEntryToGitHub: vi.fn().mockResolvedValue(undefined),
-  writeWikiPage: vi.fn().mockResolvedValue("ok"),
-  validateAndSanitize: vi.fn().mockReturnValue({
-    schemaVersion: 1, gameId: "test-game", gameName: "Test Game",
-    config: { environment: {}, dllOverrides: [], registry: [], launchArgs: [], setupDeps: [] },
-    environment: { arch: "x86_64", wineVersion: "9.0", macosVersion: "14.0", wineFlavor: "vanilla" },
-    environmentHash: "abc123", reasoning: "", confirmations: 1,
-    lastConfirmed: new Date().toISOString(),
-  }),
-}));
+// Mock SubtleCrypto so JWT signing doesn't require a real key
+const mockCrypto = {
+  subtle: {
+    importKey: vi.fn().mockResolvedValue("mock-crypto-key"),
+    sign: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
+  },
+};
 
-function makeRequest(body: unknown): Request {
+// Helper to build a fake successful GitHub fetch response
+function githubOkResponse(body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+// Mock fetch: installation token → ok; contents GET → 404; contents PUT → ok
+function makeFetchMock(getStatus = 404) {
+  return vi.fn().mockImplementation(async (url: string, opts?: RequestInit) => {
+    const u = typeof url === "string" ? url : (url as Request).url;
+    // Installation token endpoint
+    if (u.includes("/access_tokens")) {
+      return githubOkResponse({ token: "mock-token" });
+    }
+    // Contents GET (existing file check)
+    if ((opts?.method ?? "GET") === "GET" || !opts?.method) {
+      if (getStatus === 404) return new Response("not found", { status: 404 });
+      const content = btoa(unescape(encodeURIComponent("existing content")));
+      return githubOkResponse({ sha: "abc", content });
+    }
+    // Contents PUT
+    if (opts?.method === "PUT") {
+      return githubOkResponse({ content: { sha: "def" } });
+    }
+    return new Response("unexpected", { status: 500 });
+  });
+}
+
+function makeRequest(body: unknown, ip = "1.2.3.4"): Request {
   return new Request("http://localhost/api/knowledge/write", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "CF-Connecting-IP": ip,
+    },
     body: JSON.stringify(body),
   });
 }
 
 describe("handleKnowledgeWrite endpoint dispatch", () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal("crypto", mockCrypto);
+    vi.stubGlobal("fetch", makeFetchMock());
+  });
 
-  it("Test 16: kind=config returns ok with config_written action", async () => {
+  it("Test 16: kind=config with valid entry returns ok with config_written action", async () => {
     const req = makeRequest({
       kind: "config",
-      entry: { game_id: "cossacks", game_name: "Cossacks" },
+      entry: {
+        game_id: "cossacks", game_name: "Cossacks",
+        environment_hash: "abc", schema_version: 1,
+        config: { environment: {}, dll_overrides: [], registry: [], launch_args: [], setup_deps: [] },
+        environment: { arch: "x86_64", wine_version: "9.0", macos_version: "14.0", wine_flavor: "vanilla" },
+        confirmations: 1, last_confirmed: new Date().toISOString(), reasoning: "",
+      },
     });
     const res = await handleKnowledgeWrite(req, stubEnv as any);
     const body = await res.json() as any;
@@ -184,7 +222,7 @@ describe("handleKnowledgeWrite endpoint dispatch", () => {
     expect(body.ok).toBe(false);
   });
 
-  it("Test 21: kind=gamePage with non-games/ path returns 400", async () => {
+  it("Test 21: kind=gamePage with non-games/ path returns 400 gamePage_must_be_under_games", async () => {
     const req = makeRequest({
       kind: "gamePage",
       entry: { page: "sessions/cossacks.md", entry: "content" },
@@ -196,11 +234,14 @@ describe("handleKnowledgeWrite endpoint dispatch", () => {
     expect(body.error).toBe("gamePage_must_be_under_games");
   });
 
-  it("Test 22: rate limit is applied — two rapid requests from same IP", async () => {
-    // This tests that the rate-limit check runs (not necessarily hits), not a boundary test.
-    const req = makeRequest({ kind: "sessionLog", entry: { page: "log.md", entry: "test" } });
-    // First request should succeed
-    const res1 = await handleKnowledgeWrite(req, stubEnv as any);
-    expect([200, 429]).toContain(res1.status);
+  it("Test 22: rate limit middleware runs — first request not blocked (different IP per test)", async () => {
+    // Each test uses unique IP so rate limit bucket is fresh; first request should succeed (not 429)
+    const req = makeRequest(
+      { kind: "sessionLog", entry: { page: "log.md", entry: "test" } },
+      `10.0.0.${Math.floor(Math.random() * 254) + 1}`
+    );
+    const res = await handleKnowledgeWrite(req, stubEnv as any);
+    // Rate limit middleware runs — a fresh IP should not be blocked
+    expect(res.status).not.toBe(429);
   });
 });

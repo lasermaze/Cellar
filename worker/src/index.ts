@@ -824,6 +824,98 @@ async function handleWikiAppend(
 }
 
 // ---------------------------------------------------------------------------
+// Shared response helpers
+// ---------------------------------------------------------------------------
+
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type",
+  "Content-Type": "application/json",
+};
+
+function okResponse(payload: Record<string, unknown>): Response {
+  return new Response(JSON.stringify({ ok: true, ...payload }), {
+    status: 200,
+    headers: CORS_HEADERS,
+  });
+}
+
+function errorResponse(status: number, error: string): Response {
+  return new Response(JSON.stringify({ ok: false, error }), {
+    status,
+    headers: CORS_HEADERS,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// /api/knowledge/write — unified write endpoint with discriminated-union dispatch
+// ---------------------------------------------------------------------------
+
+interface KnowledgeWritePayload {
+  kind: "config" | "gamePage" | "sessionLog";
+  entry: unknown; // narrowed inside switch
+}
+
+export async function handleKnowledgeWrite(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  // Apply same rate-limit check as existing endpoints
+  const ip =
+    request.headers.get("CF-Connecting-IP") ??
+    request.headers.get("X-Forwarded-For") ??
+    "unknown";
+  if (isRateLimited(ip)) {
+    return errorResponse(429, "rate_limited");
+  }
+
+  let payload: KnowledgeWritePayload;
+  try {
+    payload = await request.json() as KnowledgeWritePayload;
+  } catch {
+    return errorResponse(400, "invalid_json");
+  }
+  if (!payload || typeof payload.kind !== "string") {
+    return errorResponse(400, "missing_kind");
+  }
+
+  const token = await getInstallationToken(env);
+  const repo = env.CELLAR_MEMORY_REPO ?? "lasermaze/cellar-memory";
+
+  switch (payload.kind) {
+    case "config": {
+      // Reuse existing validation + write logic from handleContribute
+      const validated = validateAndSanitize(payload.entry);
+      if (typeof validated === "string") return errorResponse(400, validated);
+      await writeEntryToGitHub(validated, token, repo);
+      return okResponse({ action: "config_written" });
+    }
+    case "gamePage": {
+      const p = payload.entry as WikiAppendPayload;
+      if (!p?.page || typeof p.page !== "string") return errorResponse(400, "missing_page");
+      if (!p.page.startsWith("games/")) return errorResponse(400, "gamePage_must_be_under_games");
+      if (!isPathSafe(p.page)) return errorResponse(400, "invalid_page");
+      if (typeof p.entry !== "string" || p.entry.trim().length === 0) return errorResponse(400, "empty_entry");
+      const commitMsg = p.commitMessage?.trim() || "knowledge: update game page";
+      await writeWikiPage(p.page, p.entry, commitMsg, token, repo, true /* fenced merge applied inside */);
+      return okResponse({ action: "game_page_written" });
+    }
+    case "sessionLog": {
+      const p = payload.entry as WikiAppendPayload;
+      if (!p?.page || typeof p.page !== "string") return errorResponse(400, "missing_page");
+      if (!isPathSafe(p.page)) return errorResponse(400, "invalid_page");
+      if (typeof p.entry !== "string" || p.entry.trim().length === 0) return errorResponse(400, "empty_entry");
+      const commitMsg = p.commitMessage?.trim() || "knowledge: session log";
+      await writeWikiPage(p.page, p.entry, commitMsg, token, repo, false);
+      return okResponse({ action: "session_log_written" });
+    }
+    default:
+      return errorResponse(400, "unknown_kind");
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Main fetch handler
 // ---------------------------------------------------------------------------
 
@@ -847,6 +939,10 @@ export default {
 
     if (url.pathname === "/api/wiki/append") {
       return handleWikiAppend(request, env);
+    }
+
+    if (request.method === "POST" && url.pathname === "/api/knowledge/write") {
+      return handleKnowledgeWrite(request, env);
     }
 
     return new Response(JSON.stringify({ status: "error", message: "not found" }), {
