@@ -8,21 +8,7 @@ extension AgentTools {
 
     /// The set of environment variable keys the agent is permitted to set.
     /// Shared between the write path (setEnvironment) and the read path (CollectiveMemoryService.sanitizeEntry).
-    static let allowedEnvKeys: Set<String> = [
-        "WINEDLLOVERRIDES",
-        "WINEFSYNC",
-        "WINEESYNC",
-        "WINEDEBUG",
-        "WINE_CPU_TOPOLOGY",
-        "WINE_LARGE_ADDRESS_AWARE",
-        "WINED3D_DISABLE_CSMT",
-        "MESA_GL_VERSION_OVERRIDE",
-        "MESA_GLSL_VERSION_OVERRIDE",
-        "STAGING_SHARED_MEMORY",
-        "DXVK_HUD",
-        "DXVK_FRAME_RATE",
-        "__GL_THREADED_OPTIMIZATIONS"
-    ]
+    static var allowedEnvKeys: Set<String> { PolicyResources.shared.envAllowlist }
 
     // MARK: 5. set_environment
 
@@ -52,12 +38,7 @@ extension AgentTools {
     // MARK: 6. set_registry
 
     /// Allowed HKEY prefix paths for registry edits.
-    private static let allowedRegistryPrefixes: [String] = [
-        "HKEY_CURRENT_USER\\Software\\Wine",
-        "HKEY_CURRENT_USER\\Software\\",
-        "HKEY_LOCAL_MACHINE\\Software\\Wine",
-        "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\DirectX"
-    ]
+    private static var allowedRegistryPrefixes: [String] { PolicyResources.shared.registryAllowlist }
 
     func setRegistry(input: JSONValue) -> String {
         guard let keyPath = input["key_path"]?.asString, !keyPath.isEmpty else {

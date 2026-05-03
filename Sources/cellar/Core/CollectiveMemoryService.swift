@@ -420,7 +420,7 @@ struct CollectiveMemoryService {
         }
 
         // Sanitize registry: validate HKEY prefix, truncate fields
-        let allowedRegistryPrefixes: [String] = ["HKEY_CURRENT_USER\\", "HKEY_LOCAL_MACHINE\\"]
+        let allowedRegistryPrefixes = PolicyResources.shared.registryAllowlist
         let sanitizedRegistry = entry.config.registry.compactMap { record -> RegistryRecord? in
             let truncatedKey = String(record.key.prefix(200))
             guard allowedRegistryPrefixes.contains(where: { truncatedKey.hasPrefix($0) }) else {

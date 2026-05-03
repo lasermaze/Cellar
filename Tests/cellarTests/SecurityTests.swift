@@ -160,7 +160,8 @@ struct SecurityTests {
 
     @Test("sanitizeEntry truncates registry key to 200 chars")
     func sanitizeEntryTruncatesRegistryKey() {
-        let longKey = "HKEY_CURRENT_USER\\" + String(repeating: "x", count: 300)
+        // Key must start with an allowed prefix from registry_allowlist.json
+        let longKey = "HKEY_CURRENT_USER\\Software\\" + String(repeating: "x", count: 300)
         let reg = RegistryRecord(key: longKey, valueName: "v", data: "d", purpose: nil)
         let entry = makeTestEntry(registry: [reg])
         let sanitized = CollectiveMemoryService.sanitizeEntry(entry)
