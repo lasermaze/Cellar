@@ -7,10 +7,28 @@ struct PolicyResourcesTests {
 
     // MARK: Test 1: Bundle.module subdirectory lookup
 
-    @Test("Bundle.module can find policy/system_prompt.md")
+    @Test("Bundle.module can find policy/system_prompt.md via resourcePath")
     func bundleLookup() {
-        let url = Bundle.module.url(forResource: "policy/system_prompt", withExtension: "md")
-        #expect(url != nil, "Bundle.module should resolve policy/system_prompt.md — verify .copy(Resources) in Package.swift and that the file exists at Sources/cellar/Resources/policy/system_prompt.md")
+        // .copy("Resources") places files under <bundle>/Resources/policy/ for main target,
+        // but Bundle.module.resourcePath already points to the Resources/ directory.
+        // The loader handles both layouts; here we confirm at least one resolves.
+        guard let resourcePath = Bundle.module.resourcePath else {
+            Issue.record("Bundle.module.resourcePath is nil")
+            return
+        }
+        // Try the layout where resourcePath already IS the Resources/ subdirectory
+        let directURL = URL(fileURLWithPath: resourcePath)
+            .appendingPathComponent("policy")
+            .appendingPathComponent("system_prompt.md")
+        // Also try the nested layout for non-test builds
+        let nestedURL = URL(fileURLWithPath: resourcePath)
+            .appendingPathComponent("Resources")
+            .appendingPathComponent("policy")
+            .appendingPathComponent("system_prompt.md")
+        let found = FileManager.default.fileExists(atPath: directURL.path)
+                 || FileManager.default.fileExists(atPath: nestedURL.path)
+        #expect(found,
+                "policy/system_prompt.md should exist under Bundle.module (checked \(directURL.path) and \(nestedURL.path))")
     }
 
     // MARK: Test 2: Loader happy path
@@ -39,7 +57,7 @@ struct PolicyResourcesTests {
 
     // MARK: Test 4: Version mismatch throws
 
-    @Test("loadVersionedJSON throws schemaVersionMismatch when version != expected")
+    @Test("_loadVersionedEnvAllowlist throws schemaVersionMismatch when version != expected")
     func versionMismatch() throws {
         // Build a minimal JSON blob with schema_version: 99
         let jsonData = try #require(
