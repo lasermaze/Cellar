@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-05-03T21:37:08.943Z"
+last_updated: "2026-05-03T21:44:11.252Z"
 progress:
   total_phases: 45
   completed_phases: 39
   total_plans: 92
-  completed_plans: 90
+  completed_plans: 92
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 ## Current Position
 
 Phase: 42 (Unify Agent Loop with Single Model Catalog and Typed Tool Boundary) — In Progress
-Plan: P01 complete — ModelCatalog, provider descriptor injection, AIService routing collapse
-Status: Phase 42 P01 COMPLETE — ModelDescriptor, ModelCatalog.all (9 entries), strict resolver, modelPricing dict removed
-Last activity: 2026-05-03 — P01 complete: ModelCatalog.swift created, AgentLoopProvider providers accept descriptor, AIService resolves model at session boundary
+Plan: P02 complete — AgentProvider struct + 3 adapters, AgentLoopProvider.swift deleted
+Status: Phase 42 P02 COMPLETE — AgentLoop.provider concrete (AgentProvider), three adapters own per-provider quirks, old protocol deleted
+Last activity: 2026-05-03 — P02 complete: AgentProvider.swift + Providers/{Anthropic,Deepseek,Kimi}Adapter.swift created, AgentLoopProvider.swift deleted, AgentLoop.provider retyped
 
 Progress: [█████████████████████] Phase 42 P01/P03 done
 
@@ -98,6 +98,7 @@ Progress: [█████████████████████] Phas
 | Phase 41-wiki-as-shared-agent-experience P01 | 5 | 4 tasks | 5 files |
 | Phase 41-wiki-as-shared-agent-experience P01 | 5 | 4 tasks | 5 files |
 | Phase 42 P01 | 185 | 2 tasks | 3 files |
+| Phase 42 P02 | 211 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -231,6 +232,8 @@ Progress: [█████████████████████] Phas
 - [Phase 42-01]: ModelProvider enum introduced as catalog discriminant — AIProvider has associated API key values that can't be stored in a Sendable static table
 - [Phase 42-01]: fallbackModels in AIService.swift is now a computed var over ModelCatalog.all — catalog is single source of truth for model IDs
 - [Phase 42-01]: Unknown model ID at session boundary surfaces as AgentEvent.error and .failed return — no silent (0.0,0.0) pricing fallback
+- [Phase 42-02]: AgentProvider methods are non-mutating — class-bound adapter (AnyObject) avoids protocol-existential copy-on-mutation; no mutating keyword needed at loop boundary
+- [Phase 42-02]: No shared OpenAICompatHelpers.swift — Deepseek/Kimi adapter duplication not loud enough to extract (170 lines each, shared types already in OpenAIToolRequest.swift)
 
 ### Roadmap Evolution
 
@@ -270,4 +273,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-05-03
-Stopped at: Phase 42 P01 complete — ModelCatalog.swift (9 entries, 3 providers), modelPricing dict removed, all three AgentLoopProvider structs accept ModelDescriptor, AIService.runAgentLoop resolves model at session boundary via catalog, unknown model surfaces as AgentEvent.error. Build clean.
+Stopped at: Phase 42 P02 complete — AgentProvider.swift + Providers/{Anthropic,Deepseek,Kimi}Adapter.swift created; AgentLoopProvider.swift (625 lines) deleted; AgentLoop.provider retyped to concrete AgentProvider; AIService three-way switch collapsed to single AgentProvider init. Build clean.

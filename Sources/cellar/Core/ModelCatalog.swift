@@ -27,8 +27,8 @@ struct ModelDescriptor: Sendable {
 
 /// Single source of truth for all supported models and their pricing.
 ///
-/// Pricing values (USD per token) copied from the prior per-provider modelPricing dict
-/// in AgentLoopProvider.swift. Verify against provider pricing pages before each release.
+/// Pricing values (USD per token) originally sourced from the per-provider modelPricing dict.
+/// Verify against provider pricing pages before each release.
 /// deepseek-reasoner intentionally absent — it does not support function calling (Phase 18).
 enum ModelCatalog {
 
