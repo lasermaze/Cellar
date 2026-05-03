@@ -141,7 +141,7 @@ struct OpenAIResponse: Decodable {
 
 /// Recursive JSON value enum for encoding/decoding arbitrary JSON structures.
 /// Used for tool input/output in the agent loop.
-indirect enum JSONValue: Codable, Equatable {
+indirect enum JSONValue: Codable, Equatable, Sendable {
     case string(String)
     case number(Double)
     case bool(Bool)

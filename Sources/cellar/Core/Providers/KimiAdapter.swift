@@ -165,7 +165,7 @@ final class KimiAdapter: ProviderAdapter {
 
         let message = choice.message
         var textBlocks: [String] = []
-        var toolCalls: [(id: String, name: String, input: JSONValue)] = []
+        var toolCalls: [AgentToolCall] = []
 
         if let content = message.content, !content.isEmpty {
             textBlocks.append(content)
@@ -181,7 +181,7 @@ final class KimiAdapter: ProviderAdapter {
                 } catch {
                     throw AgentLoopError.decodingError("Failed to decode tool arguments for '\(call.function.name)': \(error)")
                 }
-                toolCalls.append((id: call.id, name: call.function.name, input: input))
+                toolCalls.append(AgentToolCall(id: call.id, name: call.function.name, input: input))
             }
         }
 

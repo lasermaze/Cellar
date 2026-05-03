@@ -13,7 +13,7 @@ struct AgentLoopProviderResponse {
     }
 
     let textBlocks: [String]
-    let toolCalls: [(id: String, name: String, input: JSONValue)]
+    let toolCalls: [AgentToolCall]
     let stopReason: StopReason
     let inputTokens: Int
     let outputTokens: Int

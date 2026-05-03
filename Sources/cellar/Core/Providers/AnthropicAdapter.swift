@@ -114,14 +114,14 @@ final class AnthropicAdapter: ProviderAdapter {
 
     private func translateAnthropicResponse(_ response: AnthropicToolResponse) -> AgentLoopProviderResponse {
         var textBlocks: [String] = []
-        var toolCalls: [(id: String, name: String, input: JSONValue)] = []
+        var toolCalls: [AgentToolCall] = []
 
         for block in response.content {
             switch block {
             case .text(let t):
                 if !t.isEmpty { textBlocks.append(t) }
             case .toolUse(let id, let name, let input):
-                toolCalls.append((id: id, name: name, input: input))
+                toolCalls.append(AgentToolCall(id: id, name: name, input: input))
             case .toolResult:
                 break // Tool results don't appear in assistant responses
             }
