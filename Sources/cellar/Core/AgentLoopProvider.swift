@@ -36,19 +36,6 @@ protocol AgentLoopProvider {
     mutating func callWithRetry(maxTokens: Int, emit: (AgentEvent) -> Void) async throws -> AgentLoopProviderResponse
 }
 
-// MARK: - Per-Provider Pricing Map
-
-/// Pricing per token for known models (input, output in USD).
-let modelPricing: [String: (input: Double, output: Double)] = [
-    "claude-sonnet-4-6":   (input: 3.0 / 1_000_000,  output: 15.0 / 1_000_000),
-    "claude-opus-4-6":     (input: 15.0 / 1_000_000, output: 75.0 / 1_000_000),
-    "deepseek-chat":       (input: 0.27 / 1_000_000, output: 1.10 / 1_000_000),
-    "deepseek-reasoner":   (input: 0.55 / 1_000_000, output: 2.19 / 1_000_000),
-    "moonshot-v1-8k":      (input: 0.20 / 1_000_000, output: 2.00 / 1_000_000),
-    "moonshot-v1-32k":     (input: 1.00 / 1_000_000, output: 3.00 / 1_000_000),
-    "moonshot-v1-128k":    (input: 2.00 / 1_000_000, output: 5.00 / 1_000_000),
-]
-
 // MARK: - Shared HTTP Helper
 
 /// Async HTTP call using URLSession.data(for:).
@@ -74,16 +61,21 @@ struct AnthropicAgentProvider: AgentLoopProvider {
 
     let apiKey: String
     let modelName: String
-    let maxOutputTokensLimit: Int = 8192
+    let maxOutputTokensLimit: Int
+    private let inputPrice: Double
+    private let outputPrice: Double
     private let tools: [ToolDefinition]
     private let systemPrompt: String
     private var messages: [AnthropicToolRequest.Message] = []
 
     // MARK: Init
 
-    init(apiKey: String, model: String, tools: [ToolDefinition], systemPrompt: String) {
+    init(apiKey: String, descriptor: ModelDescriptor, tools: [ToolDefinition], systemPrompt: String) {
         self.apiKey = apiKey
-        self.modelName = model
+        self.modelName = descriptor.id
+        self.maxOutputTokensLimit = descriptor.maxOutputTokens
+        self.inputPrice = descriptor.inputPricePerToken
+        self.outputPrice = descriptor.outputPricePerToken
         self.tools = tools
         self.systemPrompt = systemPrompt
     }
@@ -91,7 +83,7 @@ struct AnthropicAgentProvider: AgentLoopProvider {
     // MARK: Pricing
 
     func pricingPerToken() -> (input: Double, output: Double) {
-        modelPricing[modelName] ?? (0.0, 0.0)
+        (inputPrice, outputPrice)
     }
 
     // MARK: Message Building
@@ -226,15 +218,20 @@ struct DeepseekAgentProvider: AgentLoopProvider {
 
     let apiKey: String
     let modelName: String
-    let maxOutputTokensLimit: Int = 8192
+    let maxOutputTokensLimit: Int
+    private let inputPrice: Double
+    private let outputPrice: Double
     private let openAITools: [OpenAIToolDef]
     private var messages: [OpenAIToolRequest.Message] = []
 
     // MARK: Init
 
-    init(apiKey: String, model: String = "deepseek-chat", tools: [ToolDefinition], systemPrompt: String) {
+    init(apiKey: String, descriptor: ModelDescriptor, tools: [ToolDefinition], systemPrompt: String) {
         self.apiKey = apiKey
-        self.modelName = model
+        self.modelName = descriptor.id
+        self.maxOutputTokensLimit = descriptor.maxOutputTokens
+        self.inputPrice = descriptor.inputPricePerToken
+        self.outputPrice = descriptor.outputPricePerToken
 
         // Convert ToolDefinition → OpenAIToolDef
         self.openAITools = tools.map { td in
@@ -262,7 +259,7 @@ struct DeepseekAgentProvider: AgentLoopProvider {
     // MARK: Pricing
 
     func pricingPerToken() -> (input: Double, output: Double) {
-        modelPricing[modelName] ?? (0.0, 0.0)
+        (inputPrice, outputPrice)
     }
 
     // MARK: Message Building
@@ -431,15 +428,20 @@ struct KimiAgentProvider: AgentLoopProvider {
 
     let apiKey: String
     let modelName: String
-    let maxOutputTokensLimit: Int = 8192
+    let maxOutputTokensLimit: Int
+    private let inputPrice: Double
+    private let outputPrice: Double
     private let openAITools: [OpenAIToolDef]
     private var messages: [OpenAIToolRequest.Message] = []
 
     // MARK: Init
 
-    init(apiKey: String, model: String = "moonshot-v1-128k", tools: [ToolDefinition], systemPrompt: String) {
+    init(apiKey: String, descriptor: ModelDescriptor, tools: [ToolDefinition], systemPrompt: String) {
         self.apiKey = apiKey
-        self.modelName = model
+        self.modelName = descriptor.id
+        self.maxOutputTokensLimit = descriptor.maxOutputTokens
+        self.inputPrice = descriptor.inputPricePerToken
+        self.outputPrice = descriptor.outputPricePerToken
 
         // Convert ToolDefinition → OpenAIToolDef
         self.openAITools = tools.map { td in
@@ -467,7 +469,7 @@ struct KimiAgentProvider: AgentLoopProvider {
     // MARK: Pricing
 
     func pricingPerToken() -> (input: Double, output: Double) {
-        modelPricing[modelName] ?? (0.0, 0.0)
+        (inputPrice, outputPrice)
     }
 
     // MARK: Message Building

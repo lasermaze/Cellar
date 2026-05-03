@@ -9,23 +9,22 @@ struct AIService {
         let label: String
     }
 
-    /// Fallback models when API fetch fails. First entry is the default.
-    static let fallbackModels: [String: [ModelOption]] = [
-        "claude": [
-            ModelOption(id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6"),
-            ModelOption(id: "claude-opus-4-6", label: "Claude Opus 4.6"),
-            ModelOption(id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5"),
-        ],
-        "deepseek": [
-            ModelOption(id: "deepseek-chat", label: "DeepSeek V3"),
-            ModelOption(id: "deepseek-reasoner", label: "DeepSeek R1"),
-        ],
-        "kimi": [
-            ModelOption(id: "moonshot-v1-128k", label: "Moonshot v1 128K"),
-            ModelOption(id: "moonshot-v1-32k", label: "Moonshot v1 32K"),
-            ModelOption(id: "moonshot-v1-8k", label: "Moonshot v1 8K"),
-        ],
-    ]
+    /// Fallback models when API fetch fails. Derived from ModelCatalog — single source of truth.
+    /// First entry per provider is the default. Provider key strings match modelEndpoints keys.
+    static var fallbackModels: [String: [ModelOption]] {
+        var result: [String: [ModelOption]] = ["claude": [], "deepseek": [], "kimi": []]
+        for descriptor in ModelCatalog.all {
+            switch descriptor.provider {
+            case .anthropic:
+                result["claude"]!.append(ModelOption(id: descriptor.id, label: descriptor.id))
+            case .deepseek:
+                result["deepseek"]!.append(ModelOption(id: descriptor.id, label: descriptor.id))
+            case .kimi:
+                result["kimi"]!.append(ModelOption(id: descriptor.id, label: descriptor.id))
+            }
+        }
+        return result
+    }
 
     /// Provider API endpoints for listing models.
     private static let modelEndpoints: [String: (url: String, keyEnv: String)] = [
@@ -962,27 +961,48 @@ struct AIService {
 
         let config = CellarConfig.load()
 
-        // Create provider with fully built systemPrompt and user-selected model
+        // Resolve model descriptor from catalog at session boundary.
+        // Unknown model IDs surface a clear error here — no silent (0.0, 0.0) fallback.
+        let providerKey: String
+        switch provider {
+        case .anthropic: providerKey = "claude"
+        case .deepseek:  providerKey = "deepseek"
+        case .kimi:      providerKey = "kimi"
+        default:         return .unavailable
+        }
+        let resolvedModelID = resolveModel(for: providerKey)
+        let descriptor: ModelDescriptor
+        do {
+            descriptor = try ModelCatalog.descriptor(for: resolvedModelID)
+        } catch let error as ModelCatalogError {
+            onOutput?(.error(error.localizedDescription))
+            return .failed(error.localizedDescription)
+        } catch {
+            onOutput?(.error(error.localizedDescription))
+            return .failed(error.localizedDescription)
+        }
+
+        // Create provider with fully built systemPrompt and resolved descriptor
         let agentProvider: AgentLoopProvider
         switch provider {
         case .anthropic(let apiKey):
             agentProvider = AnthropicAgentProvider(
                 apiKey: apiKey,
-                model: resolveModel(for: "claude"),
+                descriptor: descriptor,
                 tools: AgentTools.toolDefinitions,
                 systemPrompt: systemPrompt
             )
         case .deepseek(let apiKey):
             agentProvider = DeepseekAgentProvider(
                 apiKey: apiKey,
-                model: resolveModel(for: "deepseek"),
+                descriptor: descriptor,
                 tools: AgentTools.toolDefinitions,
                 systemPrompt: systemPrompt
             )
         case .kimi(let apiKey):
             agentProvider = KimiAgentProvider(
                 apiKey: apiKey,
-                model: resolveModel(for: "kimi"),
+                descriptor: descriptor,
                 tools: AgentTools.toolDefinitions,
                 systemPrompt: systemPrompt
             )
