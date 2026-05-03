@@ -250,6 +250,10 @@ Progress: [████████████████████] 100% (P
 - Phase 41 added (2026-05-02): Wiki as shared agent experience — capture per-session learnings (success and failure) into `wiki/sessions/`. Populate `resolutionNarrative`, add `update_wiki` tool, surface recent sessions via `query_wiki`. Closes the loop from one-way DB cache to journal of what works/doesn't. Plan/context: `.planning/phases/41-.../CONTEXT.md`.
 - Phase 41 P01 COMPLETE (2026-05-02): Worker WIKI_PAGE_PATTERN extended to sessions/; postSessionLog/postFailureSessionLog/scrubPaths/listRecentSessions in WikiService; AIService wired with sessionStartTime, success/failure session log calls, narrative hardcode removed; save_failure tool + hasSubstantiveFailure flag added.
 - Phase 41 P02 COMPLETE (2026-05-02): SessionDraftBuffer (in-memory + on-disk crash-recovery); update_wiki tool (tool 23); midSessionNotes wired from draftBuffer.notes; clearDraft() on success; purgeOldDrafts() at session start; system prompt updated. Phase 41 COMPLETE.
+- Phase 42 added (2026-05-03): Unify agent loop, single model catalog, typed tool boundary — collapse AgentLoop+AgentLoopProvider into one path, single source of truth for model/pricing/budget, replace stringly-typed tool dispatch with typed enum.
+- Phase 43 added (2026-05-03): Extract agent policy data to versioned resources and provider parity — move ~180-line system prompt, engine rules, allowlists out of Swift literals into Resources/; make tool-use first-class for Anthropic, DeepSeek, and Kimi.
+- Phase 44 added (2026-05-03): Collapse memory layer into single KnowledgeStore — unify RecipeEngine, SuccessDatabase, CollectiveMemory{Read,Write}Service, WikiService, WikiIngestService, SessionDraftBuffer behind one schema with local + remote adapters.
+- Phase 45 added (2026-05-03): Split AgentTools, consolidate config, sandbox PageParser — separate immutable session context from mutable runtime actor, single configuration resolver, route extracted fixes through WineFix allowlist before execution.
 
 ### Pending Todos
 
