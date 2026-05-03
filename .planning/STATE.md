@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-05-03T21:56:40.536Z"
+last_updated: "2026-05-03T22:30:30.777Z"
 progress:
   total_phases: 45
   completed_phases: 40
-  total_plans: 92
-  completed_plans: 92
+  total_plans: 95
+  completed_plans: 93
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 42 (Unify Agent Loop with Single Model Catalog and Typed Tool Boundary) — COMPLETE
-Plan: P03 complete — AgentToolName enum, typed dispatch, derived toolDefinitions, Phase 42 COMPLETE
-Status: Phase 42 COMPLETE — ModelCatalog (P01) + AgentProvider/3 adapters (P02) + AgentToolName typed enum (P03) all shipped with green builds
-Last activity: 2026-05-03 — P03 complete: AgentToolName.swift created (24 cases, metadata table); AgentTools.swift 746→225 lines (both string switches deleted, toolDefinitions derived from enum)
+Phase: 43 (Extract agent policy data to versioned resources and achieve provider parity)
+Plan: P01 complete — Six versioned policy files + PolicyResources loader with fail-loud schema-version validation
+Status: Phase 43 P01 COMPLETE — policy files shipped in bundle, loader green, all 4 tests pass; 43-02 (rewire callers) next
+Last activity: 2026-05-03 — P01 complete: system_prompt.md + 5 JSON files under Resources/policy/; PolicyResources.swift + PolicyResourcesTests.swift (4 tests green)
 
 Progress: [█████████████████████] Phase 42 P01/P03 done
 
@@ -100,6 +100,7 @@ Progress: [█████████████████████] Phas
 | Phase 42 P01 | 185 | 2 tasks | 3 files |
 | Phase 42 P02 | 211 | 2 tasks | 7 files |
 | Phase 42 P03 | 344 | 2 tasks | 2 files |
+| Phase 43-extract-agent-policy-data-to-versioned-resources-and-achieve-provider-parity-for-tool-use-across-anthropic-deepseek-and-kimi P01 | 10 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -237,6 +238,9 @@ Progress: [█████████████████████] Phas
 - [Phase 42-02]: No shared OpenAICompatHelpers.swift — Deepseek/Kimi adapter duplication not loud enough to extract (170 lines each, shared types already in OpenAIToolRequest.swift)
 - [Phase 42]: AgentToolName typed enum replaces both switch toolName: String blocks and 510-line hand-authored toolDefinitions array; ToolMetadata @unchecked Sendable + @Sendable closure for Swift 6 static table
 - [Phase 42]: trackPendingAction private method deleted; single tool.pendingActionDescription(for: input) call site; pending-action logic now co-located in AgentToolName metadata table
+- [Phase 43-01]: Bundle.module.url(forResource:withExtension:) does not work with SPM .copy() resources — use resourcePath + manual path construction (dual-layout fallback for test vs main binary bundle structures)
+- [Phase 43-01]: Private EngineDefinitionFile/KnownDLLFile decode structs in PolicyResources.swift — no Codable added to existing EngineDefinition/KnownDLL runtime types (narrow blast radius for 43-02)
+- [Phase 43-01]: PolicyVersionProbe promoted to file-level struct — Swift 6 forbids Decodable types nested in generic functions
 
 ### Roadmap Evolution
 
