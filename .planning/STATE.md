@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-05-03T23:22:11.991Z"
+last_updated: "2026-05-03T23:39:41.403Z"
 progress:
   total_phases: 45
   completed_phases: 41
   total_plans: 99
-  completed_plans: 96
+  completed_plans: 99
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 ## Current Position
 
 Phase: 44 (Collapse memory layer into single KnowledgeStore)
-Plan: P01 complete — KnowledgeEntry/KnowledgeStore/KnowledgeCache foundation; winetricks verbs to PolicyResources; 19 new tests
-Status: Phase 44 IN PROGRESS — P01 foundation types + winetricks policy move complete; P02 Worker; P03 adapters; P04 wiring pending
-Last activity: 2026-05-03 — P01 complete: KnowledgeEntry discriminated union, KnowledgeStore protocol, KnowledgeCache TTL helper; winetricksVerbAllowlist on PolicyResources; 201 total tests (1 pre-existing Kimi model failure unrelated)
+Plan: P03 complete — KnowledgeStoreLocal + KnowledgeStoreRemote adapters; HTTPClient seam; 18 new tests (219 total)
+Status: Phase 44 IN PROGRESS — P01 foundation types; P02 Worker; P03 adapters COMPLETE; P04 wiring pending
+Last activity: 2026-05-03 — P03 complete: KnowledgeStoreLocal (cache-only), KnowledgeStoreRemote (GitHub raw + Worker writes, TTL+stale cache, PolicyResources sanitizer); CellarPaths.knowledgeCacheDir + wikiProxyURL added; 219 total tests (1 pre-existing Kimi failure)
 
 Progress: [█████████████████████] Phase 42 P01/P03 done
 
@@ -104,6 +104,8 @@ Progress: [█████████████████████] Phas
 | Phase 43 P02 | 10 | 2 tasks | 7 files |
 | Phase 43 P03 | 5 | 2 tasks | 8 files |
 | Phase 44 P01 | 5 | 2 tasks | 8 files |
+| Phase 44 P02 | 5 | 2 tasks | 4 files |
+| Phase 44 P03 | 591 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -253,6 +255,13 @@ Progress: [█████████████████████] Phas
 - [Phase 44]: typealias ConfigEntry = CollectiveMemoryEntry — zero schema duplication for KnowledgeEntry config case
 - [Phase 44]: KnowledgeCache key-as-path: / in key creates subdirectories; convention for Plan 03: cache/knowledge/{kind}/{slug}
 - [Phase 44]: KnowledgeStoreContainer enum + nonisolated(unsafe) static var — single-writer-at-startup pattern matching PolicyResources
+- [Phase 44-02]: Pure helpers extracted to src/helpers.ts for vitest testability without Worker runtime
+- [Phase 44-02]: vi.stubGlobal fetch mock used in tests — no module extraction required for handleKnowledgeWrite dispatch tests
+- [Phase 44-02]: writeWikiPageRaw extracted to break appendToIndex recursion; appendToIndex is non-fatal (catch swallows errors)
+- [Phase 44-02]: WIKI_PAGE_PATTERN generalized to any-depth slug; isPathSafe replaces WIKI_PAGE_PATTERN.test() in handleWikiAppend
+- [Phase 44-03]: KnowledgeStoreLocal stores configs as [CollectiveMemoryEntry] JSON array — enables merge/replace by environmentHash on re-write
+- [Phase 44-03]: HTTPClient protocol seam (URLSession extension conformance) + MockHTTP/ThrowingMockHTTP — zero-dep testability without third-party mocking libraries
+- [Phase 44-03]: KnowledgeStoreRemote.write uses typed WorkerWriteEnvelope per kind: config as CollectiveMemoryEntry, gamePage/sessionLog as WikiAppendPayload (overwrite:true/false)
 
 ### Roadmap Evolution
 

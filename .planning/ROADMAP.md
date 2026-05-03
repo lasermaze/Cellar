@@ -554,7 +554,7 @@ Plans:
 **Goal:** Unify three parallel memory paths (CollectiveMemoryService, WikiService, WikiIngestService) into one KnowledgeStore protocol with local + remote adapters. Existing services become thin wrappers over the store. Worker generalized: WIKI_PAGE_PATTERN loosened, fenced-section preservation for game pages, auto-index append, new /api/knowledge/write endpoint. PolicyResources owns the only allowlists (winetricks verbs moved in). Restores config-entry context that was dropped from runAgentLoop.
 **Requirements**: KS-FOUNDATION, KS-POLICY-WINETRICKS, WORKER-WIKI-PATTERN, WORKER-FENCED-GAMES, WORKER-INDEX-APPEND, WORKER-KNOWLEDGE-WRITE, KS-LOCAL-ADAPTER, KS-REMOTE-ADAPTER, KS-WIRE-AISERVICE, KS-WIRE-AGENT-TOOLS, KS-LEGACY-WRAPPERS
 **Depends on:** Phase 43
-**Plans:** 1/4 plans executed
+**Plans:** 3/4 plans executed
 
 Plans:
 - [ ] 44-01-PLAN.md — KnowledgeStore protocol + KnowledgeEntry discriminated union + KnowledgeCache helper + move winetricks verbs to PolicyResources
