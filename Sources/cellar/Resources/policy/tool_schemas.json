@@ -1,0 +1,403 @@
+{
+  "schema_version": 1,
+  "schemas": {
+    "inspect_game": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "read_log": {
+      "type": "object",
+      "properties": {
+        "lines": {
+          "type": "number",
+          "description": "Number of lines to return from the end (default 200, max ~8000 chars)"
+        }
+      },
+      "required": []
+    },
+    "read_registry": {
+      "type": "object",
+      "properties": {
+        "key_path": {
+          "type": "string",
+          "description": "Windows registry key path, e.g. HKCU\\\\Software\\\\Wine\\\\DllOverrides or HKLM\\\\System\\\\CurrentControlSet\\\\Control"
+        },
+        "value_name": {
+          "type": "string",
+          "description": "Optional: specific value name to read. If omitted, returns all values in the section."
+        }
+      },
+      "required": ["key_path"]
+    },
+    "ask_user": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string",
+          "description": "The question to ask the user"
+        },
+        "options": {
+          "type": "array",
+          "description": "Optional: numbered choices to present to the user",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["question"]
+    },
+    "set_environment": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "description": "Environment variable name (e.g. WINEDLLOVERRIDES)"
+        },
+        "value": {
+          "type": "string",
+          "description": "Environment variable value (e.g. ddraw=n,b)"
+        }
+      },
+      "required": ["key", "value"]
+    },
+    "set_registry": {
+      "type": "object",
+      "properties": {
+        "key_path": {
+          "type": "string",
+          "description": "Registry key path, e.g. HKCU\\\\Software\\\\Wine\\\\Direct3D"
+        },
+        "value_name": {
+          "type": "string",
+          "description": "Registry value name"
+        },
+        "data": {
+          "type": "string",
+          "description": "Registry data in .reg format: dword:00000001, \"string\", hex:ff,00,..."
+        }
+      },
+      "required": ["key_path", "value_name", "data"]
+    },
+    "install_winetricks": {
+      "type": "object",
+      "properties": {
+        "verb": {
+          "type": "string",
+          "description": "Winetricks verb to install. Allowed verbs: dotnet48, dotnet40, dotnet35, vcrun2019, vcrun2015, vcrun2013, vcrun2010, vcrun2008, d3dx9, d3dx10, d3dx11_43, d3dcompiler_47, dinput8, dinput, quartz, wmp9, wmp10, dsound, xinput, physx, xact, xactengine3_7"
+        }
+      },
+      "required": ["verb"]
+    },
+    "place_dll": {
+      "type": "object",
+      "properties": {
+        "dll_name": {
+          "type": "string",
+          "description": "DLL name from the known registry (e.g. cnc-ddraw)"
+        },
+        "target": {
+          "type": "string",
+          "enum": ["game_dir", "system32", "syswow64"],
+          "description": "Placement target. If omitted, auto-detects: system DLLs use syswow64 in wow64 bottles, others use game_dir."
+        }
+      },
+      "required": ["dll_name"]
+    },
+    "launch_game": {
+      "type": "object",
+      "properties": {
+        "extra_winedebug": {
+          "type": "string",
+          "description": "Optional additional WINEDEBUG channels (e.g. +d3d,+opengl). Merged with existing WINEDEBUG."
+        },
+        "diagnostic": {
+          "type": "boolean",
+          "description": "If true, this is a quick diagnostic launch (shorter timeout, more verbose output). Does NOT count toward the 8-launch limit. Default false."
+        }
+      },
+      "required": []
+    },
+    "save_recipe": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Human-readable recipe name (e.g. 'Cossacks European Wars - Working Config')"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional notes about the configuration or what fixed the game"
+        }
+      },
+      "required": ["name"]
+    },
+    "write_game_file": {
+      "type": "object",
+      "properties": {
+        "relative_path": {
+          "type": "string",
+          "description": "File path relative to the game executable directory (e.g. 'ddraw.ini' or 'data/mode.dat')"
+        },
+        "content": {
+          "type": "string",
+          "description": "The text content to write to the file"
+        }
+      },
+      "required": ["relative_path", "content"]
+    },
+    "read_game_file": {
+      "type": "object",
+      "properties": {
+        "relative_path": {
+          "type": "string",
+          "description": "File path relative to the game executable directory (e.g. 'DeusEx.ini' or 'data/config.cfg')"
+        }
+      },
+      "required": ["relative_path"]
+    },
+    "trace_launch": {
+      "type": "object",
+      "properties": {
+        "debug_channels": {
+          "type": "array",
+          "description": "Wine debug channels to enable (default [\"+loaddll\"])",
+          "items": {
+            "type": "string"
+          }
+        },
+        "timeout_seconds": {
+          "type": "number",
+          "description": "Seconds to wait before killing the process (default 5)"
+        }
+      },
+      "required": []
+    },
+    "check_file_access": {
+      "type": "object",
+      "properties": {
+        "paths": {
+          "type": "array",
+          "description": "Relative file paths to check from the game executable's directory",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["paths"]
+    },
+    "verify_dll_override": {
+      "type": "object",
+      "properties": {
+        "dll_name": {
+          "type": "string",
+          "description": "DLL name to verify (e.g. \"ddraw\")"
+        }
+      },
+      "required": ["dll_name"]
+    },
+    "query_successdb": {
+      "type": "object",
+      "properties": {
+        "game_id": {
+          "type": "string",
+          "description": "Exact game ID to look up (e.g. 'cossacks-european-wars')"
+        },
+        "tags": {
+          "type": "array",
+          "description": "Tags to match (any overlap). E.g. ['directdraw', '2d-rts']",
+          "items": {
+            "type": "string"
+          }
+        },
+        "engine": {
+          "type": "string",
+          "description": "Engine name substring to match (e.g. 'unreal', 'source')"
+        },
+        "graphics_api": {
+          "type": "string",
+          "description": "Graphics API substring to match (e.g. 'directdraw', 'd3d9')"
+        },
+        "symptom": {
+          "type": "string",
+          "description": "Symptom description for fuzzy matching against known pitfalls (e.g. 'black screen on launch')"
+        },
+        "similar_games": {
+          "type": "object",
+          "description": "Find games with similar characteristics. Returns cross-game matches ranked by signal overlap (engine weight 3, graphics_api weight 2, tags weight 1 each, symptom weight 1). Requires at least engine or graphics_api.",
+          "properties": {
+            "engine": {
+              "type": "string",
+              "description": "Engine to match (e.g. 'unreal')"
+            },
+            "graphics_api": {
+              "type": "string",
+              "description": "Graphics API to match (e.g. 'directdraw')"
+            },
+            "tags": {
+              "type": "array",
+              "description": "Tags for overlap scoring",
+              "items": {
+                "type": "string"
+              }
+            },
+            "symptom": {
+              "type": "string",
+              "description": "Symptom for pitfall matching"
+            }
+          }
+        }
+      },
+      "required": []
+    },
+    "save_success": {
+      "type": "object",
+      "properties": {
+        "game_name": {
+          "type": "string",
+          "description": "Human-readable game name (e.g. 'Cossacks: European Wars')"
+        },
+        "game_version": {
+          "type": "string",
+          "description": "Game version if known"
+        },
+        "source": {
+          "type": "string",
+          "description": "Game source: 'gog', 'steam', 'disc', 'other'"
+        },
+        "engine": {
+          "type": "string",
+          "description": "Game engine if known (e.g. 'custom', 'unreal', 'source')"
+        },
+        "graphics_api": {
+          "type": "string",
+          "description": "Primary graphics API: 'directdraw', 'direct3d8', 'direct3d9', 'opengl'"
+        },
+        "bottle_type": {
+          "type": "string",
+          "description": "Wine bottle type: 'wow64' or 'standard'"
+        },
+        "working_directory_notes": {
+          "type": "string",
+          "description": "Notes about working directory requirements"
+        },
+        "dll_overrides": {
+          "type": "array",
+          "description": "DLL overrides applied. Each object: {dll, mode, placement?, source?}",
+          "items": {
+            "type": "object"
+          }
+        },
+        "game_config_files": {
+          "type": "array",
+          "description": "Game config files modified. Each: {path, purpose, critical_settings?}",
+          "items": {
+            "type": "object"
+          }
+        },
+        "registry": {
+          "type": "array",
+          "description": "Registry entries set. Each: {key, value_name, data, purpose?}",
+          "items": {
+            "type": "object"
+          }
+        },
+        "game_specific_dlls": {
+          "type": "array",
+          "description": "Game-specific DLLs placed. Each: {filename, source, placement, version?}",
+          "items": {
+            "type": "object"
+          }
+        },
+        "pitfalls": {
+          "type": "array",
+          "description": "Pitfalls encountered. Each: {symptom, cause, fix, wrong_fix?}",
+          "items": {
+            "type": "object"
+          }
+        },
+        "resolution_narrative": {
+          "type": "string",
+          "description": "Free-text narrative of the resolution process and what finally worked"
+        },
+        "tags": {
+          "type": "array",
+          "description": "Searchable tags for this game (e.g. ['directdraw', '2d-rts', 'gog', 'cnc-ddraw'])",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["game_name", "resolution_narrative"]
+    },
+    "search_web": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query for Wine compatibility info (e.g. 'Cossacks European Wars Wine compatibility')"
+        }
+      },
+      "required": ["query"]
+    },
+    "fetch_page": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "URL to fetch and extract text from"
+        }
+      },
+      "required": ["url"]
+    },
+    "list_windows": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    },
+    "query_compatibility": {
+      "type": "object",
+      "properties": {
+        "game_name": {
+          "type": "string",
+          "description": "Game name to search for (e.g. 'Deus Ex', 'Cossacks European Wars')"
+        }
+      },
+      "required": ["game_name"]
+    },
+    "query_wiki": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search query — game name, engine, symptom, or keyword (e.g. 'directdraw black screen', 'unity wine crash', 'dxvk apple silicon')"
+        }
+      },
+      "required": ["query"]
+    },
+    "save_failure": {
+      "type": "object",
+      "properties": {
+        "narrative": {
+          "type": "string",
+          "description": "Prose describing what you tried, what worked partially, and the final blocker. 2-5 sentences. Be specific."
+        },
+        "blocking_symptom": {
+          "type": "string",
+          "description": "Short tag for the failure mode (e.g. 'd3d9_init_fail', 'intro_video_crash', 'menu_freeze')."
+        }
+      },
+      "required": ["narrative", "blocking_symptom"]
+    },
+    "update_wiki": {
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string",
+          "description": "One short observation (1-3 sentences). Will be timestamped and attached to the session log."
+        }
+      },
+      "required": ["content"]
+    }
+  }
+}

@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "engines": [
+    {
+      "name": "GSC/DMCR",
+      "family": "gsc",
+      "file_patterns": ["fsgame.ltx", "xr_3da.exe", "dmcr.exe", "*.db0", "*.db1"],
+      "pe_import_signals": ["ddraw.dll"],
+      "string_signatures": ["X-Ray Engine", "GSC Game World", "DMCR"],
+      "typical_graphics_api": "directdraw"
+    },
+    {
+      "name": "Unreal 1",
+      "family": "unreal1",
+      "file_patterns": ["*.u", "*.utx", "*.uax", "*.umx", "*.unr"],
+      "pe_import_signals": ["d3d8.dll", "d3d9.dll"],
+      "string_signatures": ["Unreal Engine", "Epic Games"],
+      "typical_graphics_api": "direct3d9"
+    },
+    {
+      "name": "Build",
+      "family": "build",
+      "file_patterns": ["*.grp", "*.art", "game.con", "defs.con", "build.exe", "commit.dat"],
+      "pe_import_signals": ["ddraw.dll"],
+      "string_signatures": ["Build Engine", "Ken Silverman"],
+      "typical_graphics_api": "directdraw"
+    },
+    {
+      "name": "id Tech 2/3",
+      "family": "idtech",
+      "file_patterns": ["*.pak", "*.pk3", "baseq2/", "baseq3/", "id1/"],
+      "pe_import_signals": ["opengl32.dll"],
+      "string_signatures": ["id Tech", "id Software", "Quake"],
+      "typical_graphics_api": "opengl"
+    },
+    {
+      "name": "Unity",
+      "family": "unity",
+      "file_patterns": ["unityplayer.dll", "*_data/", "globalgamemanagers", "assembly-csharp.dll", "managed/"],
+      "pe_import_signals": [],
+      "string_signatures": ["Unity Engine", "UnityMain"],
+      "typical_graphics_api": "direct3d9"
+    },
+    {
+      "name": "UE4/5",
+      "family": "unreal4",
+      "file_patterns": ["*.uasset", "*.uexp", "*.utoc", "*.ucas"],
+      "pe_import_signals": ["d3d11.dll", "d3d9.dll"],
+      "string_signatures": ["Unreal Engine 4", "Unreal Engine 5", "Epic Games"],
+      "typical_graphics_api": "direct3d11"
+    },
+    {
+      "name": "Westwood",
+      "family": "westwood",
+      "file_patterns": ["*.mix", "conquer.mix", "redalert.mix", "tibsun.mix", "ra2.mix", "scores.mix", "local.mix"],
+      "pe_import_signals": ["ddraw.dll"],
+      "string_signatures": ["Westwood Studios", "Command & Conquer"],
+      "typical_graphics_api": "directdraw"
+    },
+    {
+      "name": "Blizzard",
+      "family": "blizzard",
+      "file_patterns": ["*.mpq", "diabdat.mpq", "stardat.mpq", "war3.mpq", "d2data.mpq"],
+      "pe_import_signals": ["ddraw.dll", "dsound.dll"],
+      "string_signatures": ["Blizzard Entertainment", "Battle.net"],
+      "typical_graphics_api": "directdraw"
+    }
+  ]
+}
