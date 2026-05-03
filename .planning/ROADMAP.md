@@ -539,13 +539,15 @@ Plans:
 
 ### Phase 43: Extract agent policy data to versioned resources and achieve provider parity for tool-use across Anthropic DeepSeek and Kimi
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Externalize the agent loop system prompt, engine families, KnownDLL registry, env/registry allowlists, and tool input schemas into versioned files under `Sources/cellar/Resources/policy/`, loaded via a single fail-loud `PolicyResources` loader; introduce a canonical `AgentToolCall` struct so Anthropic, DeepSeek, and Kimi adapters all route the 24-tool surface through native function-calling with no JSON-in-text fallback.
+**Requirements**: POL-01, POL-02, POL-03, POL-04, POL-05, TUP-01, TUP-02, TUP-03, TUP-04, TUP-05
 **Depends on:** Phase 42
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 43 to break down)
+- [ ] 43-01-PLAN.md — Policy resource files + PolicyResources loader + tests (zero behavior change)
+- [ ] 43-02-PLAN.md — Rewire callers (AIService prompt, ConfigTools allowlists, EngineRegistry, KnownDLLRegistry, AgentToolName schemas, CollectiveMemoryService) to PolicyResources
+- [ ] 43-03-PLAN.md — AgentToolCall struct + retype AgentLoopProviderResponse + three-adapter parity + per-provider round-trip tests
 
 ### Phase 44: Collapse memory layer into single KnowledgeStore with one schema and local plus remote adapters
 
