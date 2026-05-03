@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-05-03T22:30:30.777Z"
+last_updated: "2026-05-03T22:43:37.447Z"
 progress:
   total_phases: 45
   completed_phases: 40
   total_plans: 95
-  completed_plans: 93
+  completed_plans: 94
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 ## Current Position
 
 Phase: 43 (Extract agent policy data to versioned resources and achieve provider parity)
-Plan: P01 complete — Six versioned policy files + PolicyResources loader with fail-loud schema-version validation
-Status: Phase 43 P01 COMPLETE — policy files shipped in bundle, loader green, all 4 tests pass; 43-02 (rewire callers) next
-Last activity: 2026-05-03 — P01 complete: system_prompt.md + 5 JSON files under Resources/policy/; PolicyResources.swift + PolicyResourcesTests.swift (4 tests green)
+Plan: P02 complete — All six policy literal sources rewired to PolicyResources.shared; 829 lines removed from Swift sources
+Status: Phase 43 P02 COMPLETE — AIService, ConfigTools, EngineRegistry, KnownDLLRegistry, AgentToolName, CollectiveMemoryService all delegate to PolicyResources; build green; Phase 43 COMPLETE pending P03 (provider parity)
+Last activity: 2026-05-03 — P02 complete: ~829 LOC of inline policy data removed; all existing tests pass (176/177; pre-existing CellarConfig Kimi model failure unrelated)
 
 Progress: [█████████████████████] Phase 42 P01/P03 done
 
@@ -101,6 +101,7 @@ Progress: [█████████████████████] Phas
 | Phase 42 P02 | 211 | 2 tasks | 7 files |
 | Phase 42 P03 | 344 | 2 tasks | 2 files |
 | Phase 43-extract-agent-policy-data-to-versioned-resources-and-achieve-provider-parity-for-tool-use-across-anthropic-deepseek-and-kimi P01 | 10 | 2 tasks | 8 files |
+| Phase 43 P02 | 10 | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -241,6 +242,8 @@ Progress: [█████████████████████] Phas
 - [Phase 43-01]: Bundle.module.url(forResource:withExtension:) does not work with SPM .copy() resources — use resourcePath + manual path construction (dual-layout fallback for test vs main binary bundle structures)
 - [Phase 43-01]: Private EngineDefinitionFile/KnownDLLFile decode structs in PolicyResources.swift — no Codable added to existing EngineDefinition/KnownDLL runtime types (narrow blast radius for 43-02)
 - [Phase 43-01]: PolicyVersionProbe promoted to file-level struct — Swift 6 forbids Decodable types nested in generic functions
+- [Phase 43-02]: private static func schema(for:) in AgentToolName rather than per-case inlining — keeps delegation pattern visible in one place; fallback is a minimally-valid empty-object schema
+- [Phase 43-02]: ConfigTools.allowedRegistryPrefixes kept private — CollectiveMemoryService reads PolicyResources.shared.registryAllowlist directly (no visibility change needed)
 
 ### Roadmap Evolution
 
