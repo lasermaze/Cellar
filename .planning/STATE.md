@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-05-03T23:39:41.403Z"
+last_updated: "2026-05-03T23:54:15.706Z"
 progress:
   total_phases: 45
-  completed_phases: 41
+  completed_phases: 42
   total_plans: 99
   completed_plans: 99
 ---
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 ## Current Position
 
 Phase: 44 (Collapse memory layer into single KnowledgeStore)
-Plan: P03 complete — KnowledgeStoreLocal + KnowledgeStoreRemote adapters; HTTPClient seam; 18 new tests (219 total)
-Status: Phase 44 IN PROGRESS — P01 foundation types; P02 Worker; P03 adapters COMPLETE; P04 wiring pending
-Last activity: 2026-05-03 — P03 complete: KnowledgeStoreLocal (cache-only), KnowledgeStoreRemote (GitHub raw + Worker writes, TTL+stale cache, PolicyResources sanitizer); CellarPaths.knowledgeCacheDir + wikiProxyURL added; 219 total tests (1 pre-existing Kimi failure)
+Plan: P04 complete — KnowledgeStoreContainer.shared live path; AIService rewired; legacy services thin wrappers; 232 tests
+Status: Phase 44 COMPLETE — P01 foundation; P02 Worker; P03 adapters; P04 wiring ALL DONE
+Last activity: 2026-05-03 — P04 complete: 5 AIService call sites rewired; 4 legacy services thin wrappers; agentValidWinetricksVerbs deleted; queryWiki routes through store; 232 total tests (13 new, 1 pre-existing Kimi failure)
 
 Progress: [█████████████████████] Phase 42 P01/P03 done
 
@@ -106,6 +106,7 @@ Progress: [█████████████████████] Phas
 | Phase 44 P01 | 5 | 2 tasks | 8 files |
 | Phase 44 P02 | 5 | 2 tasks | 4 files |
 | Phase 44 P03 | 591 | 2 tasks | 5 files |
+| Phase 44 P04 | 622 | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -262,6 +263,9 @@ Progress: [█████████████████████] Phas
 - [Phase 44-03]: KnowledgeStoreLocal stores configs as [CollectiveMemoryEntry] JSON array — enables merge/replace by environmentHash on re-write
 - [Phase 44-03]: HTTPClient protocol seam (URLSession extension conformance) + MockHTTP/ThrowingMockHTTP — zero-dep testability without third-party mocking libraries
 - [Phase 44-03]: KnowledgeStoreRemote.write uses typed WorkerWriteEnvelope per kind: config as CollectiveMemoryEntry, gamePage/sessionLog as WikiAppendPayload (overwrite:true/false)
+- [Phase 44-04]: KnowledgeStoreRemote registered at runAgentLoop entry (not app init) — idempotent NoOpKnowledgeStore guard matches PolicyResources.shared pattern
+- [Phase 44-04]: agentValidWinetricksVerbs Set literal deleted; replaced with computed var delegating to PolicyResources.shared.winetricksVerbAllowlist — single source of truth achieved
+- [Phase 44-04]: Legacy services kept as thin wrappers (not deleted) — safe public API surface; future deletion phase removes them after migrating remaining unique helpers
 
 ### Roadmap Evolution
 
@@ -301,4 +305,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-05-03
-Stopped at: Phase 44 P01 complete — KnowledgeEntry/KnowledgeStore/KnowledgeCache foundation; winetricksVerbAllowlist on PolicyResources; 201 tests green (1 pre-existing Kimi failure unrelated).
+Stopped at: Phase 44 P04 complete — KnowledgeStoreContainer.shared is live data path; 5 AIService call sites rewired; 4 legacy services converted to thin wrappers; agentValidWinetricksVerbs literal deleted; 232 tests (13 new integration tests, 1 pre-existing Kimi failure).
