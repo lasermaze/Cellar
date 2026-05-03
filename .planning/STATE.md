@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-05-03T21:44:11.252Z"
+last_updated: "2026-05-03T21:53:03.206Z"
 progress:
   total_phases: 45
-  completed_phases: 39
+  completed_phases: 40
   total_plans: 92
   completed_plans: 92
 ---
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 42 (Unify Agent Loop with Single Model Catalog and Typed Tool Boundary) — In Progress
-Plan: P02 complete — AgentProvider struct + 3 adapters, AgentLoopProvider.swift deleted
-Status: Phase 42 P02 COMPLETE — AgentLoop.provider concrete (AgentProvider), three adapters own per-provider quirks, old protocol deleted
-Last activity: 2026-05-03 — P02 complete: AgentProvider.swift + Providers/{Anthropic,Deepseek,Kimi}Adapter.swift created, AgentLoopProvider.swift deleted, AgentLoop.provider retyped
+Phase: 42 (Unify Agent Loop with Single Model Catalog and Typed Tool Boundary) — COMPLETE
+Plan: P03 complete — AgentToolName enum, typed dispatch, derived toolDefinitions, Phase 42 COMPLETE
+Status: Phase 42 COMPLETE — ModelCatalog (P01) + AgentProvider/3 adapters (P02) + AgentToolName typed enum (P03) all shipped with green builds
+Last activity: 2026-05-03 — P03 complete: AgentToolName.swift created (24 cases, metadata table); AgentTools.swift 746→225 lines (both string switches deleted, toolDefinitions derived from enum)
 
 Progress: [█████████████████████] Phase 42 P01/P03 done
 
@@ -99,6 +99,7 @@ Progress: [█████████████████████] Phas
 | Phase 41-wiki-as-shared-agent-experience P01 | 5 | 4 tasks | 5 files |
 | Phase 42 P01 | 185 | 2 tasks | 3 files |
 | Phase 42 P02 | 211 | 2 tasks | 7 files |
+| Phase 42 P03 | 344 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -234,6 +235,8 @@ Progress: [█████████████████████] Phas
 - [Phase 42-01]: Unknown model ID at session boundary surfaces as AgentEvent.error and .failed return — no silent (0.0,0.0) pricing fallback
 - [Phase 42-02]: AgentProvider methods are non-mutating — class-bound adapter (AnyObject) avoids protocol-existential copy-on-mutation; no mutating keyword needed at loop boundary
 - [Phase 42-02]: No shared OpenAICompatHelpers.swift — Deepseek/Kimi adapter duplication not loud enough to extract (170 lines each, shared types already in OpenAIToolRequest.swift)
+- [Phase 42]: AgentToolName typed enum replaces both switch toolName: String blocks and 510-line hand-authored toolDefinitions array; ToolMetadata @unchecked Sendable + @Sendable closure for Swift 6 static table
+- [Phase 42]: trackPendingAction private method deleted; single tool.pendingActionDescription(for: input) call site; pending-action logic now co-located in AgentToolName metadata table
 
 ### Roadmap Evolution
 
