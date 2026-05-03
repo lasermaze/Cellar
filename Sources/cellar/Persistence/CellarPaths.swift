@@ -155,6 +155,20 @@ struct CellarPaths {
         wikiCacheDir.appendingPathComponent(relativePath)
     }
 
+    /// Root directory for unified KnowledgeStore cache: ~/.cellar/cache/knowledge/
+    /// Sub-paths: knowledge/config/, knowledge/game-page/, knowledge/session-log/
+    static var knowledgeCacheDir: URL {
+        base.appendingPathComponent("cache/knowledge", isDirectory: true)
+    }
+
+    /// Base URL for the Cloudflare Worker knowledge-write proxy.
+    /// Reads CELLAR_WIKI_PROXY_URL from environment, falls back to production Worker URL.
+    static var wikiProxyURL: URL {
+        let override = ProcessInfo.processInfo.environment["CELLAR_WIKI_PROXY_URL"]
+        let defaultURL = "https://cellar-memory-proxy.sook40.workers.dev"
+        return URL(string: override ?? defaultURL)!
+    }
+
     // Diagnostics directory: ~/.cellar/diagnostics/
     static let diagnosticsDir: URL = base.appendingPathComponent("diagnostics")
 
