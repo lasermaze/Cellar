@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-05-03T22:43:37.447Z"
+last_updated: "2026-05-03T22:52:59.974Z"
 progress:
   total_phases: 45
-  completed_phases: 40
+  completed_phases: 41
   total_plans: 95
-  completed_plans: 94
+  completed_plans: 95
 ---
 
 # Project State
@@ -23,9 +23,9 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 ## Current Position
 
 Phase: 43 (Extract agent policy data to versioned resources and achieve provider parity)
-Plan: P02 complete — All six policy literal sources rewired to PolicyResources.shared; 829 lines removed from Swift sources
-Status: Phase 43 P02 COMPLETE — AIService, ConfigTools, EngineRegistry, KnownDLLRegistry, AgentToolName, CollectiveMemoryService all delegate to PolicyResources; build green; Phase 43 COMPLETE pending P03 (provider parity)
-Last activity: 2026-05-03 — P02 complete: ~829 LOC of inline policy data removed; all existing tests pass (176/177; pre-existing CellarConfig Kimi model failure unrelated)
+Plan: P03 complete — AgentToolCall struct introduced; all three adapters updated; 9 adapter round-trip tests green
+Status: Phase 43 COMPLETE — P01 PolicyResources bundle; P02 rewire all policy literals; P03 AgentToolCall struct + provider parity tests; all TUP requirements closed
+Last activity: 2026-05-03 — P03 complete: AgentToolCall replaces anonymous tuple; JSONValue gains Sendable; 9 new tests (186 total, 1 pre-existing Kimi model failure unrelated)
 
 Progress: [█████████████████████] Phase 42 P01/P03 done
 
@@ -102,6 +102,7 @@ Progress: [█████████████████████] Phas
 | Phase 42 P03 | 344 | 2 tasks | 2 files |
 | Phase 43-extract-agent-policy-data-to-versioned-resources-and-achieve-provider-parity-for-tool-use-across-anthropic-deepseek-and-kimi P01 | 10 | 2 tasks | 8 files |
 | Phase 43 P02 | 10 | 2 tasks | 7 files |
+| Phase 43 P03 | 5 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -244,6 +245,9 @@ Progress: [█████████████████████] Phas
 - [Phase 43-01]: PolicyVersionProbe promoted to file-level struct — Swift 6 forbids Decodable types nested in generic functions
 - [Phase 43-02]: private static func schema(for:) in AgentToolName rather than per-case inlining — keeps delegation pattern visible in one place; fallback is a minimally-valid empty-object schema
 - [Phase 43-02]: ConfigTools.allowedRegistryPrefixes kept private — CollectiveMemoryService reads PolicyResources.shared.registryAllowlist directly (no visibility change needed)
+- [Phase 43-03]: JSONValue gains Sendable: required by AgentToolCall.input field; all JSONValue cases hold value types so conformance is safe
+- [Phase 43-03]: Internal testable helpers (translateResponse/encodedAssistantBlocks) in adapters keep private implementation hidden while enabling deterministic unit tests without HTTP
+- [Phase 43-03]: AgentToolCall struct replaces anonymous tuple: struct property access is syntactically identical to named-tuple label access in Swift — AgentLoop and AgentTools required zero changes
 
 ### Roadmap Evolution
 

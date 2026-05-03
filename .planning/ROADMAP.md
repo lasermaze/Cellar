@@ -542,7 +542,7 @@ Plans:
 **Goal:** Externalize the agent loop system prompt, engine families, KnownDLL registry, env/registry allowlists, and tool input schemas into versioned files under `Sources/cellar/Resources/policy/`, loaded via a single fail-loud `PolicyResources` loader; introduce a canonical `AgentToolCall` struct so Anthropic, DeepSeek, and Kimi adapters all route the 24-tool surface through native function-calling with no JSON-in-text fallback.
 **Requirements**: POL-01, POL-02, POL-03, POL-04, POL-05, TUP-01, TUP-02, TUP-03, TUP-04, TUP-05
 **Depends on:** Phase 42
-**Plans:** 2/3 plans executed
+**Plans:** 3/3 plans complete
 
 Plans:
 - [ ] 43-01-PLAN.md — Policy resource files + PolicyResources loader + tests (zero behavior change)
