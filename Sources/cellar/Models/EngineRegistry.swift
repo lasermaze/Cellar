@@ -24,83 +24,8 @@ struct EngineRegistry {
 
     // MARK: - Engine Definitions
 
-    // Source: SteamDB FileDetectionRuleSets + PCGamingWiki + enginedetect.py
-    static let engines: [EngineDefinition] = [
-        // 1. GSC/DMCR (X-Ray Engine) — S.T.A.L.K.E.R., Cossacks, American Conquest
-        EngineDefinition(
-            name: "GSC/DMCR",
-            family: "gsc",
-            filePatterns: ["fsgame.ltx", "xr_3da.exe", "dmcr.exe", "*.db0", "*.db1"],
-            peImportSignals: ["ddraw.dll"],
-            stringSignatures: ["X-Ray Engine", "GSC Game World", "DMCR"],
-            typicalGraphicsApi: "directdraw"
-        ),
-        // 2. Unreal Engine 1 — Unreal, Unreal Tournament, Deus Ex, Rune
-        EngineDefinition(
-            name: "Unreal 1",
-            family: "unreal1",
-            filePatterns: ["*.u", "*.utx", "*.uax", "*.umx", "*.unr"],
-            peImportSignals: ["d3d8.dll", "d3d9.dll"],
-            stringSignatures: ["Unreal Engine", "Epic Games"],
-            typicalGraphicsApi: "direct3d9"
-        ),
-        // 3. Build Engine — Duke Nukem 3D, Shadow Warrior, Blood
-        EngineDefinition(
-            name: "Build",
-            family: "build",
-            filePatterns: ["*.grp", "*.art", "game.con", "defs.con", "build.exe", "commit.dat"],
-            peImportSignals: ["ddraw.dll"],
-            stringSignatures: ["Build Engine", "Ken Silverman"],
-            typicalGraphicsApi: "directdraw"
-        ),
-        // 4. id Tech 2/3 — Quake, Quake 2, Quake 3, RTCW, CoD
-        EngineDefinition(
-            name: "id Tech 2/3",
-            family: "idtech",
-            filePatterns: ["*.pak", "*.pk3", "baseq2/", "baseq3/", "id1/"],
-            peImportSignals: ["opengl32.dll"],
-            stringSignatures: ["id Tech", "id Software", "Quake"],
-            typicalGraphicsApi: "opengl"
-        ),
-        // 5. Unity — broad modern engine
-        EngineDefinition(
-            name: "Unity",
-            family: "unity",
-            filePatterns: ["unityplayer.dll", "*_data/", "globalgamemanagers", "assembly-csharp.dll", "managed/"],
-            peImportSignals: [],
-            stringSignatures: ["Unity Engine", "UnityMain"],
-            typicalGraphicsApi: "direct3d9"
-        ),
-        // 6. UE4/5 — Unreal Engine 4 and 5
-        EngineDefinition(
-            name: "UE4/5",
-            family: "unreal4",
-            filePatterns: ["*.uasset", "*.uexp", "*.utoc", "*.ucas"],
-            peImportSignals: ["d3d11.dll", "d3d9.dll"],
-            stringSignatures: ["Unreal Engine 4", "Unreal Engine 5", "Epic Games"],
-            typicalGraphicsApi: "direct3d11"
-        ),
-        // 7. Westwood — Command & Conquer, Red Alert, Tiberian Sun
-        EngineDefinition(
-            name: "Westwood",
-            family: "westwood",
-            filePatterns: ["*.mix", "conquer.mix", "redalert.mix", "tibsun.mix",
-                           "ra2.mix", "scores.mix", "local.mix"],
-            peImportSignals: ["ddraw.dll"],
-            stringSignatures: ["Westwood Studios", "Command & Conquer"],
-            typicalGraphicsApi: "directdraw"
-        ),
-        // 8. Blizzard — Diablo, StarCraft, Warcraft
-        EngineDefinition(
-            name: "Blizzard",
-            family: "blizzard",
-            filePatterns: ["*.mpq", "diabdat.mpq", "stardat.mpq",
-                           "war3.mpq", "d2data.mpq"],
-            peImportSignals: ["ddraw.dll", "dsound.dll"],
-            stringSignatures: ["Blizzard Entertainment", "Battle.net"],
-            typicalGraphicsApi: "directdraw"
-        ),
-    ]
+    // Source: Resources/policy/engines.json (schema_version: 1)
+    static var engines: [EngineDefinition] { PolicyResources.shared.engineDefinitions }
 
     // MARK: - Unique file patterns (high weight)
 
