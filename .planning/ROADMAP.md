@@ -526,3 +526,43 @@ Plans:
 Plans:
 - [ ] 41-01-PLAN.md — Phase A: Worker regex fix, postSessionLog writer, success+failure path wiring (gathered from AgentTools state), narrative passthrough, query_wiki retrieval extension, save_failure tool, system prompt
 - [ ] 41-02-PLAN.md — Phase B: update_wiki tool + SessionDraftBuffer + on-disk checkpoint at ~/.cellar/cache/sessions/{shortId}.draft.md (depends on 41-01)
+
+### Phase 42: Unify agent loop with single model catalog and typed tool boundary
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 41
+**Plans:** 1/3 plans executed
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 42 to break down)
+
+### Phase 43: Extract agent policy data to versioned resources and achieve provider parity for tool-use across Anthropic DeepSeek and Kimi
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 42
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 43 to break down)
+
+### Phase 44: Collapse memory layer into single KnowledgeStore with one schema and local plus remote adapters
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 43
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 44 to break down)
+
+### Phase 45: Split AgentTools into session and runtime actor consolidate configuration and sandbox PageParser fixes through allowlist
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 44
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 45 to break down)

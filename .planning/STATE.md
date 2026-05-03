@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-05-02T23:16:34.642Z"
+last_updated: "2026-05-03T21:37:08.943Z"
 progress:
-  total_phases: 41
+  total_phases: 45
   completed_phases: 39
-  total_plans: 89
-  completed_plans: 89
+  total_plans: 92
+  completed_plans: 90
 ---
 
 # Project State
@@ -22,12 +22,12 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 41 (Wiki as Shared Agent Experience) — COMPLETE
-Plan: P02 complete — update_wiki tool, SessionDraftBuffer, midSessionNotes wired
-Status: Phase 41 COMPLETE — both P01 (session log writes) and P02 (mid-session update_wiki tool) shipped
-Last activity: 2026-05-02 — P02 complete: SessionDraftBuffer, update_wiki tool, midSessionNotes wired into both session log call sites
+Phase: 42 (Unify Agent Loop with Single Model Catalog and Typed Tool Boundary) — In Progress
+Plan: P01 complete — ModelCatalog, provider descriptor injection, AIService routing collapse
+Status: Phase 42 P01 COMPLETE — ModelDescriptor, ModelCatalog.all (9 entries), strict resolver, modelPricing dict removed
+Last activity: 2026-05-03 — P01 complete: ModelCatalog.swift created, AgentLoopProvider providers accept descriptor, AIService resolves model at session boundary
 
-Progress: [████████████████████] 100% (Phase 41 COMPLETE)
+Progress: [█████████████████████] Phase 42 P01/P03 done
 
 ## Performance Metrics
 
@@ -97,6 +97,7 @@ Progress: [████████████████████] 100% (P
 | Phase 40-wiki-batch-ingest P02 | 3 | 2 tasks | 2 files |
 | Phase 41-wiki-as-shared-agent-experience P01 | 5 | 4 tasks | 5 files |
 | Phase 41-wiki-as-shared-agent-experience P01 | 5 | 4 tasks | 5 files |
+| Phase 42 P01 | 185 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -227,6 +228,9 @@ Progress: [████████████████████] 100% (P
 - [Phase 41-02]: SessionDraftBuffer is lazy var on AgentTools (not init) — avoids early filesystem access before session starts
 - [Phase 41-02]: Both tasks combined into one atomic commit — dispatch in AgentTools and implementation in ResearchTools are inseparable; intermediate build fails
 - [Phase 41-02]: Failure path keeps draft on disk — operator may want to inspect orphaned notes after failed session
+- [Phase 42-01]: ModelProvider enum introduced as catalog discriminant — AIProvider has associated API key values that can't be stored in a Sendable static table
+- [Phase 42-01]: fallbackModels in AIService.swift is now a computed var over ModelCatalog.all — catalog is single source of truth for model IDs
+- [Phase 42-01]: Unknown model ID at session boundary surfaces as AgentEvent.error and .failed return — no silent (0.0,0.0) pricing fallback
 
 ### Roadmap Evolution
 
@@ -265,5 +269,5 @@ None.
 
 ## Session Continuity
 
-Last session: 2026-05-02
-Stopped at: Phase 41 P02 complete — SessionDraftBuffer, update_wiki tool (tool 23), midSessionNotes wired, clearDraft on success, purgeOldDrafts at session start, build clean. Phase 41 COMPLETE.
+Last session: 2026-05-03
+Stopped at: Phase 42 P01 complete — ModelCatalog.swift (9 entries, 3 providers), modelPricing dict removed, all three AgentLoopProvider structs accept ModelDescriptor, AIService.runAgentLoop resolves model at session boundary via catalog, unknown model surfaces as AgentEvent.error. Build clean.
