@@ -31,8 +31,8 @@ enum KnowledgeStoreContainer {
 // MARK: - NoOpKnowledgeStore
 
 /// Default no-op implementation used before Plan 04 wires the real adapter at app startup.
-/// Kept private to this file — callers must go through KnowledgeStoreContainer.shared.
-private struct NoOpKnowledgeStore: KnowledgeStore {
+/// Internal visibility allows the `is NoOpKnowledgeStore` startup guard in AIService.
+struct NoOpKnowledgeStore: KnowledgeStore {
     func fetchContext(for gameName: String, environment: EnvironmentFingerprint) async -> String? {
         nil
     }

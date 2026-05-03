@@ -264,6 +264,18 @@ struct CollectiveMemoryService {
         )
     }
 
+    // MARK: - Internal Static Shims (used by AIService to build EnvironmentFingerprint)
+
+    /// Internal wrapper for detectWineVersion — allows AIService to build the fingerprint.
+    static func detectWineVersionInternal(wineURL: URL) -> String? {
+        detectWineVersion(wineURL: wineURL)
+    }
+
+    /// Internal wrapper for detectWineFlavor — allows AIService to build the fingerprint.
+    static func detectWineFlavorInternal(wineURL: URL) -> String {
+        detectWineFlavor(wineURL: wineURL)
+    }
+
     // MARK: - Private Helpers
 
     /// Run `wine --version` via Process and parse the version string.

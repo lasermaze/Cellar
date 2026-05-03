@@ -308,6 +308,123 @@ struct WikiService: Sendable {
         )
     }
 
+    // MARK: - Internal Static Shims (used by AIService after Task 1 rewire)
+
+    /// Build the path for a success session log file.
+    static func sessionLogFilename(record: SuccessRecord) -> String {
+        let dateStr = String(ISO8601DateFormatter().string(from: Date()).prefix(10))
+        let slug = slugify(record.gameName)
+        let shortId = String(UUID().uuidString.prefix(8)).lowercased()
+        return "sessions/\(dateStr)-\(slug)-\(shortId).md"
+    }
+
+    /// Build the path for a failure session log file.
+    static func failureSessionLogFilename(gameId: String) -> String {
+        let dateStr = String(ISO8601DateFormatter().string(from: Date()).prefix(10))
+        let slug = slugify(gameId)
+        let shortId = String(UUID().uuidString.prefix(8)).lowercased()
+        return "sessions/\(dateStr)-\(slug)-\(shortId).md"
+    }
+
+    /// Build the body for a success session log entry.
+    static func formatSuccessSessionBody(
+        record: SuccessRecord,
+        duration: TimeInterval,
+        wineURL: URL?,
+        midSessionNotes: [(timestamp: String, content: String)]
+    ) -> String {
+        let dateStr = String(ISO8601DateFormatter().string(from: Date()).prefix(10))
+        let shortId = String(UUID().uuidString.prefix(8)).lowercased()
+        let body = formatSessionEntry(
+            record: record,
+            outcome: .success,
+            duration: duration,
+            wineURL: wineURL,
+            shortId: shortId,
+            dateStr: dateStr,
+            midSessionNotes: midSessionNotes
+        )
+        return scrubPaths(body)
+    }
+
+    /// Build the body for a failure session log entry.
+    static func formatFailureSessionBody(
+        gameId: String,
+        gameName: String,
+        narrative: String,
+        actionsAttempted: [String],
+        launchCount: Int,
+        duration: TimeInterval,
+        wineURL: URL?,
+        stopReason: String,
+        midSessionNotes: [(timestamp: String, content: String)]
+    ) -> String {
+        let dateStr = String(ISO8601DateFormatter().string(from: Date()).prefix(10))
+        let shortId = String(UUID().uuidString.prefix(8)).lowercased()
+        let body = formatFailureEntry(
+            gameName: gameName,
+            narrative: narrative,
+            actionsAttempted: actionsAttempted,
+            launchCount: launchCount,
+            duration: duration,
+            wineURL: wineURL,
+            stopReason: stopReason,
+            shortId: shortId,
+            dateStr: dateStr,
+            midSessionNotes: midSessionNotes
+        )
+        return scrubPaths(body)
+    }
+
+    /// Build a GamePageEntry from a SuccessRecord (for KnowledgeStore.write(.gamePage)).
+    static func buildIngestedGamePage(record: SuccessRecord) -> GamePageEntry? {
+        let slug = slugify(record.gameName)
+        // Build the page body from the ingest logic (pitfalls, engine, DLL patterns, log)
+        var parts: [String] = []
+
+        for pitfall in record.pitfalls {
+            let symptomSlug = slugify(pitfall.symptom)
+            let candidates = ["symptoms/crash-on-launch.md", "symptoms/black-screen.md", "symptoms/d3d-errors.md"]
+            let bestPage = findBestMatch(slug: symptomSlug, symptom: pitfall.symptom, candidates: candidates)
+            parts.append("[\(bestPage)] \(formatPitfall(pitfall, gameName: record.gameName))")
+        }
+
+        if let engine = record.engine?.lowercased() {
+            let enginePages: [String: String] = [
+                "directdraw": "engines/directdraw.md",
+                "unity": "engines/unity.md",
+                "dxvk": "engines/dxvk.md",
+            ]
+            let key = enginePages.keys.first { engine.contains($0) || (record.graphicsApi?.lowercased().contains($0) ?? false) }
+            if let key = key, let pagePath = enginePages[key] {
+                parts.append("[\(pagePath)] \(formatEngineEntry(record: record))")
+            }
+        }
+
+        if let gfx = record.graphicsApi?.lowercased(), record.engine == nil || !(record.engine?.lowercased().contains(gfx) ?? false) {
+            if gfx.contains("directdraw") || gfx.contains("ddraw") {
+                parts.append("[engines/directdraw.md] \(formatEngineEntry(record: record))")
+            }
+        }
+
+        for override in record.dllOverrides {
+            if let source = override.source, source.lowercased().contains("cnc-ddraw") {
+                parts.append("[engines/directdraw.md] - \(record.gameName): `\(override.dll)=\(override.mode)` via \(source)")
+            }
+        }
+
+        let dateStr = ISO8601DateFormatter().string(from: Date()).prefix(10)
+        parts.append("[log.md] ## [\(dateStr)] ingest | \(record.gameName) (gameId: \(record.gameId))")
+
+        guard !parts.isEmpty else { return nil }
+
+        return GamePageEntry(
+            slug: slug,
+            autoContent: parts.joined(separator: "\n"),
+            commitMessage: "wiki: ingest from \(record.gameName)"
+        )
+    }
+
     // MARK: - Ingest Helpers
 
     /// Format a pitfall as a wiki bullet point

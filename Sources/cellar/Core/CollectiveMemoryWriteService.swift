@@ -106,6 +106,38 @@ struct CollectiveMemoryWriteService {
         return (synced: synced, failed: failed)
     }
 
+    // MARK: - Internal Static Shims (used by AIService after Task 1 rewire)
+
+    /// Build a CollectiveMemoryEntry from a SuccessRecord for KnowledgeStore.write(.config).
+    static func buildConfigEntry(record: SuccessRecord, gameName: String, wineURL: URL) -> CollectiveMemoryEntry? {
+        guard let wineVersion = detectWineVersion(wineURL: wineURL) else { return nil }
+        let wineFlavor = detectWineFlavor(wineURL: wineURL)
+        let fingerprint = EnvironmentFingerprint.current(wineVersion: wineVersion, wineFlavor: wineFlavor)
+        let environmentHash = fingerprint.computeHash()
+        let formatter = ISO8601DateFormatter()
+        let lastConfirmed = formatter.string(from: Date())
+        let workingConfig = WorkingConfig(
+            environment: record.environment,
+            dllOverrides: record.dllOverrides,
+            registry: record.registry,
+            launchArgs: [],
+            setupDeps: []
+        )
+        return CollectiveMemoryEntry(
+            schemaVersion: 1,
+            gameId: record.gameId,
+            gameName: gameName,
+            config: workingConfig,
+            environment: fingerprint,
+            environmentHash: environmentHash,
+            reasoning: record.resolutionNarrative ?? "",
+            engine: record.engine,
+            graphicsApi: record.graphicsApi,
+            confirmations: 1,
+            lastConfirmed: lastConfirmed
+        )
+    }
+
     // MARK: - Private: Proxy POST
 
     /// POST entry JSON to the Cloudflare Worker proxy.

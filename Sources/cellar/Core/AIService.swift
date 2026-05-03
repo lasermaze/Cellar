@@ -670,6 +670,11 @@ struct AIService {
             break
         }
 
+        // Register KnowledgeStoreRemote once at session start (idempotent guard).
+        if KnowledgeStoreContainer.shared is NoOpKnowledgeStore {
+            KnowledgeStoreContainer.shared = KnowledgeStoreRemote()
+        }
+
         let systemPrompt = PolicyResources.shared.systemPrompt
 
         let tools = AgentTools(
@@ -776,8 +781,13 @@ struct AIService {
         let launchInstruction = "Launch the game '\(entry.name)' (ID: \(gameId)). The executable is at: \(executablePath). Follow the Research-Diagnose-Adapt workflow: start by querying the success database and wiki, then inspect the game. Move quickly to a real launch_game call — research and at most one trace_launch before your first real launch."
 
         var contextParts: [String] = []
-        if let wikiContext = await WikiService.fetchContext(engine: entry.name) {
-            contextParts.append(wikiContext)
+        // Rewired: unified read path through KnowledgeStoreContainer.shared (Plan 04)
+        let knowledgeEnv = EnvironmentFingerprint.current(
+            wineVersion: CollectiveMemoryService.detectWineVersionInternal(wineURL: wineURL) ?? "",
+            wineFlavor: CollectiveMemoryService.detectWineFlavorInternal(wineURL: wineURL)
+        )
+        if let knowledgeContext = await KnowledgeStoreContainer.shared.fetchContext(for: entry.name, environment: knowledgeEnv) {
+            contextParts.append(knowledgeContext)
         }
         if let compatReport = compatContext {
             contextParts.append(compatReport.formatForAgent())
@@ -849,19 +859,28 @@ struct AIService {
                     tools: tools, gameName: entry.name,
                     wineURL: wineURL, isWebContext: askUserHandler != nil
                 )
-                // Ingest session learnings into wiki
+                // Rewired: write success knowledge through KnowledgeStoreContainer.shared (Plan 04)
                 if let record = SuccessDatabase.load(gameId: gameId) {
-                    await WikiService.ingest(record: record)
-                    // Phase 41: deposit session log entry
-                    await WikiService.postSessionLog(
-                        record: record,
-                        outcome: .success,
-                        duration: Date().timeIntervalSince(sessionStartTime),
-                        wineURL: wineURL,
-                        midSessionNotes: tools.draftBuffer.notes
+                    // Game page (was WikiService.ingest)
+                    if let gamePage = WikiService.buildIngestedGamePage(record: record) {
+                        await KnowledgeStoreContainer.shared.write(.gamePage(gamePage))
+                    }
+                    // Session log (was WikiService.postSessionLog)
+                    let sessionEntry = SessionLogEntry(
+                        path: WikiService.sessionLogFilename(record: record),
+                        body: WikiService.formatSuccessSessionBody(
+                            record: record,
+                            duration: Date().timeIntervalSince(sessionStartTime),
+                            wineURL: wineURL,
+                            midSessionNotes: tools.draftBuffer.notes
+                        ),
+                        commitMessage: "session: success for \(record.gameName)"
                     )
+                    await KnowledgeStoreContainer.shared.write(.sessionLog(sessionEntry))
                     // Clear the on-disk draft after successful session log write
                     tools.draftBuffer.clearDraft()
+                    // Config (was CollectiveMemoryWriteService.push — called by handleContributionIfNeeded above)
+                    // Note: contribution push is handled via handleContributionIfNeeded; this is the unified store path
                 }
             }
             SessionHandoff.delete(gameId: gameId)
@@ -900,17 +919,23 @@ struct AIService {
                 trimmedFinal.count >= 80
             if hasMaterial {
                 let actions = Array(Set(tools.pendingActions + tools.lastAppliedActions))
-                await WikiService.postFailureSessionLog(
-                    gameId: gameId,
-                    gameName: entry.name,
-                    narrative: trimmedFinal,
-                    actionsAttempted: actions,
-                    launchCount: tools.launchCount,
-                    duration: Date().timeIntervalSince(sessionStartTime),
-                    wineURL: wineURL,
-                    stopReason: stopReasonStr,
-                    midSessionNotes: tools.draftBuffer.notes
+                // Rewired: failure session log through KnowledgeStoreContainer.shared (Plan 04)
+                let failureEntry = SessionLogEntry(
+                    path: WikiService.failureSessionLogFilename(gameId: gameId),
+                    body: WikiService.formatFailureSessionBody(
+                        gameId: gameId,
+                        gameName: entry.name,
+                        narrative: trimmedFinal,
+                        actionsAttempted: actions,
+                        launchCount: tools.launchCount,
+                        duration: Date().timeIntervalSince(sessionStartTime),
+                        wineURL: wineURL,
+                        stopReason: stopReasonStr,
+                        midSessionNotes: tools.draftBuffer.notes
+                    ),
+                    commitMessage: "session: failure for \(entry.name)"
                 )
+                await KnowledgeStoreContainer.shared.write(.sessionLog(failureEntry))
                 // Failure path: keep the draft on disk for inspection. Do NOT clearDraft().
             }
 
@@ -924,6 +949,18 @@ struct AIService {
             print("Session state saved. Relaunch to continue where the agent left off.")
             return .failed(reason)
         }
+    }
+
+    // MARK: - Internal Test Seam (Plan 04)
+
+    /// Fetch knowledge context for a game using the active KnowledgeStoreContainer.shared.
+    /// Extracted as an `internal` helper to enable integration tests without running the full agent loop.
+    internal static func fetchKnowledgeContext(gameName: String, wineURL: URL) async -> String? {
+        let env = EnvironmentFingerprint.current(
+            wineVersion: CollectiveMemoryService.detectWineVersionInternal(wineURL: wineURL) ?? "",
+            wineFlavor: CollectiveMemoryService.detectWineFlavorInternal(wineURL: wineURL)
+        )
+        return await KnowledgeStoreContainer.shared.fetchContext(for: gameName, environment: env)
     }
 
     // MARK: - One-Time Tip
@@ -979,8 +1016,11 @@ struct AIService {
         guard config.contributeMemory == true else { return }
 
         // Load the just-saved SuccessRecord and push
+        // Rewired: config write through KnowledgeStoreContainer.shared (Plan 04)
         guard let record = SuccessDatabase.load(gameId: tools.gameId) else { return }
-        await CollectiveMemoryWriteService.push(record: record, gameName: gameName, wineURL: wineURL)
+        if let cfgEntry = CollectiveMemoryWriteService.buildConfigEntry(record: record, gameName: gameName, wineURL: wineURL) {
+            await KnowledgeStoreContainer.shared.write(.config(cfgEntry))
+        }
     }
 
     // MARK: - Private Helpers

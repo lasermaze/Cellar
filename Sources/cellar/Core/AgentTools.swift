@@ -205,21 +205,9 @@ final class AgentTools: @unchecked Sendable {
 // MARK: - AIService Extension
 
 extension AIService {
-    /// Public accessor for the winetricks verb allowlist — used by AgentTools.installWinetricks.
-    static let agentValidWinetricksVerbs: Set<String> = [
-        // Runtime dependencies
-        "dotnet48", "dotnet40", "dotnet35",
-        "vcrun2019", "vcrun2015", "vcrun2013", "vcrun2010", "vcrun2008",
-        // DirectX components
-        "d3dx9", "d3dx10", "d3dx11_43", "d3dcompiler_47",
-        "dinput8", "dinput",
-        // Media
-        "quartz", "wmp9", "wmp10",
-        // Audio
-        "dsound",
-        // Input
-        "xinput",
-        // Common game deps
-        "physx", "xact", "xactengine3_7"
-    ]
+    /// Winetricks verb allowlist — delegates to PolicyResources.shared (Plan 04 migration).
+    /// All former callers of agentValidWinetricksVerbs now read PolicyResources.shared.winetricksVerbAllowlist.
+    static var agentValidWinetricksVerbs: Set<String> {
+        PolicyResources.shared.winetricksVerbAllowlist
+    }
 }
