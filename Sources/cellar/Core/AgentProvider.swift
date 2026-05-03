@@ -1,5 +1,40 @@
 import Foundation
 
+// MARK: - AgentLoopProviderResponse
+
+/// The normalized response returned by any ProviderAdapter implementation.
+/// Abstracts away Anthropic and OpenAI/Deepseek response format differences.
+struct AgentLoopProviderResponse {
+    enum StopReason {
+        case endTurn
+        case toolUse
+        case maxTokens
+        case other(String)
+    }
+
+    let textBlocks: [String]
+    let toolCalls: [(id: String, name: String, input: JSONValue)]
+    let stopReason: StopReason
+    let inputTokens: Int
+    let outputTokens: Int
+}
+
+// MARK: - Shared HTTP Helper
+
+/// Async HTTP call using URLSession.data(for:).
+/// Used by AnthropicAdapter, DeepseekAdapter, and KimiAdapter.
+func agentCallAPI(request: URLRequest) async throws -> Data {
+    let (data, response) = try await URLSession.shared.data(for: request)
+    guard let http = response as? HTTPURLResponse else {
+        throw AgentLoopError.noResponse
+    }
+    if http.statusCode >= 400 {
+        let body = String(data: data, encoding: .utf8) ?? "(binary)"
+        throw AgentLoopError.httpError(statusCode: http.statusCode, body: body)
+    }
+    return data
+}
+
 // MARK: - ProviderAdapter Protocol
 
 /// Internal protocol implemented by exactly three adapter classes.

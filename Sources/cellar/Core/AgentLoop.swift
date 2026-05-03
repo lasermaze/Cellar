@@ -144,7 +144,7 @@ struct AgentLoop {
 
     // MARK: Properties
 
-    var provider: AgentLoopProvider  // var because protocol methods are mutating
+    var provider: AgentProvider  // var for potential future mutability; adapter is class-backed so methods are non-mutating
     let maxIterations: Int
     let maxTokens: Int
     let budgetCeiling: Double
@@ -155,7 +155,7 @@ struct AgentLoop {
     // MARK: Init
 
     init(
-        provider: AgentLoopProvider,
+        provider: AgentProvider,
         maxIterations: Int = 20,
         maxTokens: Int = 4096,
         budgetCeiling: Double = 5.00,

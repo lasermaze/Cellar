@@ -982,33 +982,22 @@ struct AIService {
             return .failed(error.localizedDescription)
         }
 
-        // Create provider with fully built systemPrompt and resolved descriptor
-        let agentProvider: AgentLoopProvider
+        // Create provider with fully built systemPrompt and resolved descriptor.
+        // Single AgentProvider construction replaces three-way switch — provider routing is
+        // done inside AgentProvider.init via descriptor.provider (ModelProvider enum).
+        let apiKey: String
         switch provider {
-        case .anthropic(let apiKey):
-            agentProvider = AnthropicAgentProvider(
-                apiKey: apiKey,
-                descriptor: descriptor,
-                tools: AgentTools.toolDefinitions,
-                systemPrompt: systemPrompt
-            )
-        case .deepseek(let apiKey):
-            agentProvider = DeepseekAgentProvider(
-                apiKey: apiKey,
-                descriptor: descriptor,
-                tools: AgentTools.toolDefinitions,
-                systemPrompt: systemPrompt
-            )
-        case .kimi(let apiKey):
-            agentProvider = KimiAgentProvider(
-                apiKey: apiKey,
-                descriptor: descriptor,
-                tools: AgentTools.toolDefinitions,
-                systemPrompt: systemPrompt
-            )
-        default:
-            return .unavailable
+        case .anthropic(let key): apiKey = key
+        case .deepseek(let key):  apiKey = key
+        case .kimi(let key):      apiKey = key
+        default:                  return .unavailable
         }
+        let agentProvider = AgentProvider(
+            descriptor: descriptor,
+            apiKey: apiKey,
+            tools: AgentTools.toolDefinitions,
+            systemPrompt: systemPrompt
+        )
 
         // Create event log
         let eventLog = AgentEventLog(gameId: gameId)
