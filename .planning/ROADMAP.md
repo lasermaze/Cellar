@@ -551,13 +551,16 @@ Plans:
 
 ### Phase 44: Collapse memory layer into single KnowledgeStore with one schema and local plus remote adapters
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Unify three parallel memory paths (CollectiveMemoryService, WikiService, WikiIngestService) into one KnowledgeStore protocol with local + remote adapters. Existing services become thin wrappers over the store. Worker generalized: WIKI_PAGE_PATTERN loosened, fenced-section preservation for game pages, auto-index append, new /api/knowledge/write endpoint. PolicyResources owns the only allowlists (winetricks verbs moved in). Restores config-entry context that was dropped from runAgentLoop.
+**Requirements**: KS-FOUNDATION, KS-POLICY-WINETRICKS, WORKER-WIKI-PATTERN, WORKER-FENCED-GAMES, WORKER-INDEX-APPEND, WORKER-KNOWLEDGE-WRITE, KS-LOCAL-ADAPTER, KS-REMOTE-ADAPTER, KS-WIRE-AISERVICE, KS-WIRE-AGENT-TOOLS, KS-LEGACY-WRAPPERS
 **Depends on:** Phase 43
-**Plans:** 0 plans
+**Plans:** 4 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 44 to break down)
+- [ ] 44-01-PLAN.md — KnowledgeStore protocol + KnowledgeEntry discriminated union + KnowledgeCache helper + move winetricks verbs to PolicyResources
+- [ ] 44-02-PLAN.md — Worker: loosen WIKI_PAGE_PATTERN, fenced-section merge for games/, index append, new /api/knowledge/write endpoint
+- [ ] 44-03-PLAN.md — KnowledgeStoreLocal (cache-only) + KnowledgeStoreRemote (GitHub raw reads + Worker writes + TTL cache); sanitizer reads PolicyResources.shared
+- [ ] 44-04-PLAN.md — Wire AIService + ResearchTools + WikiIngestService through KnowledgeStoreContainer.shared; convert four legacy services to thin wrappers; delete agentValidWinetricksVerbs literal
 
 ### Phase 45: Split AgentTools into session and runtime actor consolidate configuration and sandbox PageParser fixes through allowlist
 
