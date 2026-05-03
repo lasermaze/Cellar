@@ -52,14 +52,13 @@ struct WikiIngestService: Sendable {
             pcgwPage: pcgwPage
         )
 
-        // g. POST full page content to games/{slug}.md
-        let pagePath = "games/\(slug).md"
-        await WikiService.postWikiAppend(
-            page: pagePath,
-            entry: pageContent,
-            commitMessage: "wiki: ingest \(gameName)",
-            overwrite: true
+        // g. Write full page content via KnowledgeStore (Plan 04 — fenced-section merge active in Worker)
+        let entry = GamePageEntry(
+            slug: slug,
+            autoContent: pageContent,
+            commitMessage: "wiki: ingest \(gameName)"
         )
+        await KnowledgeStoreContainer.shared.write(.gamePage(entry))
 
         return true
     }

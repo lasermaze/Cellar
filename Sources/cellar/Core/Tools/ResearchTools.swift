@@ -248,7 +248,29 @@ extension AgentTools {
               case .string(let query) = obj["query"] else {
             return jsonResult(["error": "query parameter required"])
         }
-        return await WikiService.search(query: query)
+        // Rewired: routes through KnowledgeStoreContainer.shared (Plan 04)
+        let slug = WikiService.slugify(query)
+        let filter = KnowledgeListFilter(kind: nil, slug: slug, maxResults: 5)
+        let metas = await KnowledgeStoreContainer.shared.list(filter: filter)
+        let env = EnvironmentFingerprint.current(wineVersion: "", wineFlavor: "")
+        let context = await KnowledgeStoreContainer.shared.fetchContext(for: query, environment: env)
+
+        if metas.isEmpty && context == nil {
+            return "No relevant wiki pages found for '\(query)'"
+        }
+        return formatQueryWikiResult(metas: metas, context: context, query: query)
+    }
+
+    /// Format a non-nil human-readable result from wiki metas and context.
+    /// Preserves the always-returns-String contract (RESEARCH.md pitfall #7).
+    private func formatQueryWikiResult(metas: [KnowledgeEntryMeta], context: String?, query: String) -> String {
+        var parts: [String] = []
+        if let ctx = context { parts.append(ctx) }
+        if !metas.isEmpty {
+            let metaLines = metas.map { "[\($0.kind.rawValue)] \($0.slug)" }.joined(separator: "\n")
+            parts.append("Available entries for '\(query)':\n\(metaLines)")
+        }
+        return parts.isEmpty ? "No relevant wiki pages found for '\(query)'" : parts.joined(separator: "\n\n")
     }
 
     // MARK: - Compatibility Lookup

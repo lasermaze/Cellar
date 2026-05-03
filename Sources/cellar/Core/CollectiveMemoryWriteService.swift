@@ -17,58 +17,18 @@ struct CollectiveMemoryWriteService {
             ?? "https://cellar-memory-proxy.sook40.workers.dev/api/contribute"
     }
 
-    // MARK: - Public API
+    // MARK: - Public API (thin wrapper — delegates to KnowledgeStoreContainer.shared)
 
-    /// Push a working game configuration to the collective memory repo via the proxy.
-    /// Never throws. All errors are caught and logged internally.
+    /// Push a working game configuration to collective memory.
     ///
-    /// - Parameters:
-    ///   - record: The locally-saved SuccessRecord to contribute.
-    ///   - gameName: The display name of the game.
-    ///   - wineURL: URL to the wine binary (used to detect Wine version and flavor).
+    /// Plan 04: thin wrapper — builds ConfigEntry and writes via KnowledgeStoreContainer.shared.write(.config).
+    /// Legacy callers continue to compile without changes.
     static func push(record: SuccessRecord, gameName: String, wineURL: URL) async {
-        // Step 1: Detect Wine version
-        guard let wineVersion = detectWineVersion(wineURL: wineURL) else {
+        guard let entry = buildConfigEntry(record: record, gameName: gameName, wineURL: wineURL) else {
             logPushEvent("WARN", gameId: record.gameId, "Could not detect Wine version, skipping push")
             return
         }
-
-        // Step 2: Detect Wine flavor
-        let wineFlavor = detectWineFlavor(wineURL: wineURL)
-
-        // Step 3: Build environment fingerprint
-        let fingerprint = EnvironmentFingerprint.current(wineVersion: wineVersion, wineFlavor: wineFlavor)
-        let environmentHash = fingerprint.computeHash()
-
-        // Step 4: Build ISO8601 timestamp
-        let formatter = ISO8601DateFormatter()
-        let lastConfirmed = formatter.string(from: Date())
-
-        // Step 5: Transform SuccessRecord -> CollectiveMemoryEntry
-        let workingConfig = WorkingConfig(
-            environment: record.environment,
-            dllOverrides: record.dllOverrides,
-            registry: record.registry,
-            launchArgs: [],
-            setupDeps: []
-        )
-
-        let entry = CollectiveMemoryEntry(
-            schemaVersion: 1,
-            gameId: record.gameId,
-            gameName: gameName,
-            config: workingConfig,
-            environment: fingerprint,
-            environmentHash: environmentHash,
-            reasoning: record.resolutionNarrative ?? "",
-            engine: record.engine,
-            graphicsApi: record.graphicsApi,
-            confirmations: 1,
-            lastConfirmed: lastConfirmed
-        )
-
-        // Step 6: POST to proxy
-        await postToProxy(entry: entry)
+        await KnowledgeStoreContainer.shared.write(.config(entry))
     }
 
     /// Sync all local success records to collective memory via the proxy.

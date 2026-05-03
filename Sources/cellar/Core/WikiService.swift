@@ -74,80 +74,33 @@ struct WikiService: Sendable {
         return readCache(relativePath)
     }
 
-    // MARK: - Read Path
+    // MARK: - Read Path (thin wrappers — Plan 04)
 
     /// Fetch relevant wiki context for a game engine and optional symptom keywords.
-    /// Returns formatted wiki content block, or nil if wiki unavailable or no relevant pages found.
+    /// Plan 04: thin wrapper — delegates to KnowledgeStoreContainer.shared.fetchContext.
     static func fetchContext(engine: String?, symptoms: [String] = [], maxPages: Int = 3) async -> String? {
-        guard let indexContent = await fetchPage("index.md") else {
-            return nil
-        }
-
-        let keywords = extractKeywords(gameName: engine ?? "", symptoms: symptoms)
-        let pagePaths = findRelevantPages(in: indexContent, keywords: keywords, limit: maxPages)
-        guard !pagePaths.isEmpty else { return nil }
-
-        var totalLength = 0
-        var pageContents: [String] = []
-        for path in pagePaths {
-            guard let content = await fetchPage(path) else { continue }
-            if totalLength + content.count > maxContentLength && !pageContents.isEmpty { break }
-            pageContents.append(content)
-            totalLength += content.count
-        }
-
-        guard !pageContents.isEmpty else { return nil }
-        let combined = pageContents.joined(separator: "\n\n---\n\n")
-        return "--- WIKI KNOWLEDGE ---\n\(combined)\n--- END WIKI KNOWLEDGE ---"
+        let env = EnvironmentFingerprint.current(wineVersion: "", wineFlavor: "")
+        return await KnowledgeStoreContainer.shared.fetchContext(for: engine ?? "", environment: env)
     }
 
     /// Search wiki pages by query string, returning formatted content or a no-match message.
-    /// Used by the query_wiki agent tool for mid-session lookups.
+    /// Plan 04: thin wrapper — delegates to KnowledgeStoreContainer.shared.list + fetchContext.
+    /// ALWAYS returns non-nil String (preserves API contract per RESEARCH.md pitfall #7).
     static func search(query: String, maxResults: Int = 3) async -> String {
-        guard let indexContent = await fetchPage("index.md") else {
-            return "Wiki not available"
-        }
-
-        let keywords = query.lowercased().components(separatedBy: .alphanumerics.inverted).filter { $0.count > 2 }
-        let pagePaths = findRelevantPages(in: indexContent, keywords: keywords, limit: maxResults)
-        guard !pagePaths.isEmpty else {
+        let filter = KnowledgeListFilter(kind: nil, slug: slugify(query), maxResults: maxResults)
+        let metas = await KnowledgeStoreContainer.shared.list(filter: filter)
+        let env = EnvironmentFingerprint.current(wineVersion: "", wineFlavor: "")
+        let context = await KnowledgeStoreContainer.shared.fetchContext(for: query, environment: env)
+        if metas.isEmpty && context == nil {
             return "No relevant wiki pages found for '\(query)'"
         }
-
-        var pageContents: [String] = []
-        var totalLength = 0
-        for path in pagePaths {
-            guard let content = await fetchPage(path) else { continue }
-            if totalLength + content.count > maxContentLength && !pageContents.isEmpty { break }
-            pageContents.append("[\(path)]\n\(content)")
-            totalLength += content.count
+        var parts: [String] = []
+        if let ctx = context { parts.append(ctx) }
+        if !metas.isEmpty {
+            let metaLines = metas.map { "[\($0.kind.rawValue)] \($0.slug)" }.joined(separator: "\n")
+            parts.append("Available entries:\n\(metaLines)")
         }
-
-        if pageContents.isEmpty {
-            return "No relevant wiki pages found for '\(query)'"
-        }
-        var formatted = pageContents.joined(separator: "\n\n---\n\n")
-
-        // Phase 41: append recent session entries when the query matches a known game slug.
-        let slug = slugify(query)
-        let sessionPaths = await listRecentSessions(forSlug: slug, max: 3)
-        if !sessionPaths.isEmpty {
-            var sessionsText = "\n\n## Recent sessions for \(query)\n"
-            var consumed = 0
-            let totalBudget = 4000
-            let perSessionCap = 1333
-            for path in sessionPaths {
-                guard consumed < totalBudget,
-                      let raw = await fetchPage(path) else { continue }
-                let sliceLen = min(perSessionCap, totalBudget - consumed)
-                let snippet = String(raw.prefix(sliceLen))
-                sessionsText += "\n--- \(path) ---\n" + snippet + "\n"
-                consumed += snippet.count
-            }
-            formatted += sessionsText
-        }
-
-        return formatted
+        return parts.joined(separator: "\n\n")
     }
 
     // MARK: - Ingest
@@ -184,60 +137,18 @@ struct WikiService: Sendable {
         }
     }
 
-    /// Ingest learnings from a successful game session into wiki pages via the Cloudflare Worker.
-    /// POSTs each derived update to the Worker wiki-append endpoint.
-    /// Best-effort — failures are logged to stderr but never block the user.
+    /// Ingest learnings from a successful game session into wiki pages via the KnowledgeStore.
+    /// Plan 04: thin wrapper — builds GamePageEntry and delegates to KnowledgeStoreContainer.shared.write(.gamePage).
     static func ingest(record: SuccessRecord) async {
-        let commitMessage = "wiki: ingest from \(record.gameName)"
-
-        // 1. Append pitfalls to matching symptom pages
-        for pitfall in record.pitfalls {
-            let symptomSlug = slugify(pitfall.symptom)
-            let candidates = ["symptoms/crash-on-launch.md", "symptoms/black-screen.md", "symptoms/d3d-errors.md"]
-            let bestPage = findBestMatch(slug: symptomSlug, symptom: pitfall.symptom, candidates: candidates)
-            let entry = formatPitfall(pitfall, gameName: record.gameName)
-            await postWikiAppend(page: bestPage, entry: entry, commitMessage: commitMessage)
+        if let gamePage = buildIngestedGamePage(record: record) {
+            await KnowledgeStoreContainer.shared.write(.gamePage(gamePage))
         }
-
-        // 2. Append engine/graphics info to engine pages
-        if let engine = record.engine?.lowercased() {
-            let enginePages: [String: String] = [
-                "directdraw": "engines/directdraw.md",
-                "unity": "engines/unity.md",
-                "dxvk": "engines/dxvk.md",
-            ]
-            let key = enginePages.keys.first { engine.contains($0) || (record.graphicsApi?.lowercased().contains($0) ?? false) }
-            if let key = key, let pagePath = enginePages[key] {
-                let entry = formatEngineEntry(record: record)
-                await postWikiAppend(page: pagePath, entry: entry, commitMessage: commitMessage)
-            }
-        }
-
-        // Also check graphicsApi independently (e.g., graphicsApi: "directdraw" without engine set)
-        if let gfx = record.graphicsApi?.lowercased(), record.engine == nil || !(record.engine?.lowercased().contains(gfx) ?? false) {
-            if gfx.contains("directdraw") || gfx.contains("ddraw") {
-                let entry = formatEngineEntry(record: record)
-                await postWikiAppend(page: "engines/directdraw.md", entry: entry, commitMessage: commitMessage)
-            }
-        }
-
-        // 3. Append DLL override patterns to relevant pages
-        for override in record.dllOverrides {
-            if let source = override.source, source.lowercased().contains("cnc-ddraw") {
-                let entry = "- \(record.gameName): `\(override.dll)=\(override.mode)` via \(source)"
-                await postWikiAppend(page: "engines/directdraw.md", entry: entry, commitMessage: commitMessage)
-            }
-        }
-
-        // 4. Append log entry summarizing this ingest
-        let dateStr = ISO8601DateFormatter().string(from: Date()).prefix(10)
-        let logEntry = "## [\(dateStr)] ingest | \(record.gameName) (gameId: \(record.gameId))"
-        await postWikiAppend(page: "log.md", entry: logEntry, commitMessage: commitMessage)
     }
 
-    // MARK: - Session Log
+    // MARK: - Session Log (thin wrappers — Plan 04)
 
     /// Write a per-session log entry for a successful or partial session.
+    /// Plan 04: thin wrapper — delegates to KnowledgeStoreContainer.shared.write(.sessionLog).
     static func postSessionLog(
         record: SuccessRecord,
         outcome: SessionOutcome,
@@ -245,31 +156,16 @@ struct WikiService: Sendable {
         wineURL: URL?,
         midSessionNotes: [(timestamp: String, content: String)] = []
     ) async {
-        let dateStr = String(ISO8601DateFormatter().string(from: Date()).prefix(10))
-        let slug = slugify(record.gameName)
-        let shortId = String(UUID().uuidString.prefix(8)).lowercased()
-        let pagePath = "sessions/\(dateStr)-\(slug)-\(shortId).md"
-
-        let body = formatSessionEntry(
-            record: record,
-            outcome: outcome,
-            duration: duration,
-            wineURL: wineURL,
-            shortId: shortId,
-            dateStr: dateStr,
-            midSessionNotes: midSessionNotes
+        let entry = SessionLogEntry(
+            path: sessionLogFilename(record: record),
+            body: formatSuccessSessionBody(record: record, duration: duration, wineURL: wineURL, midSessionNotes: midSessionNotes),
+            commitMessage: "session: \(outcome.headerLabel) for \(record.gameName)"
         )
-        let scrubbed = scrubPaths(body)
-
-        await postWikiAppend(
-            page: pagePath,
-            entry: scrubbed,
-            commitMessage: "wiki: session log \(record.gameName) (\(outcome.headerLabel))",
-            overwrite: false
-        )
+        await KnowledgeStoreContainer.shared.write(.sessionLog(entry))
     }
 
     /// Write a per-session log entry for a failed session (no SuccessRecord available).
+    /// Plan 04: thin wrapper — delegates to KnowledgeStoreContainer.shared.write(.sessionLog).
     static func postFailureSessionLog(
         gameId: String,
         gameName: String,
@@ -281,31 +177,17 @@ struct WikiService: Sendable {
         stopReason: String,
         midSessionNotes: [(timestamp: String, content: String)] = []
     ) async {
-        let dateStr = String(ISO8601DateFormatter().string(from: Date()).prefix(10))
-        let slug = slugify(gameName)
-        let shortId = String(UUID().uuidString.prefix(8)).lowercased()
-        let pagePath = "sessions/\(dateStr)-\(slug)-\(shortId).md"
-
-        let body = formatFailureEntry(
-            gameName: gameName,
-            narrative: narrative,
-            actionsAttempted: actionsAttempted,
-            launchCount: launchCount,
-            duration: duration,
-            wineURL: wineURL,
-            stopReason: stopReason,
-            shortId: shortId,
-            dateStr: dateStr,
-            midSessionNotes: midSessionNotes
+        let entry = SessionLogEntry(
+            path: failureSessionLogFilename(gameId: gameId),
+            body: formatFailureSessionBody(
+                gameId: gameId, gameName: gameName, narrative: narrative,
+                actionsAttempted: actionsAttempted, launchCount: launchCount,
+                duration: duration, wineURL: wineURL, stopReason: stopReason,
+                midSessionNotes: midSessionNotes
+            ),
+            commitMessage: "session: failure for \(gameName)"
         )
-        let scrubbed = scrubPaths(body)
-
-        await postWikiAppend(
-            page: pagePath,
-            entry: scrubbed,
-            commitMessage: "wiki: session log \(gameName) (failed)",
-            overwrite: false
-        )
+        await KnowledgeStoreContainer.shared.write(.sessionLog(entry))
     }
 
     // MARK: - Internal Static Shims (used by AIService after Task 1 rewire)
