@@ -81,6 +81,23 @@ final class AnthropicAdapter: ProviderAdapter {
         throw AgentLoopError.apiUnavailable
     }
 
+    // MARK: Internal Testable Helpers
+
+    /// Translates a decoded AnthropicToolResponse into the canonical provider response.
+    /// Internal so unit tests can call it directly without an HTTP round-trip.
+    func translateResponse(_ response: AnthropicToolResponse) -> AgentLoopProviderResponse {
+        translateAnthropicResponse(response)
+    }
+
+    /// Returns the tool_use blocks that appendAssistantResponse would emit for a given response.
+    /// Internal for encode round-trip tests — avoids exposing the full messages array.
+    func encodedAssistantBlocks(for response: AgentLoopProviderResponse) -> [ToolContentBlock] {
+        var blocks: [ToolContentBlock] = []
+        for text in response.textBlocks { blocks.append(.text(text)) }
+        for call in response.toolCalls { blocks.append(.toolUse(id: call.id, name: call.name, input: call.input)) }
+        return blocks
+    }
+
     // MARK: Private
 
     private func callAnthropic(maxTokens: Int) async throws -> AnthropicToolResponse {

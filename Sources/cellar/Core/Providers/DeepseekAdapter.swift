@@ -132,6 +132,27 @@ final class DeepseekAdapter: ProviderAdapter {
         throw AgentLoopError.apiUnavailable
     }
 
+    // MARK: Internal Testable Helpers
+
+    /// Translates a decoded OpenAIToolResponse into the canonical provider response.
+    /// Internal so unit tests can call it directly without an HTTP round-trip.
+    func translateResponse(_ response: OpenAIToolResponse) throws -> AgentLoopProviderResponse {
+        try translateDeepseekResponse(response)
+    }
+
+    /// Returns the tool_calls array that appendAssistantResponse would emit for a given response.
+    /// Internal for encode round-trip tests — avoids exposing the full messages array.
+    func encodedAssistantToolCalls(for response: AgentLoopProviderResponse) -> [OpenAIToolRequest.ToolCall]? {
+        response.toolCalls.isEmpty ? nil : response.toolCalls.compactMap { call in
+            guard let argumentsData = try? JSONEncoder().encode(call.input),
+                  let argumentsString = String(data: argumentsData, encoding: .utf8) else { return nil }
+            return OpenAIToolRequest.ToolCall(
+                id: call.id, type: "function",
+                function: OpenAIToolRequest.FunctionCall(name: call.name, arguments: argumentsString)
+            )
+        }
+    }
+
     // MARK: Private
 
     private func callDeepseek(maxTokens: Int) async throws -> OpenAIToolResponse {
