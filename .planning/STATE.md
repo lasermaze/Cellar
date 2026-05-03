@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-05-03T22:58:30.623Z"
+last_updated: "2026-05-03T23:22:11.991Z"
 progress:
   total_phases: 45
   completed_phases: 41
-  total_plans: 95
-  completed_plans: 95
+  total_plans: 99
+  completed_plans: 96
 ---
 
 # Project State
@@ -22,10 +22,10 @@ See: .planning/PROJECT.md (updated 2026-04-03)
 
 ## Current Position
 
-Phase: 43 (Extract agent policy data to versioned resources and achieve provider parity)
-Plan: P03 complete — AgentToolCall struct introduced; all three adapters updated; 9 adapter round-trip tests green
-Status: Phase 43 COMPLETE — P01 PolicyResources bundle; P02 rewire all policy literals; P03 AgentToolCall struct + provider parity tests; all TUP requirements closed
-Last activity: 2026-05-03 — P03 complete: AgentToolCall replaces anonymous tuple; JSONValue gains Sendable; 9 new tests (186 total, 1 pre-existing Kimi model failure unrelated)
+Phase: 44 (Collapse memory layer into single KnowledgeStore)
+Plan: P01 complete — KnowledgeEntry/KnowledgeStore/KnowledgeCache foundation; winetricks verbs to PolicyResources; 19 new tests
+Status: Phase 44 IN PROGRESS — P01 foundation types + winetricks policy move complete; P02 Worker; P03 adapters; P04 wiring pending
+Last activity: 2026-05-03 — P01 complete: KnowledgeEntry discriminated union, KnowledgeStore protocol, KnowledgeCache TTL helper; winetricksVerbAllowlist on PolicyResources; 201 total tests (1 pre-existing Kimi model failure unrelated)
 
 Progress: [█████████████████████] Phase 42 P01/P03 done
 
@@ -103,6 +103,7 @@ Progress: [█████████████████████] Phas
 | Phase 43-extract-agent-policy-data-to-versioned-resources-and-achieve-provider-parity-for-tool-use-across-anthropic-deepseek-and-kimi P01 | 10 | 2 tasks | 8 files |
 | Phase 43 P02 | 10 | 2 tasks | 7 files |
 | Phase 43 P03 | 5 | 2 tasks | 8 files |
+| Phase 44 P01 | 5 | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -248,6 +249,10 @@ Progress: [█████████████████████] Phas
 - [Phase 43-03]: JSONValue gains Sendable: required by AgentToolCall.input field; all JSONValue cases hold value types so conformance is safe
 - [Phase 43-03]: Internal testable helpers (translateResponse/encodedAssistantBlocks) in adapters keep private implementation hidden while enabling deterministic unit tests without HTTP
 - [Phase 43-03]: AgentToolCall struct replaces anonymous tuple: struct property access is syntactically identical to named-tuple label access in Swift — AgentLoop and AgentTools required zero changes
+- [Phase 44]: winetricks_verbs.json is a plain JSON array (no schema_version wrapper) — simpler to load since no migration path needed
+- [Phase 44]: typealias ConfigEntry = CollectiveMemoryEntry — zero schema duplication for KnowledgeEntry config case
+- [Phase 44]: KnowledgeCache key-as-path: / in key creates subdirectories; convention for Plan 03: cache/knowledge/{kind}/{slug}
+- [Phase 44]: KnowledgeStoreContainer enum + nonisolated(unsafe) static var — single-writer-at-startup pattern matching PolicyResources
 
 ### Roadmap Evolution
 
@@ -287,4 +292,4 @@ None.
 ## Session Continuity
 
 Last session: 2026-05-03
-Stopped at: Phase 42 P02 complete — AgentProvider.swift + Providers/{Anthropic,Deepseek,Kimi}Adapter.swift created; AgentLoopProvider.swift (625 lines) deleted; AgentLoop.provider retyped to concrete AgentProvider; AIService three-way switch collapsed to single AgentProvider init. Build clean.
+Stopped at: Phase 44 P01 complete — KnowledgeEntry/KnowledgeStore/KnowledgeCache foundation; winetricksVerbAllowlist on PolicyResources; 201 tests green (1 pre-existing Kimi failure unrelated).
