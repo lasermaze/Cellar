@@ -117,6 +117,16 @@ private struct ToolSchemasFile: Decodable {
     let schemas: [String: JSONValue]
 }
 
+private struct WinetricksVerbsFile: Decodable {
+    let verbs: [String]
+
+    init(from decoder: Decoder) throws {
+        // winetricks_verbs.json is a plain JSON array, not an object
+        let container = try decoder.singleValueContainer()
+        verbs = try container.decode([String].self)
+    }
+}
+
 // MARK: - Private helpers for versioned JSON decoding
 
 private struct PolicyVersionProbe: Decodable { let schema_version: Int }
@@ -130,6 +140,7 @@ struct PolicyResources: @unchecked Sendable {
     let envAllowlist: Set<String>
     let registryAllowlist: [String]
     let toolSchemas: [String: JSONValue]
+    let winetricksVerbAllowlist: Set<String>
 
     // MARK: Shared singleton — fail loud at startup
 
@@ -230,6 +241,24 @@ struct PolicyResources: @unchecked Sendable {
             expectedVersion: 1
         )
         self.toolSchemas = schemasFile.schemas
+
+        // 7. winetricks_verbs.json — plain JSON array (no schema_version wrapper)
+        let verbsURL = policyDir.appendingPathComponent("winetricks_verbs.json")
+        guard FileManager.default.fileExists(atPath: verbsURL.path) else {
+            throw PolicyError.missingResource("policy/winetricks_verbs.json")
+        }
+        let verbsData: Data
+        do {
+            verbsData = try Data(contentsOf: verbsURL)
+        } catch {
+            throw PolicyError.decodingError(file: "policy/winetricks_verbs.json", underlying: error)
+        }
+        do {
+            let verbsList = try JSONDecoder().decode([String].self, from: verbsData)
+            self.winetricksVerbAllowlist = Set(verbsList)
+        } catch {
+            throw PolicyError.decodingError(file: "policy/winetricks_verbs.json", underlying: error)
+        }
     }
 
     // MARK: - Internal helpers (exposed for unit tests)

@@ -68,4 +68,43 @@ struct PolicyResourcesTests {
             _ = try PolicyResources._loadVersionedEnvAllowlist(from: jsonData, expectedVersion: 1)
         }
     }
+
+    // MARK: Test 5: winetricksVerbAllowlist is non-empty
+
+    @Test("PolicyResources.shared.winetricksVerbAllowlist is a non-empty Set<String>")
+    func winetricksVerbAllowlistNonEmpty() {
+        let verbs = PolicyResources.shared.winetricksVerbAllowlist
+        #expect(!verbs.isEmpty, "winetricksVerbAllowlist should be non-empty")
+    }
+
+    // MARK: Test 6: winetricksVerbAllowlist matches AgentTools literal (loss-free move)
+
+    @Test("PolicyResources.shared.winetricksVerbAllowlist equals AgentTools.agentValidWinetricksVerbs")
+    func winetricksVerbAllowlistMatchesAgentTools() {
+        #expect(
+            PolicyResources.shared.winetricksVerbAllowlist == AIService.agentValidWinetricksVerbs,
+            "winetricksVerbAllowlist must match AgentTools literal exactly — no regressions"
+        )
+    }
+
+    // MARK: Test 7: winetricks_verbs.json loaded via Bundle.module resourcePath fallback
+
+    @Test("winetricks_verbs.json is accessible via Bundle.module resourcePath")
+    func winetricksVerbsBundleLookup() {
+        guard let resourcePath = Bundle.module.resourcePath else {
+            Issue.record("Bundle.module.resourcePath is nil")
+            return
+        }
+        let directURL = URL(fileURLWithPath: resourcePath)
+            .appendingPathComponent("policy")
+            .appendingPathComponent("winetricks_verbs.json")
+        let nestedURL = URL(fileURLWithPath: resourcePath)
+            .appendingPathComponent("Resources")
+            .appendingPathComponent("policy")
+            .appendingPathComponent("winetricks_verbs.json")
+        let found = FileManager.default.fileExists(atPath: directURL.path)
+                 || FileManager.default.fileExists(atPath: nestedURL.path)
+        #expect(found,
+                "winetricks_verbs.json should exist under Bundle.module (checked \(directURL.path) and \(nestedURL.path))")
+    }
 }
