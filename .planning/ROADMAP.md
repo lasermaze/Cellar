@@ -564,10 +564,12 @@ Plans:
 
 ### Phase 45: Split AgentTools into session and runtime actor consolidate configuration and sandbox PageParser fixes through allowlist
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** Gate `fetch_page` behind a PolicyResources domain allowlist, consolidate AgentTools' six constructor params into a `SessionConfiguration` struct, and extract all mutable session state into a new `AgentSession` final class — giving AgentTools a clean coordinator role with no scattered state.
+**Requirements**: ALLOW-01, CFG-01, SPLIT-01
 **Depends on:** Phase 44
-**Plans:** 0 plans
+**Plans:** 3 plans
 
 Plans:
-- [ ] TBD (run /gsd:plan-phase 45 to break down)
+- [ ] 45-01-PLAN.md — fetch_page_domains.json + PolicyResources.fetchPageAllowlist + domain gate in ResearchTools.fetchPage
+- [ ] 45-02-PLAN.md — SessionConfiguration struct + AgentTools.init(config:) + self.X → self.config.X migration in tool extensions
+- [ ] 45-03-PLAN.md — AgentSession final class + AgentTools gains let session: AgentSession + self.X → self.session.X migration in tool extensions and AIService
