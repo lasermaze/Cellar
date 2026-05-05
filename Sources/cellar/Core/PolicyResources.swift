@@ -141,6 +141,7 @@ struct PolicyResources: @unchecked Sendable {
     let registryAllowlist: [String]
     let toolSchemas: [String: JSONValue]
     let winetricksVerbAllowlist: Set<String>
+    let fetchPageAllowlist: Set<String>
 
     // MARK: Shared singleton — fail loud at startup
 
@@ -258,6 +259,24 @@ struct PolicyResources: @unchecked Sendable {
             self.winetricksVerbAllowlist = Set(verbsList)
         } catch {
             throw PolicyError.decodingError(file: "policy/winetricks_verbs.json", underlying: error)
+        }
+
+        // 8. fetch_page_domains.json — plain JSON array (no schema_version wrapper)
+        let fetchDomainsURL = policyDir.appendingPathComponent("fetch_page_domains.json")
+        guard FileManager.default.fileExists(atPath: fetchDomainsURL.path) else {
+            throw PolicyError.missingResource("policy/fetch_page_domains.json")
+        }
+        let fetchDomainsData: Data
+        do {
+            fetchDomainsData = try Data(contentsOf: fetchDomainsURL)
+        } catch {
+            throw PolicyError.decodingError(file: "policy/fetch_page_domains.json", underlying: error)
+        }
+        do {
+            let domainsList = try JSONDecoder().decode([String].self, from: fetchDomainsData)
+            self.fetchPageAllowlist = Set(domainsList)
+        } catch {
+            throw PolicyError.decodingError(file: "policy/fetch_page_domains.json", underlying: error)
         }
     }
 

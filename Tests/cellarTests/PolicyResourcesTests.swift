@@ -43,6 +43,9 @@ struct PolicyResourcesTests {
         #expect(pr.engineDefinitions.count > 0, "engineDefinitions should be non-empty")
         #expect(pr.dllRegistry.contains(where: { $0.name == "cnc-ddraw" }), "dllRegistry should contain cnc-ddraw")
         #expect(pr.toolSchemas["set_environment"] != nil, "toolSchemas should have set_environment entry")
+        #expect(pr.fetchPageAllowlist.contains("winehq.org"), "fetchPageAllowlist should contain winehq.org")
+        #expect(pr.fetchPageAllowlist.contains("githubusercontent.com"), "fetchPageAllowlist should contain githubusercontent.com")
+        #expect(!pr.fetchPageAllowlist.isEmpty, "fetchPageAllowlist should be non-empty")
     }
 
     // MARK: Test 3: Frontmatter parsing
@@ -69,7 +72,27 @@ struct PolicyResourcesTests {
         }
     }
 
-    // MARK: Test 5: winetricksVerbAllowlist is non-empty
+    // MARK: Test 5: fetchPageAllowlist is non-empty and covers required domains
+
+    @Test("PolicyResources.shared.fetchPageAllowlist is a non-empty Set<String> containing required domains")
+    func fetchPageAllowlistNonEmpty() {
+        let pr = PolicyResources.shared
+        #expect(pr.fetchPageAllowlist.contains("winehq.org"), "fetchPageAllowlist should contain winehq.org")
+        #expect(pr.fetchPageAllowlist.contains("githubusercontent.com"), "fetchPageAllowlist should contain githubusercontent.com")
+        #expect(!pr.fetchPageAllowlist.isEmpty, "fetchPageAllowlist should be non-empty")
+    }
+
+    @Test("fetchPageAllowlist covers all required wine/gaming domains")
+    func fetchPageAllowlistCoverage() {
+        let al = PolicyResources.shared.fetchPageAllowlist
+        let required = ["winehq.org", "pcgamingwiki.com", "protondb.com",
+                        "github.com", "githubusercontent.com", "reddit.com"]
+        for domain in required {
+            #expect(al.contains(domain), "\(domain) must be in fetchPageAllowlist")
+        }
+    }
+
+    // MARK: Test 6: winetricksVerbAllowlist is non-empty
 
     @Test("PolicyResources.shared.winetricksVerbAllowlist is a non-empty Set<String>")
     func winetricksVerbAllowlistNonEmpty() {
