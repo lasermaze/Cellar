@@ -124,13 +124,18 @@ Typically $0.05-0.50 per game launch with Claude Sonnet. DeepSeek is ~5x cheaper
 
 ```
 Sources/cellar/
-  Commands/       — CLI commands (status, add, launch, remove, log, serve, sync)
-  Core/           — Business logic (AIService, AgentLoop, AgentTools, WineProcess, DiscImageHandler)
-  Core/Tools/     — Agent tool implementations (Research, Diagnostic, Config, Launch, Save)
-  Models/         — Data types (GameEntry, Recipe, KnownDLLRegistry, AIModels)
-  Persistence/    — Storage (CellarStore, RecipeEngine, CellarPaths, CellarConfig)
-  Web/            — Vapor web server (GameController, LaunchController, SettingsController)
+  Commands/        — CLI commands (status, add, launch, remove, log, serve, sync, wiki)
+  Core/            — Agent loop, AI service, Wine process, knowledge store, policy resources
+  Core/Tools/      — Agent tool implementations (Diagnostic, Config, Launch, Save, Research)
+  Core/Providers/  — AI provider adapters (Anthropic, DeepSeek, Kimi)
+  Models/          — Data types (GameEntry, Recipe, ModelCatalog, AIModels)
+  Persistence/     — Storage (CellarStore, CellarPaths, CellarConfig)
+  Web/             — Vapor web server + Leaf templates
+  Resources/policy — Versioned allowlists (env keys, registry, DLLs, domains)
+worker/            — Cloudflare Worker for remote knowledge store writes
 ```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the full file-by-file reference.
 
 ## Building from Source
 
@@ -147,4 +152,4 @@ Requires Xcode 16+ or Swift 6.0+ toolchain.
 
 ## License
 
-MIT
+[MIT](LICENSE)
