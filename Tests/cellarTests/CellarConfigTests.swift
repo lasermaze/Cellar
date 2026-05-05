@@ -64,9 +64,9 @@ struct CellarConfigTests {
         #expect(AIService.fallbackModels["deepseek"]?.first?.id == "deepseek-chat")
     }
 
-    @Test("Kimi default model is moonshot-v1-128k")
+    @Test("Kimi default model is moonshot-v1-8k")
     func kimiDefaultModel() {
-        #expect(AIService.fallbackModels["kimi"]?.first?.id == "moonshot-v1-128k")
+        #expect(AIService.fallbackModels["kimi"]?.first?.id == "moonshot-v1-8k")
     }
 
     // MARK: - AIProvider Enum
