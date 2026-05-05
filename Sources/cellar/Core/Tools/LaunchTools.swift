@@ -24,15 +24,15 @@ extension AgentTools {
 
         // Enforce max launch limit (diagnostic launches are free)
         if !isDiagnostic {
-            if launchCount >= maxLaunches {
+            if session.launchCount >= session.maxLaunches {
                 return jsonResult([
-                    "error": "Maximum launches (\(maxLaunches)) reached for this session. Save a recipe if you found a working configuration.",
-                    "launch_number": launchCount
+                    "error": "Maximum launches (\(session.maxLaunches)) reached for this session. Save a recipe if you found a working configuration.",
+                    "launch_number": session.launchCount
                 ])
             }
-            launchCount += 1
+            session.launchCount += 1
         }
-        let thisLaunchNumber = launchCount
+        let thisLaunchNumber = session.launchCount
 
         // Pre-flight checks
         var preflightWarnings: [String] = []
@@ -44,7 +44,7 @@ extension AgentTools {
         }
 
         // b. Check DLL override files exist where expected
-        if let overrides = accumulatedEnv["WINEDLLOVERRIDES"], !overrides.isEmpty {
+        if let overrides = session.accumulatedEnv["WINEDLLOVERRIDES"], !overrides.isEmpty {
             let gameDir = URL(fileURLWithPath: config.executablePath).deletingLastPathComponent()
             let system32Dir = config.bottleURL.appendingPathComponent("drive_c/windows/system32")
             let syswow64Dir = config.bottleURL.appendingPathComponent("drive_c/windows/syswow64")
@@ -67,7 +67,7 @@ extension AgentTools {
         }
 
         // Build environment: start with accumulated env
-        var env = accumulatedEnv
+        var env = session.accumulatedEnv
 
         // Merge extra_winedebug if provided
         if let extraDebug = input["extra_winedebug"]?.asString, !extraDebug.isEmpty {
@@ -82,7 +82,7 @@ extension AgentTools {
         let logDir = logFile.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: logDir, withIntermediateDirectories: true)
 
-        let launchLabel = isDiagnostic ? "diagnostic" : "\(thisLaunchNumber)/\(maxLaunches)"
+        let launchLabel = isDiagnostic ? "diagnostic" : "\(thisLaunchNumber)/\(session.maxLaunches)"
         print("\n[Agent launch \(launchLabel)] Starting game...")
 
         // Run game via wineProcess
@@ -103,23 +103,23 @@ extension AgentTools {
         }
 
         // Store last log file for read_log
-        lastLogFile = logFile
+        session.lastLogFile = logFile
 
         // Parse structured diagnostics from stderr
         let diagnostics = WineErrorParser.parse(result.stderr)
 
         // Swap pending actions for diff tracking
-        lastAppliedActions = pendingActions
-        pendingActions = []
+        session.lastAppliedActions = session.pendingActions
+        session.pendingActions = []
 
         // Compute changes since last launch
-        let changesDiff = computeChangesDiff(current: diagnostics, previousDiagnostics: previousDiagnostics, lastActions: lastAppliedActions)
+        let changesDiff = computeChangesDiff(current: diagnostics, previousDiagnostics: session.previousDiagnostics, lastActions: session.lastAppliedActions)
 
         // Store current diagnostics for next comparison
-        previousDiagnostics = diagnostics
+        session.previousDiagnostics = diagnostics
 
         // Persist to disk for cross-session tracking
-        let record = DiagnosticRecord.from(diagnostics: diagnostics, gameId: config.gameId, lastActions: lastAppliedActions)
+        let record = DiagnosticRecord.from(diagnostics: diagnostics, gameId: config.gameId, lastActions: session.lastAppliedActions)
         DiagnosticRecord.write(record)
 
         // Parse +loaddll lines from stderr for DLL load analysis

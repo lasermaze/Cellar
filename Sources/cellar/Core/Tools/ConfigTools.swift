@@ -25,13 +25,13 @@ extension AgentTools {
             return jsonResult(["error": "Environment key '\(key)' not allowed. Allowed keys: \(allowed)"])
         }
 
-        accumulatedEnv[key] = value
+        session.accumulatedEnv[key] = value
 
         return jsonResult([
             "status": "ok",
             "key": key,
             "value": value,
-            "current_env": accumulatedEnv
+            "current_env": session.accumulatedEnv
         ])
     }
 
@@ -97,7 +97,7 @@ extension AgentTools {
         }
 
         // Skip if already installed
-        if installedDeps.contains(verb) {
+        if session.installedDeps.contains(verb) {
             return jsonResult(["status": "ok", "verb": verb, "note": "Already installed in this session"])
         }
 
@@ -115,7 +115,7 @@ extension AgentTools {
         do {
             let result = try runner.install(verb: verb)
             if result.success {
-                installedDeps.insert(verb)
+                session.installedDeps.insert(verb)
                 return jsonResult([
                     "status": "ok",
                     "verb": verb,
@@ -201,8 +201,8 @@ extension AgentTools {
             for (dll, mode) in knownDLL.requiredOverrides {
                 let override = "\(dll)=\(mode)"
                 let key = "WINEDLLOVERRIDES"
-                let current = accumulatedEnv[key] ?? ""
-                accumulatedEnv[key] = current.isEmpty ? override : "\(current);\(override)"
+                let current = session.accumulatedEnv[key] ?? ""
+                session.accumulatedEnv[key] = current.isEmpty ? override : "\(current);\(override)"
                 appliedOverrides[dll] = mode
             }
 

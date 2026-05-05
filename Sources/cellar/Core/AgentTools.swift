@@ -42,40 +42,16 @@ final class AgentTools: @unchecked Sendable {
         return readLine() ?? ""
     }
 
-    // MARK: - Mutable State
+    // MARK: - Session State
 
-    /// Wine environment variables accumulated across set_environment calls.
-    var accumulatedEnv: [String: String] = [:]
-    /// Number of times launch_game has been called.
-    var launchCount: Int = 0
-    /// Maximum allowed launches per agent session.
-    let maxLaunches: Int = 8
-    /// Winetricks verbs already installed (to skip duplicates).
-    var installedDeps: Set<String> = []
-    /// Log file from the most recent launch_game call.
-    var lastLogFile: URL? = nil
-
-    /// Actions applied since the last launch (for changes_since_last tracking).
-    /// Internal so extension files (LaunchTools, DiagnosticTools) can read/write.
-    var pendingActions: [String] = []
-    /// Actions that were pending at the time of the last launch.
-    var lastAppliedActions: [String] = []
-    /// Previous launch diagnostics for computing changes between launches.
-    var previousDiagnostics: WineDiagnostics? = nil
-    /// Set by save_failure tool to signal the failure branch should write a session log entry
-    /// even when no other substantive material exists.
-    var hasSubstantiveFailure: Bool = false
-
-    /// Stable per-session short ID (8 hex chars). Used for the on-disk draft file path.
-    let sessionShortId: String = String(UUID().uuidString.prefix(8)).lowercased()
-
-    /// Mid-session observation buffer (populated by update_wiki tool, flushed by AIService at session end).
-    lazy var draftBuffer: SessionDraftBuffer = SessionDraftBuffer(shortId: sessionShortId)
+    /// All mutable per-session runtime state. Isolated from injected infrastructure.
+    let session: AgentSession
 
     // MARK: - Init
 
     init(config: SessionConfiguration) {
         self.config = config
+        self.session = AgentSession()
     }
 
     // MARK: - Session Handoff
@@ -91,9 +67,9 @@ final class AgentTools: @unchecked Sendable {
             stopReason: stopReason,
             iterationsUsed: iterationsUsed,
             estimatedCostUSD: costUSD,
-            accumulatedEnv: accumulatedEnv,
-            installedDeps: Array(installedDeps),
-            launchCount: launchCount,
+            accumulatedEnv: session.accumulatedEnv,
+            installedDeps: Array(session.installedDeps),
+            launchCount: session.launchCount,
             lastStatus: statusText
         )
     }
@@ -165,7 +141,7 @@ final class AgentTools: @unchecked Sendable {
 
         // Track pending actions via enum metadata — single call site, no inline switch.
         if let desc = tool.pendingActionDescription(for: input) {
-            pendingActions.append(desc)
+            session.pendingActions.append(desc)
         }
 
         return .success(content: resultString)

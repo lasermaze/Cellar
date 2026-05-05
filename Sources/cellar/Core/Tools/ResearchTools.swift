@@ -247,11 +247,11 @@ extension AgentTools {
         if trimmed.count > 1000 {
             return jsonResult(["error": "content too long (max 1000 chars; observed \(trimmed.count))"])
         }
-        draftBuffer.append(content: trimmed)
+        session.draftBuffer.append(content: trimmed)
         return jsonResult([
             "ok": "true",
             "noted": "true",
-            "total_notes": "\(draftBuffer.notes.count)",
+            "total_notes": "\(session.draftBuffer.notes.count)",
             "message": "Observation captured. Will be attached to session log at end."
         ])
     }

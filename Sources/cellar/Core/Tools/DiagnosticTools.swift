@@ -162,7 +162,7 @@ extension AgentTools {
 
     func readLog(input: JSONValue) -> String {
         // Resolve log file: use lastLogFile or scan for most recent
-        var logFileURL: URL? = lastLogFile
+        var logFileURL: URL? = session.lastLogFile
 
         if logFileURL == nil {
             let logDir = CellarPaths.logDir(for: config.gameId)
@@ -378,7 +378,7 @@ extension AgentTools {
         // Build environment: copy accumulated, merge WINEDEBUG channels
         var env = ProcessInfo.processInfo.environment
         env["WINEPREFIX"] = config.wineProcess.winePrefix.path
-        for (key, value) in accumulatedEnv {
+        for (key, value) in session.accumulatedEnv {
             env[key] = value
         }
         let existingDebug = env["WINEDEBUG"] ?? ""
@@ -490,14 +490,14 @@ extension AgentTools {
         let diagnostics = WineErrorParser.parse(stderr)
 
         // Swap pending actions for diff tracking
-        lastAppliedActions = pendingActions
-        pendingActions = []
+        session.lastAppliedActions = session.pendingActions
+        session.pendingActions = []
 
-        let changesDiff = computeChangesDiff(current: diagnostics, previousDiagnostics: previousDiagnostics, lastActions: lastAppliedActions)
-        previousDiagnostics = diagnostics
+        let changesDiff = computeChangesDiff(current: diagnostics, previousDiagnostics: session.previousDiagnostics, lastActions: session.lastAppliedActions)
+        session.previousDiagnostics = diagnostics
 
         // Persist to disk for cross-session tracking
-        let record = DiagnosticRecord.from(diagnostics: diagnostics, gameId: config.gameId, lastActions: lastAppliedActions)
+        let record = DiagnosticRecord.from(diagnostics: diagnostics, gameId: config.gameId, lastActions: session.lastAppliedActions)
         DiagnosticRecord.write(record)
 
         return jsonResult([
@@ -547,7 +547,7 @@ extension AgentTools {
 
         // 1. Check configured override in accumulatedEnv
         let configuredOverride: String?
-        if let overrides = accumulatedEnv["WINEDLLOVERRIDES"] {
+        if let overrides = session.accumulatedEnv["WINEDLLOVERRIDES"] {
             // Parse override string like "ddraw=n,b;dsound=b"
             let pairs = overrides.components(separatedBy: ";")
             configuredOverride = pairs.first(where: { $0.lowercased().hasPrefix(baseName + "=") })

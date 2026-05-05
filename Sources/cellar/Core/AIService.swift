@@ -872,13 +872,13 @@ struct AIService {
                             record: record,
                             duration: Date().timeIntervalSince(sessionStartTime),
                             wineURL: wineURL,
-                            midSessionNotes: tools.draftBuffer.notes
+                            midSessionNotes: tools.session.draftBuffer.notes
                         ),
                         commitMessage: "session: success for \(record.gameName)"
                     )
                     await KnowledgeStoreContainer.shared.write(.sessionLog(sessionEntry))
                     // Clear the on-disk draft after successful session log write
-                    tools.draftBuffer.clearDraft()
+                    tools.session.draftBuffer.clearDraft()
                     // Config (was CollectiveMemoryWriteService.push — called by handleContributionIfNeeded above)
                     // Note: contribution push is handled via handleContributionIfNeeded; this is the unified store path
                 }
@@ -912,13 +912,13 @@ struct AIService {
             // Phase 41: deposit failure session log if substantive material exists
             let trimmedFinal = result.finalText.trimmingCharacters(in: .whitespacesAndNewlines)
             let hasMaterial =
-                !tools.pendingActions.isEmpty ||
-                !tools.lastAppliedActions.isEmpty ||
-                tools.launchCount > 0 ||
-                tools.hasSubstantiveFailure ||
+                !tools.session.pendingActions.isEmpty ||
+                !tools.session.lastAppliedActions.isEmpty ||
+                tools.session.launchCount > 0 ||
+                tools.session.hasSubstantiveFailure ||
                 trimmedFinal.count >= 80
             if hasMaterial {
-                let actions = Array(Set(tools.pendingActions + tools.lastAppliedActions))
+                let actions = Array(Set(tools.session.pendingActions + tools.session.lastAppliedActions))
                 // Rewired: failure session log through KnowledgeStoreContainer.shared (Plan 04)
                 let failureEntry = SessionLogEntry(
                     path: WikiService.failureSessionLogFilename(gameId: gameId),
@@ -927,11 +927,11 @@ struct AIService {
                         gameName: entry.name,
                         narrative: trimmedFinal,
                         actionsAttempted: actions,
-                        launchCount: tools.launchCount,
+                        launchCount: tools.session.launchCount,
                         duration: Date().timeIntervalSince(sessionStartTime),
                         wineURL: wineURL,
                         stopReason: stopReasonStr,
-                        midSessionNotes: tools.draftBuffer.notes
+                        midSessionNotes: tools.session.draftBuffer.notes
                     ),
                     commitMessage: "session: failure for \(entry.name)"
                 )

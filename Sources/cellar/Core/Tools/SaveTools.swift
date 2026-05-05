@@ -22,11 +22,11 @@ extension AgentTools {
             source: "ai-agent",
             executable: executableFilename,
             wineTested: nil,
-            environment: accumulatedEnv,
+            environment: session.accumulatedEnv,
             registry: [],
             launchArgs: [],
             notes: notes,
-            setupDeps: installedDeps.isEmpty ? nil : Array(installedDeps).sorted(),
+            setupDeps: session.installedDeps.isEmpty ? nil : Array(session.installedDeps).sorted(),
             installDir: nil,
             retryVariants: nil
         )
@@ -38,7 +38,7 @@ extension AgentTools {
                 "status": "ok",
                 "recipe_path": recipePath,
                 "game_id": config.gameId,
-                "environment_vars_saved": accumulatedEnv.count
+                "environment_vars_saved": session.accumulatedEnv.count
             ])
         } catch {
             return jsonResult(["error": "Failed to save recipe: \(error.localizedDescription)"])
@@ -182,7 +182,7 @@ extension AgentTools {
             os: nil,
             executable: executableInfo,
             workingDirectory: workingDir,
-            environment: accumulatedEnv,
+            environment: session.accumulatedEnv,
             dllOverrides: dllOverrides,
             gameConfigFiles: gameConfigFiles,
             registry: registryRecords,
@@ -205,11 +205,11 @@ extension AgentTools {
                 source: "ai-agent",
                 executable: recipeExeName,
                 wineTested: nil,
-                environment: accumulatedEnv,
+                environment: session.accumulatedEnv,
                 registry: [],
                 launchArgs: [],
                 notes: input["resolution_narrative"]?.asString,
-                setupDeps: installedDeps.isEmpty ? nil : Array(installedDeps).sorted(),
+                setupDeps: session.installedDeps.isEmpty ? nil : Array(session.installedDeps).sorted(),
                 installDir: nil,
                 retryVariants: nil
             )
@@ -219,7 +219,7 @@ extension AgentTools {
                 "status": "ok",
                 "saved_to": savedPath,
                 "game_id": config.gameId,
-                "environment_vars": accumulatedEnv.count,
+                "environment_vars": session.accumulatedEnv.count,
                 "dll_overrides": dllOverrides.count,
                 "pitfalls": pitfalls.count,
                 "tags": tags
@@ -238,9 +238,9 @@ extension AgentTools {
             return jsonResult(["error": "save_failure requires narrative and blocking_symptom"])
         }
         // Mark the AgentTools state so AIService failure branch knows to write a session log.
-        hasSubstantiveFailure = true
+        session.hasSubstantiveFailure = true
         // Seed pendingActions so the failure session log captures the symptom tag.
-        pendingActions.append("save_failure: \(symptom)")
+        session.pendingActions.append("save_failure: \(symptom)")
         fputs("save_failure recorded: \(symptom)\n", stderr)
         return jsonResult([
             "ok": "true",
