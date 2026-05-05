@@ -22,3 +22,8 @@ github-app.json
 
 # GSD planning artifacts — local only
 .planning/
+
+# Scratch/temp files
+fe_out.txt
+architecture.html
+AgentControl
