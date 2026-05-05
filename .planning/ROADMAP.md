@@ -567,7 +567,7 @@ Plans:
 **Goal:** Gate `fetch_page` behind a PolicyResources domain allowlist, consolidate AgentTools' six constructor params into a `SessionConfiguration` struct, and extract all mutable session state into a new `AgentSession` final class — giving AgentTools a clean coordinator role with no scattered state.
 **Requirements**: ALLOW-01, CFG-01, SPLIT-01
 **Depends on:** Phase 44
-**Plans:** 1/3 plans executed
+**Plans:** 2/3 plans executed
 
 Plans:
 - [ ] 45-01-PLAN.md — fetch_page_domains.json + PolicyResources.fetchPageAllowlist + domain gate in ResearchTools.fetchPage
