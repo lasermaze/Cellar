@@ -19,3 +19,6 @@ github-app.json
 *.cue
 *.mdf
 *.nrg
+
+# GSD planning artifacts — local only
+.planning/
