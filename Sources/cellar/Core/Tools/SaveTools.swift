@@ -13,10 +13,10 @@ extension AgentTools {
         let notes = input["notes"]?.asString
 
         // Build recipe from current accumulated state
-        let executableFilename = URL(fileURLWithPath: executablePath).lastPathComponent
+        let executableFilename = URL(fileURLWithPath: config.executablePath).lastPathComponent
 
         let recipe = Recipe(
-            id: gameId,
+            id: config.gameId,
             name: name,
             version: "1.0.0",
             source: "ai-agent",
@@ -33,11 +33,11 @@ extension AgentTools {
 
         do {
             try RecipeEngine.saveUserRecipe(recipe)
-            let recipePath = CellarPaths.userRecipeFile(for: gameId).path
+            let recipePath = CellarPaths.userRecipeFile(for: config.gameId).path
             return jsonResult([
                 "status": "ok",
                 "recipe_path": recipePath,
-                "game_id": gameId,
+                "game_id": config.gameId,
                 "environment_vars_saved": accumulatedEnv.count
             ])
         } catch {
@@ -117,7 +117,7 @@ extension AgentTools {
             return jsonResult(["error": "game_name is required"])
         }
 
-        let exeFilename = URL(fileURLWithPath: executablePath).lastPathComponent
+        let exeFilename = URL(fileURLWithPath: config.executablePath).lastPathComponent
         let executableInfo = ExecutableInfo(path: exeFilename, type: "unknown", peImports: nil)
 
         let workingDirNotes = input["working_directory_notes"]?.asString
@@ -170,7 +170,7 @@ extension AgentTools {
 
         let record = SuccessRecord(
             schemaVersion: 1,
-            gameId: gameId,
+            gameId: config.gameId,
             gameName: gameName,
             gameVersion: input["game_version"]?.asString,
             source: input["source"]?.asString,
@@ -194,12 +194,12 @@ extension AgentTools {
 
         do {
             try SuccessDatabase.save(record)
-            let savedPath = CellarPaths.successdbFile(for: gameId).path
+            let savedPath = CellarPaths.successdbFile(for: config.gameId).path
 
             // Backward compatibility: also save as user recipe
-            let recipeExeName = URL(fileURLWithPath: executablePath).lastPathComponent
+            let recipeExeName = URL(fileURLWithPath: config.executablePath).lastPathComponent
             let recipe = Recipe(
-                id: gameId,
+                id: config.gameId,
                 name: gameName,
                 version: "1.0.0",
                 source: "ai-agent",
@@ -218,7 +218,7 @@ extension AgentTools {
             return jsonResult([
                 "status": "ok",
                 "saved_to": savedPath,
-                "game_id": gameId,
+                "game_id": config.gameId,
                 "environment_vars": accumulatedEnv.count,
                 "dll_overrides": dllOverrides.count,
                 "pitfalls": pitfalls.count,

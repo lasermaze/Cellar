@@ -39,15 +39,15 @@ extension AgentTools {
         let fm = FileManager.default
 
         // a. Verify executable exists
-        if !fm.fileExists(atPath: executablePath) {
-            preflightWarnings.append("Executable not found at: \(executablePath)")
+        if !fm.fileExists(atPath: config.executablePath) {
+            preflightWarnings.append("Executable not found at: \(config.executablePath)")
         }
 
         // b. Check DLL override files exist where expected
         if let overrides = accumulatedEnv["WINEDLLOVERRIDES"], !overrides.isEmpty {
-            let gameDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
-            let system32Dir = bottleURL.appendingPathComponent("drive_c/windows/system32")
-            let syswow64Dir = bottleURL.appendingPathComponent("drive_c/windows/syswow64")
+            let gameDir = URL(fileURLWithPath: config.executablePath).deletingLastPathComponent()
+            let system32Dir = config.bottleURL.appendingPathComponent("drive_c/windows/system32")
+            let syswow64Dir = config.bottleURL.appendingPathComponent("drive_c/windows/syswow64")
             let pairs = overrides.components(separatedBy: ";")
             for pair in pairs {
                 let parts = pair.components(separatedBy: "=")
@@ -76,7 +76,7 @@ extension AgentTools {
         }
 
         // Create log file
-        let logFile = CellarPaths.logFile(for: gameId, timestamp: Date())
+        let logFile = CellarPaths.logFile(for: config.gameId, timestamp: Date())
 
         // Ensure log directory exists
         let logDir = logFile.deletingLastPathComponent()
@@ -88,8 +88,8 @@ extension AgentTools {
         // Run game via wineProcess
         let result: WineResult
         do {
-            result = try wineProcess.run(
-                binary: executablePath,
+            result = try config.wineProcess.run(
+                binary: config.executablePath,
                 arguments: [],
                 environment: env,
                 logFile: logFile
@@ -119,7 +119,7 @@ extension AgentTools {
         previousDiagnostics = diagnostics
 
         // Persist to disk for cross-session tracking
-        let record = DiagnosticRecord.from(diagnostics: diagnostics, gameId: gameId, lastActions: lastAppliedActions)
+        let record = DiagnosticRecord.from(diagnostics: diagnostics, gameId: config.gameId, lastActions: lastAppliedActions)
         DiagnosticRecord.write(record)
 
         // Parse +loaddll lines from stderr for DLL load analysis

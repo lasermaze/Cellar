@@ -69,7 +69,7 @@ extension AgentTools {
         let tempFile = URL(fileURLWithPath: NSTemporaryDirectory() + UUID().uuidString + ".reg")
         do {
             try regContent.write(to: tempFile, atomically: true, encoding: .utf8)
-            try wineProcess.applyRegistryFile(at: tempFile)
+            try config.wineProcess.applyRegistryFile(at: tempFile)
             try? FileManager.default.removeItem(at: tempFile)
             return jsonResult([
                 "status": "ok",
@@ -108,8 +108,8 @@ extension AgentTools {
 
         let runner = WinetricksRunner(
             winetricksURL: winetricksURL,
-            wineBinary: wineURL,
-            bottlePath: bottleURL.path
+            wineBinary: config.wineURL,
+            bottlePath: config.bottleURL.path
         )
 
         do {
@@ -162,7 +162,7 @@ extension AgentTools {
         } else {
             // Auto-detect using KnownDLL metadata and bottle layout
             detectedTarget = knownDLL.isSystemDLL
-                ? DLLPlacementTarget.autoDetect(bottleURL: bottleURL, dllBitness: 32, isSystemDLL: true)
+                ? DLLPlacementTarget.autoDetect(bottleURL: config.bottleURL, dllBitness: 32, isSystemDLL: true)
                 : .gameDir
         }
 
@@ -171,13 +171,13 @@ extension AgentTools {
         let targetName: String
         switch detectedTarget {
         case .gameDir:
-            targetDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
+            targetDir = URL(fileURLWithPath: config.executablePath).deletingLastPathComponent()
             targetName = "game_dir"
         case .system32:
-            targetDir = bottleURL.appendingPathComponent("drive_c/windows/system32")
+            targetDir = config.bottleURL.appendingPathComponent("drive_c/windows/system32")
             targetName = "system32"
         case .syswow64:
-            targetDir = bottleURL.appendingPathComponent("drive_c/windows/syswow64")
+            targetDir = config.bottleURL.appendingPathComponent("drive_c/windows/syswow64")
             targetName = "syswow64"
         }
 
@@ -230,7 +230,7 @@ extension AgentTools {
             return jsonResult(["error": "content is required"])
         }
 
-        let gameDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
+        let gameDir = URL(fileURLWithPath: config.executablePath).deletingLastPathComponent()
 
         // Normalize: replace backslashes with forward slashes
         let normalizedPath = relativePath.replacingOccurrences(of: "\\", with: "/")
@@ -293,7 +293,7 @@ extension AgentTools {
             return jsonResult(["error": "relative_path is required"])
         }
 
-        let gameDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
+        let gameDir = URL(fileURLWithPath: config.executablePath).deletingLastPathComponent()
         let normalizedPath = relativePath.replacingOccurrences(of: "\\", with: "/")
         let targetURL = gameDir.appendingPathComponent(normalizedPath).standardized
 

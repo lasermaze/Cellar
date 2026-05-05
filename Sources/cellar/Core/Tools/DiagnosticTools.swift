@@ -7,12 +7,12 @@ extension AgentTools {
     // MARK: 1. inspect_game
 
     func inspectGame(input: JSONValue) -> String {
-        print("[inspect_game] START for \(gameId)")
-        let gameDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
+        print("[inspect_game] START for \(config.gameId)")
+        let gameDir = URL(fileURLWithPath: config.executablePath).deletingLastPathComponent()
 
         // Detect PE type using PEReader
         print("[inspect_game] detecting PE type...")
-        let detectedArch = PEReader.detectArch(fileURL: URL(fileURLWithPath: executablePath))
+        let detectedArch = PEReader.detectArch(fileURL: URL(fileURLWithPath: config.executablePath))
         let exeType: String
         switch detectedArch {
         case .win64: exeType = "PE32+ (64-bit)"
@@ -46,12 +46,12 @@ extension AgentTools {
         }
 
         // Check bottle existence
-        let bottleExists = FileManager.default.fileExists(atPath: bottleURL.path)
+        let bottleExists = FileManager.default.fileExists(atPath: config.bottleURL.path)
 
         // List DLLs in system32
         print("[inspect_game] listing system32 DLLs...")
         var system32DLLs: [String] = []
-        let system32Dir = bottleURL
+        let system32Dir = config.bottleURL
             .appendingPathComponent("drive_c")
             .appendingPathComponent("windows")
             .appendingPathComponent("system32")
@@ -67,7 +67,7 @@ extension AgentTools {
 
         // Load bundled recipe info
         var recipeInfo: [String: Any] = [:]
-        if let recipe = try? RecipeEngine.findBundledRecipe(for: gameId) {
+        if let recipe = try? RecipeEngine.findBundledRecipe(for: config.gameId) {
             recipeInfo = [
                 "name": recipe.name,
                 "environment": recipe.environment,
@@ -78,7 +78,7 @@ extension AgentTools {
         print("[inspect_game] scanning PE imports...")
         // PE imports: scan first 64KB of exe for DLL name strings (PE headers live here)
         var peImports: [String] = []
-        if let handle = try? FileHandle(forReadingFrom: URL(fileURLWithPath: executablePath)) {
+        if let handle = try? FileHandle(forReadingFrom: URL(fileURLWithPath: config.executablePath)) {
             let headerData = handle.readData(ofLength: 65536)
             try? handle.close()
             // Convert to ASCII, replacing non-printable bytes with spaces
@@ -106,18 +106,18 @@ extension AgentTools {
 
         // Extract strings from binary (find printable sequences >= 10 chars)
         print("[inspect_game] extracting strings...")
-        let binaryStrings = extractStrings(from: executablePath)
+        let binaryStrings = extractStrings(from: config.executablePath)
         print("[inspect_game] found \(binaryStrings.count) strings")
 
         print("[inspect_game] DONE")
         return jsonResult([
-            "game_id": gameId,
-            "executable_path": executablePath,
+            "game_id": config.gameId,
+            "executable_path": config.executablePath,
             "exe_type": exeType,
             "bottle_arch": detectedArch?.rawValue ?? "unknown",
             "game_files": allGameFiles,
             "bottle_exists": bottleExists,
-            "bottle_path": bottleURL.path,
+            "bottle_path": config.bottleURL.path,
             "system32_dlls": system32DLLs,
             "recipe": recipeInfo,
             "pe_imports": peImports,
@@ -165,7 +165,7 @@ extension AgentTools {
         var logFileURL: URL? = lastLogFile
 
         if logFileURL == nil {
-            let logDir = CellarPaths.logDir(for: gameId)
+            let logDir = CellarPaths.logDir(for: config.gameId)
             if let contents = try? FileManager.default.contentsOfDirectory(
                 at: logDir,
                 includingPropertiesForKeys: [.contentModificationDateKey]
@@ -182,7 +182,7 @@ extension AgentTools {
         }
 
         guard let url = logFileURL else {
-            return jsonResult(["error": "No log file found for game '\(gameId)'. Run launch_game first.", "log_content": ""])
+            return jsonResult(["error": "No log file found for game '\(config.gameId)'. Run launch_game first.", "log_content": ""])
         }
 
         // Read file, return last 8000 chars
@@ -214,9 +214,9 @@ extension AgentTools {
         let regFileURL: URL
         let upperKeyPath = keyPath.uppercased()
         if upperKeyPath.hasPrefix("HKCU") || upperKeyPath.hasPrefix("HKEY_CURRENT_USER") {
-            regFileURL = bottleURL.appendingPathComponent("user.reg")
+            regFileURL = config.bottleURL.appendingPathComponent("user.reg")
         } else if upperKeyPath.hasPrefix("HKLM") || upperKeyPath.hasPrefix("HKEY_LOCAL_MACHINE") {
-            regFileURL = bottleURL.appendingPathComponent("system.reg")
+            regFileURL = config.bottleURL.appendingPathComponent("system.reg")
         } else {
             return jsonResult(["error": "Unsupported hive in key_path '\(keyPath)'. Use HKCU or HKLM prefix."])
         }
@@ -377,7 +377,7 @@ extension AgentTools {
 
         // Build environment: copy accumulated, merge WINEDEBUG channels
         var env = ProcessInfo.processInfo.environment
-        env["WINEPREFIX"] = wineProcess.winePrefix.path
+        env["WINEPREFIX"] = config.wineProcess.winePrefix.path
         for (key, value) in accumulatedEnv {
             env[key] = value
         }
@@ -387,12 +387,12 @@ extension AgentTools {
 
         // Create process
         let process = Process()
-        process.executableURL = wineProcess.wineBinary
-        process.arguments = [executablePath]
+        process.executableURL = config.wineProcess.wineBinary
+        process.arguments = [config.executablePath]
         process.environment = env
 
         // Set CWD to binary's parent directory (matches WineProcess CWD fix)
-        let binaryURL = URL(fileURLWithPath: executablePath)
+        let binaryURL = URL(fileURLWithPath: config.executablePath)
         process.currentDirectoryURL = binaryURL.deletingLastPathComponent()
 
         // Capture stderr
@@ -419,7 +419,7 @@ extension AgentTools {
         // Kill timer: terminate process + kill wineserver after timeout
         let killWork = DispatchWorkItem { [weak self] in
             process.terminate()
-            try? self?.wineProcess.killWineserver()
+            try? self?.config.wineProcess.killWineserver()
             // Force SIGKILL after 2 more seconds if process is still alive
             DispatchQueue.global().asyncAfter(deadline: .now() + 2.0) {
                 if process.isRunning {
@@ -438,12 +438,12 @@ extension AgentTools {
         let maxWait = Double(timeoutSeconds) + 5.0
         if waitDone.wait(timeout: .now() + maxWait) == .timedOut {
             kill(process.processIdentifier, SIGKILL)
-            try? wineProcess.killWineserver()
+            try? config.wineProcess.killWineserver()
         }
         killWork.cancel()
 
         // Kill wineserver to release all Wine children holding pipe descriptors
-        try? wineProcess.killWineserver()
+        try? config.wineProcess.killWineserver()
 
         // Close pipes immediately — readabilityHandler already captured data in real-time.
         // Do NOT call readDataToEndOfFile — Wine child processes hold pipe descriptors
@@ -497,7 +497,7 @@ extension AgentTools {
         previousDiagnostics = diagnostics
 
         // Persist to disk for cross-session tracking
-        let record = DiagnosticRecord.from(diagnostics: diagnostics, gameId: gameId, lastActions: lastAppliedActions)
+        let record = DiagnosticRecord.from(diagnostics: diagnostics, gameId: config.gameId, lastActions: lastAppliedActions)
         DiagnosticRecord.write(record)
 
         return jsonResult([
@@ -517,7 +517,7 @@ extension AgentTools {
             return jsonResult(["error": "paths array is required and must not be empty"])
         }
 
-        let gameDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
+        let gameDir = URL(fileURLWithPath: config.executablePath).deletingLastPathComponent()
         let fm = FileManager.default
 
         var results: [[String: Any]] = []
@@ -556,10 +556,10 @@ extension AgentTools {
         }
 
         // 2. Check where native DLL files exist
-        let gameDir = URL(fileURLWithPath: executablePath).deletingLastPathComponent()
-        let system32Dir = bottleURL
+        let gameDir = URL(fileURLWithPath: config.executablePath).deletingLastPathComponent()
+        let system32Dir = config.bottleURL
             .appendingPathComponent("drive_c/windows/system32")
-        let syswow64Dir = bottleURL
+        let syswow64Dir = config.bottleURL
             .appendingPathComponent("drive_c/windows/syswow64")
 
         let fm = FileManager.default
@@ -576,7 +576,7 @@ extension AgentTools {
 
         // 3. Run a short trace launch to see what Wine actually loaded (skip if no executable found)
         let traceResultStr: String
-        if fm.fileExists(atPath: executablePath) {
+        if fm.fileExists(atPath: config.executablePath) {
             let traceInput = JSONValue.object([
                 "debug_channels": .array([.string("+loaddll")]),
                 "timeout_seconds": .number(8)

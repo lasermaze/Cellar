@@ -34,7 +34,7 @@ extension AgentTools {
         }
 
         // Check research cache
-        let cacheFile = CellarPaths.researchCacheFile(for: gameId)
+        let cacheFile = CellarPaths.researchCacheFile(for: config.gameId)
         if let cacheData = try? Data(contentsOf: cacheFile),
            let cache = try? JSONDecoder().decode(ResearchCache.self, from: cacheData),
            !cache.isStale() {
@@ -45,7 +45,7 @@ extension AgentTools {
                 "results": resultDicts,
                 "from_cache": true,
                 "result_count": cache.results.count,
-                "game_id": gameId
+                "game_id": config.gameId
             ])
         }
 
@@ -123,7 +123,7 @@ extension AgentTools {
 
         // Save to research cache (single write after all results collected)
         let formatter = ISO8601DateFormatter()
-        let cache = ResearchCache(gameId: gameId, fetchedAt: formatter.string(from: Date()), results: results)
+        let cache = ResearchCache(gameId: config.gameId, fetchedAt: formatter.string(from: Date()), results: results)
         if let cacheData = try? JSONEncoder().encode(cache) {
             try? FileManager.default.createDirectory(at: CellarPaths.researchCacheDir, withIntermediateDirectories: true)
             try? cacheData.write(to: cacheFile)
@@ -136,7 +136,7 @@ extension AgentTools {
             "results": resultDicts,
             "from_cache": false,
             "result_count": results.count,
-            "game_id": gameId
+            "game_id": config.gameId
         ])
     }
 
