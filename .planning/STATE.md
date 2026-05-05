@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Agent Loop Rewrite
 status: unknown
-last_updated: "2026-05-04T00:26:23.969Z"
+last_updated: "2026-05-05T00:07:41.856Z"
 progress:
   total_phases: 45
   completed_phases: 42
-  total_plans: 99
-  completed_plans: 99
+  total_plans: 102
+  completed_plans: 100
 ---
 
 # Project State
@@ -107,6 +107,7 @@ Progress: [█████████████████████] Phas
 | Phase 44 P02 | 5 | 2 tasks | 4 files |
 | Phase 44 P03 | 591 | 2 tasks | 5 files |
 | Phase 44 P04 | 622 | 2 tasks | 9 files |
+| Phase 45 P01 | 8 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -266,6 +267,9 @@ Progress: [█████████████████████] Phas
 - [Phase 44-04]: KnowledgeStoreRemote registered at runAgentLoop entry (not app init) — idempotent NoOpKnowledgeStore guard matches PolicyResources.shared pattern
 - [Phase 44-04]: agentValidWinetricksVerbs Set literal deleted; replaced with computed var delegating to PolicyResources.shared.winetricksVerbAllowlist — single source of truth achieved
 - [Phase 44-04]: Legacy services kept as thin wrappers (not deleted) — safe public API surface; future deletion phase removes them after migrating remaining unique helpers
+- [Phase 45]: fetch_page_domains.json is a plain JSON array (no schema_version wrapper) — follows winetricks_verbs.json pattern from Phase 44
+- [Phase 45]: Domain gate in fetchPage returns JSON error with hint key: Use search_web to find relevant pages first — actionable for the agent
+- [Phase 45]: Subdomain suffix check uses dot-prefixed hasSuffix so evil-winehq.org cannot bypass winehq.org entry
 
 ### Roadmap Evolution
 
