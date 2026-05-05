@@ -17,12 +17,7 @@ final class AgentTools: @unchecked Sendable {
 
     // MARK: - Injected Context
 
-    let gameId: String
-    let entry: GameEntry
-    let executablePath: String      // resolved full path to game EXE
-    let bottleURL: URL
-    let wineURL: URL
-    let wineProcess: WineProcess
+    let config: SessionConfiguration
 
     // MARK: - Control Channel
 
@@ -79,20 +74,8 @@ final class AgentTools: @unchecked Sendable {
 
     // MARK: - Init
 
-    init(
-        gameId: String,
-        entry: GameEntry,
-        executablePath: String,
-        bottleURL: URL,
-        wineURL: URL,
-        wineProcess: WineProcess
-    ) {
-        self.gameId = gameId
-        self.entry = entry
-        self.executablePath = executablePath
-        self.bottleURL = bottleURL
-        self.wineURL = wineURL
-        self.wineProcess = wineProcess
+    init(config: SessionConfiguration) {
+        self.config = config
     }
 
     // MARK: - Session Handoff
@@ -103,7 +86,7 @@ final class AgentTools: @unchecked Sendable {
         let statusText = String(lastText.suffix(1000)).trimmingCharacters(in: .whitespacesAndNewlines)
 
         return SessionHandoff(
-            gameId: gameId,
+            gameId: config.gameId,
             timestamp: ISO8601DateFormatter().string(from: Date()),
             stopReason: stopReason,
             iterationsUsed: iterationsUsed,

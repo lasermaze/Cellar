@@ -677,14 +677,14 @@ struct AIService {
 
         let systemPrompt = PolicyResources.shared.systemPrompt
 
-        let tools = AgentTools(
+        let tools = AgentTools(config: SessionConfiguration(
             gameId: gameId,
             entry: entry,
             executablePath: executablePath,
             bottleURL: bottleURL,
             wineURL: wineURL,
             wineProcess: wineProcess
-        )
+        ))
         if let handler = askUserHandler {
             tools.askUserHandler = handler
         }
@@ -1017,7 +1017,7 @@ struct AIService {
 
         // Load the just-saved SuccessRecord and push
         // Rewired: config write through KnowledgeStoreContainer.shared (Plan 04)
-        guard let record = SuccessDatabase.load(gameId: tools.gameId) else { return }
+        guard let record = SuccessDatabase.load(gameId: tools.config.gameId) else { return }
         if let cfgEntry = CollectiveMemoryWriteService.buildConfigEntry(record: record, gameName: gameName, wineURL: wineURL) {
             await KnowledgeStoreContainer.shared.write(.config(cfgEntry))
         }
