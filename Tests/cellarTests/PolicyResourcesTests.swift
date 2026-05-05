@@ -92,7 +92,23 @@ struct PolicyResourcesTests {
         }
     }
 
-    // MARK: Test 6: winetricksVerbAllowlist is non-empty
+    // MARK: Test 6: fetchPage domain allowlist subdomain matching logic
+
+    @Test("fetchPageAllowlist subdomain matching logic")
+    func fetchPageSubdomainMatching() {
+        let allowlist: Set<String> = ["winehq.org", "githubusercontent.com", "github.com"]
+        func isAllowed(_ urlStr: String) -> Bool {
+            guard let host = URL(string: urlStr)?.host else { return false }
+            return allowlist.contains(where: { host == $0 || host.hasSuffix(".\($0)") })
+        }
+        #expect(isAllowed("https://winehq.org/page") == true)
+        #expect(isAllowed("https://appdb.winehq.org/page") == true)
+        #expect(isAllowed("https://raw.githubusercontent.com/file") == true)
+        #expect(isAllowed("https://example.com/page") == false)
+        #expect(isAllowed("https://evil-winehq.org/page") == false, "evil-winehq.org must not match winehq.org")
+    }
+
+    // MARK: Test 7: winetricksVerbAllowlist is non-empty
 
     @Test("PolicyResources.shared.winetricksVerbAllowlist is a non-empty Set<String>")
     func winetricksVerbAllowlistNonEmpty() {

@@ -148,6 +148,19 @@ extension AgentTools {
             return jsonResult(["error": "url is required and must be a valid URL"])
         }
 
+        // ── Domain allowlist check (Phase 45) ──
+        guard let host = pageURL.host else {
+            return jsonResult(["error": "Domain not in allowlist", "url": urlStr,
+                               "hint": "Use search_web to find relevant pages first"])
+        }
+        let domainAllowed = PolicyResources.shared.fetchPageAllowlist
+            .contains(where: { host == $0 || host.hasSuffix(".\($0)") })
+        guard domainAllowed else {
+            return jsonResult(["error": "Domain not in allowlist", "url": urlStr,
+                               "hint": "Use search_web to find relevant pages first"])
+        }
+        // ── end allowlist check ──
+
         // Fetch using async/await
         var request = URLRequest(url: pageURL)
         request.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)", forHTTPHeaderField: "User-Agent")
